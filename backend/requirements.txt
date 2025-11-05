@@ -1,0 +1,28 @@
+# --- Framework ---
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic
+
+# --- Configuración ---
+pydantic-settings
+
+# --- Base de datos y Cache ---
+mysqlclient
+sqlalchemy
+redis
+celery
+
+# --- IA y RAG ---
+langchain
+qdrant-client
+google-generativeai
+sentence-transformers
+
+# --- Procesamiento de Documentos ---
+pandas
+openpyxl
+python-docx
+python-pptx
+pypdf2
+pdfplumber
