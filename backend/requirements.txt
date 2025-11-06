@@ -1,0 +1,31 @@
+# --- Framework ---
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic
+python-multipart
+
+# --- Configuración ---
+pydantic-settings
+
+# --- Base de datos y Cache ---
+pymysql
+cryptography  # Requerido por PyMySQL
+sqlalchemy
+redis
+celery
+
+# --- IA y RAG ---
+langchain-text-splitters  # <-- CAMBIO: Paquete separado en LangChain 0.1+
+langchain-core
+qdrant-client
+google-generativeai
+sentence-transformers
+
+# --- Procesamiento de Documentos ---
+pandas
+openpyxl
+python-docx
+python-pptx
+PyPDF2
+pdfplumber
