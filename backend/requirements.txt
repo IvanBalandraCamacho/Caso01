@@ -3,12 +3,14 @@ fastapi
 uvicorn[standard]
 python-dotenv
 pydantic
-
+python-multipart
 # --- Configuración ---
 pydantic-settings
 
 # --- Base de datos y Cache ---
-mysqlclient
+# CAMBIO: Usar PyMySQL en lugar de mysqlclient
+pymysql
+cryptography  # Requerido por PyMySQL
 sqlalchemy
 redis
 celery

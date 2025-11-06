@@ -15,5 +15,5 @@ celery_app.conf.update(
     enable_utc=True,
 )
 
-# Más adelante, le diremos a Celery dónde encontrar nuestras tareas
-# celery_app.autodiscover_tasks(['backend.processing.tasks'])
+# Le dice a Celery que busque tareas en el módulo 'backend.processing.tasks'
+celery_app.autodiscover_tasks(['processing'])
