@@ -1,13 +1,12 @@
-import { type Config } from "tailwindcss"
-import animatePlugin from "tailwindcss-animate" // <-- CORREGIDO: Importación correcta
+import type { Config } from "tailwindcss";
 
-export default {
-  darkMode: "class", // <-- CORRECCIÓN: Quitado los corchetes []
+const config: Config = {
+  darkMode: "class",
   content: [
-    './pages/**/*.{ts,tsx}',
-    './components/**/*.{ts,tsx}',
-    './app/**/*.{ts,tsx}',
-    './src/**/*.{ts,tsx}',
+    "./pages/**/*.{ts,tsx}",
+    "./components/**/*.{ts,tsx}",
+    "./app/**/*.{ts,tsx}",
+    "./src/**/*.{ts,tsx}",
   ],
   prefix: "",
   theme: {
@@ -20,7 +19,7 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ["Roboto", "sans-serif"], 
+        sans: ["Roboto", "sans-serif"],
       },
       colors: {
         brand: {
@@ -85,5 +84,7 @@ export default {
       },
     },
   },
-  plugins: [animatePlugin], // <-- CORREGIDO: Usando la variable importada
-} satisfies Config
+  plugins: [require("tailwindcss-animate")],
+};
+
+export default config;
