@@ -1,8 +1,9 @@
 import uuid
 from qdrant_client import QdrantClient, models
 from sentence_transformers import SentenceTransformer
-from langchain_text_splitters import RecursiveCharacterTextSplitter  # <-- CAMBIO
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from core.config import settings
+from models.schemas import DocumentChunk 
 
 # --- Inicializar Clientes (se cargan una vez) ---
 print("VECTOR_STORE: Cargando cliente de Qdrant...")
@@ -79,3 +80,39 @@ def process_and_embed_text(text: str, document_id: str, workspace_id: str) -> in
     
     print(f"VECTOR_STORE: {len(points)} chunks indexados en Qdrant (Colección: {collection_name}).")
     return len(points)
+
+# ... (la función process_and_embed_text está arriba) ...
+
+def search_similar_chunks(query: str, workspace_id: str, top_k: int = 5) -> list[DocumentChunk]:
+    """
+    Busca en Qdrant los chunks más relevantes para una consulta.
+    """
+    collection_name = f"workspace_{workspace_id}"
+    
+    # 1. Crear el embedding para la consulta del usuario
+    query_vector = embedding_model.encode(query).tolist()
+    
+    # 2. Realizar la búsqueda en Qdrant
+    print(f"VECTOR_STORE: Buscando en '{collection_name}' (top_k={top_k}) para la consulta: '{query[:20]}...'")
+    
+    search_results = qdrant_client.search(
+        collection_name=collection_name,
+        query_vector=query_vector,
+        limit=top_k,
+        with_payload=True # Para que nos devuelva los datos del chunk
+    )
+    
+    # 3. Formatear los resultados
+    chunks = []
+    for result in search_results:
+        chunks.append(
+            DocumentChunk(
+                document_id=result.payload.get("document_id"),
+                chunk_text=result.payload.get("chunk_text"),
+                chunk_index=result.payload.get("chunk_index"),
+                score=result.score
+            )
+        )
+    
+    print(f"VECTOR_STORE: Encontrados {len(chunks)} chunks relevantes.")
+    return chunks

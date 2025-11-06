@@ -68,3 +68,22 @@ class DocumentPublic(DocumentBase):
             chunk_count=0,
             created_at=datetime.utcnow() # Temporal, se sobreescribirá
         )
+        
+# --- Chat Schemas ---
+
+class ChatRequest(BaseModel):
+    """Schema para la pregunta del usuario."""
+    query: str
+    
+class DocumentChunk(BaseModel):
+    """Representa un chunk de contexto recuperado."""
+    document_id: str
+    chunk_text: str
+    chunk_index: int
+    score: float # La puntuación de similitud de Qdrant
+
+class ChatResponse(BaseModel):
+    """Schema para la respuesta del chat (ahora con respuesta del LLM)."""
+    query: str
+    llm_response: str  # <-- AÑADIR ESTA LÍNEA
+    relevant_chunks: list[DocumentChunk]

@@ -6,6 +6,8 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 from models import database, workspace as workspace_model, document as document_model, schemas
 from core.celery_app import celery_app
+from processing import vector_store
+from core import llm_service
 
 router = APIRouter()
 
@@ -114,3 +116,69 @@ def upload_document_to_workspace(
     print(f"API: Tarea para Documento {db_document.id} enviada a Celery.")
 
     return db_document
+@router.post(
+    "/workspaces/{workspace_id}/chat",
+    response_model=schemas.ChatResponse,
+    summary="Procesar una pregunta de chat (Pipeline RAG Completo)"
+)
+def chat_with_workspace(
+    workspace_id: str,
+    chat_request: schemas.ChatRequest,
+    db: Session = Depends(database.get_db)
+):
+    """
+    Maneja una consulta de chat contra un workspace (Pipeline RAG Completo).
+    
+    Paso 1 (Retrieve):
+    - Busca en Qdrant los chunks más relevantes de este workspace.
+    
+    Paso 2 (Augment & Generate):
+    - Construye un prompt con la pregunta y los chunks.
+    - Llama al LLM (Gemini) para obtener una respuesta en lenguaje natural.
+    """
+    
+    # 1. Verificar que el Workspace exista
+    db_workspace = db.query(workspace_model.Workspace).filter(
+        workspace_model.Workspace.id == workspace_id
+    ).first()
+    
+    if not db_workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workspace con id {workspace_id} no encontrado."
+        )
+
+    try:
+        # 2. Paso de Recuperación (Retrieve)
+        relevant_chunks = vector_store.search_similar_chunks(
+            query=chat_request.query,
+            workspace_id=workspace_id
+        )
+        
+        if not relevant_chunks:
+            # Si no hay chunks, no podemos contestar
+            return schemas.ChatResponse(
+                query=chat_request.query,
+                llm_response="No encontré documentos relevantes para esta consulta. Intente subir un archivo primero.",
+                relevant_chunks=[]
+            )
+
+        # 3. Paso de Generación (Generate)
+        llm_response_text = llm_service.generate_response(
+            query=chat_request.query,
+            context_chunks=relevant_chunks
+        )
+        
+        # 4. Devolver la respuesta completa
+        return schemas.ChatResponse(
+            query=chat_request.query,
+            llm_response=llm_response_text,
+            relevant_chunks=relevant_chunks
+        )
+        
+    except Exception as e:
+        print(f"API_CHAT: Error al procesar el chat: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al procesar la solicitud de chat: {e}"
+        )
