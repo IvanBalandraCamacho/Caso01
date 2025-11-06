@@ -1,12 +1,28 @@
-# frontend/Dockerfile
-# (Este es un placeholder temporal)
-
-# 1. Usar una imagen base de Node.js (Alpine es ligera)
-FROM node:18-alpine
-
-# 2. Establecer el directorio de trabajo
+# 1. Etapa de Dependencias
+FROM node:18-alpine AS deps
 WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
 
-# 3. Comando 'dummy' para mantener el contenedor vivo
-#    (Luego lo cambiaremos por el 'npm run dev' de Next.js)
-CMD ["tail", "-f", "/dev/null"]
+# 2. Etapa de Construcción (Builder)
+FROM node:18-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build
+
+# 3. Etapa Final (Runner)
+FROM node:18-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV production
+
+# Copia solo los archivos necesarios para producción
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+
+# Exponer el puerto 3000
+EXPOSE 3000
+
+# Comando de inicio
+CMD ["node", "server.js"]
