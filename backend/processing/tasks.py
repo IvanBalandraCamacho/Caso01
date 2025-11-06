@@ -1,18 +1,21 @@
 import time
 import os
+from pathlib import Path # <-- AÑADIR
 from core.celery_app import celery_app
-from models import database, document as document_model
+from models import database, document as document_model, workspace as workspace_model
 from sqlalchemy.orm import Session
+from . import parser        # <-- AÑADIR
+from . import vector_store  # <-- AÑADIR
 
 @celery_app.task
-def process_document(document_id: str, temp_file_path: str):
+def process_document(document_id: str, temp_file_path_str: str):
     """
     Tarea asíncrona de Celery para procesar un documento.
     """
     print(f"WORKER: Iniciando procesamiento para Documento ID: {document_id}")
     
-    # Obtenemos una sesión de BD para el worker
     db: Session = database.SessionLocal()
+    temp_file_path = Path(temp_file_path_str) # Convertir string a Path
     
     try:
         # 1. Encontrar el documento
@@ -29,16 +32,25 @@ def process_document(document_id: str, temp_file_path: str):
         db.commit()
         print(f"WORKER: Documento {document_id} en estado PROCESSING.")
 
-        # 3. Simular el trabajo (chunking, embeddings, etc.)
-        # (Más adelante aquí irá la lógica de RAG)
-        print(f"WORKER: Procesando archivo en {temp_file_path}...")
-        time.sleep(10) # Simulación de 10 segundos de trabajo
+        # 3. --- LÓGICA RAG REAL ---
+        # 3a. Extraer texto del archivo
+        print(f"WORKER: Extrayendo texto de {temp_file_path}...")
+        full_text = parser.extract_text_from_file(temp_file_path)
         
+        # 3b. Vectorizar e Indexar
+        print(f"WORKER: Vectorizando e indexando texto...")
+        chunk_count = vector_store.process_and_embed_text(
+            text=full_text,
+            document_id=db_document.id,
+            workspace_id=db_document.workspace_id
+        )
+        # --- FIN LÓGICA RAG ---
+
         # 4. Actualizar estado a COMPLETED
         db_document.status = "COMPLETED"
-        db_document.chunk_count = 99 # Valor de prueba
+        db_document.chunk_count = chunk_count # Guardar el número real de chunks
         db.commit()
-        print(f"WORKER: Documento {document_id} completado. {db_document.chunk_count} chunks creados.")
+        print(f"WORKER: Documento {document_id} completado. {chunk_count} chunks creados.")
 
         # 5. Limpiar el archivo temporal
         if os.path.exists(temp_file_path):

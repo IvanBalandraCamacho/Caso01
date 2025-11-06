@@ -77,6 +77,7 @@ services:
     env_file:
       - ./backend/.env
     environment:
+      - PYTHONPATH=/app  # <-- ¡ESTA ES LA SOLUCIÓN!
       # CAMBIO: Usar pymysql en lugar de mysqlclient
       - DATABASE_URL=mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
       - REDIS_URL=redis://redis:6379
