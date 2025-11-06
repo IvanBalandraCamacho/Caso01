@@ -4,11 +4,11 @@ uvicorn[standard]
 python-dotenv
 pydantic
 python-multipart
+
 # --- Configuración ---
 pydantic-settings
 
 # --- Base de datos y Cache ---
-# CAMBIO: Usar PyMySQL en lugar de mysqlclient
 pymysql
 cryptography  # Requerido por PyMySQL
 sqlalchemy
@@ -16,7 +16,8 @@ redis
 celery
 
 # --- IA y RAG ---
-langchain
+langchain-text-splitters  # <-- CAMBIO: Paquete separado en LangChain 0.1+
+langchain-core
 qdrant-client
 google-generativeai
 sentence-transformers
@@ -26,5 +27,5 @@ pandas
 openpyxl
 python-docx
 python-pptx
-pypdf2
+PyPDF2
 pdfplumber

@@ -1,7 +1,7 @@
 import uuid
 from qdrant_client import QdrantClient, models
 from sentence_transformers import SentenceTransformer
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter  # <-- CAMBIO
 from core.config import settings
 
 # --- Inicializar Clientes (se cargan una vez) ---
@@ -9,12 +9,10 @@ print("VECTOR_STORE: Cargando cliente de Qdrant...")
 qdrant_client = QdrantClient(url=settings.QDRANT_URL)
 
 print("VECTOR_STORE: Cargando modelo de embeddings 'all-MiniLM-L6-v2'...")
-# Usamos el modelo especificado en el plan 
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2", device="cpu") 
 print("VECTOR_STORE: Modelo de embeddings cargado.")
 
 # --- Text Splitter ---
-# Estrategia de chunking [cite: 319]
 text_splitter = RecursiveCharacterTextSplitter(
     chunk_size=512,
     chunk_overlap=50
@@ -26,13 +24,12 @@ def get_or_create_collection(collection_name: str):
         qdrant_client.recreate_collection(
             collection_name=collection_name,
             vectors_config=models.VectorParams(
-                size=embedding_model.get_sentence_embedding_dimension(), # 384 para MiniLM
+                size=embedding_model.get_sentence_embedding_dimension(),
                 distance=models.Distance.COSINE
             )
         )
         print(f"VECTOR_STORE: Colección '{collection_name}' creada.")
     except Exception as e:
-        # Si la colección ya existe, puede fallar. Lo ignoramos.
         print(f"VECTOR_STORE: Colección '{collection_name}' ya existe o no se pudo crear: {e}")
 
 def process_and_embed_text(text: str, document_id: str, workspace_id: str) -> int:
@@ -55,7 +52,6 @@ def process_and_embed_text(text: str, document_id: str, workspace_id: str) -> in
     print(f"VECTOR_STORE: Texto dividido en {len(chunks)} chunks.")
     
     # 3. Crear Embeddings
-    # Esto puede tardar un momento
     vectors = embedding_model.encode(chunks, show_progress_bar=True)
     
     # 4. Preparar Puntos para Qdrant
@@ -63,7 +59,7 @@ def process_and_embed_text(text: str, document_id: str, workspace_id: str) -> in
     for i, chunk_text in enumerate(chunks):
         points.append(
             models.PointStruct(
-                id=str(uuid.uuid4()), # ID único para cada chunk
+                id=str(uuid.uuid4()),
                 vector=vectors[i].tolist(),
                 payload={
                     "document_id": document_id,
@@ -78,7 +74,7 @@ def process_and_embed_text(text: str, document_id: str, workspace_id: str) -> in
     qdrant_client.upsert(
         collection_name=collection_name,
         points=points,
-        wait=True # Esperar a que la operación se complete
+        wait=True
     )
     
     print(f"VECTOR_STORE: {len(points)} chunks indexados en Qdrant (Colección: {collection_name}).")

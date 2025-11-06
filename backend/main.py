@@ -1,10 +1,29 @@
 from fastapi import FastAPI
-from api.routes import health, workspaces  # <-- Importar 'workspaces'
+from api.routes import health, workspaces
 from core.config import settings
 from models import database
+import time
+from sqlalchemy.exc import OperationalError
 
-# Crear las tablas en la base de datos (si no existen)
-database.Base.metadata.create_all(bind=database.engine)
+# Crear las tablas en la base de datos con reintentos
+def create_tables_with_retry(max_retries=5, delay=3):
+    """Intenta crear las tablas, esperando a que MySQL esté listo."""
+    for attempt in range(max_retries):
+        try:
+            print(f"Intento {attempt + 1}/{max_retries} de crear tablas en la base de datos...")
+            database.Base.metadata.create_all(bind=database.engine)
+            print("✅ Tablas creadas exitosamente.")
+            return
+        except OperationalError as e:
+            if attempt < max_retries - 1:
+                print(f"⚠️  MySQL no está listo aún. Reintentando en {delay} segundos...")
+                time.sleep(delay)
+            else:
+                print(f"❌ No se pudo conectar a MySQL después de {max_retries} intentos.")
+                raise
+
+# Ejecutar la creación de tablas con reintentos
+create_tables_with_retry()
 
 app = FastAPI(
     title="Sistema de IA Empresarial (Multi-LLM)",
@@ -14,7 +33,7 @@ app = FastAPI(
 
 # --- Registrar Routers ---
 app.include_router(health.router, prefix="/api/v1", tags=["Health Check"])
-app.include_router(workspaces.router, prefix="/api/v1", tags=["Workspaces"]) # <-- AÑADIR ESTA LÍNEA
+app.include_router(workspaces.router, prefix="/api/v1", tags=["Workspaces"])
 
 @app.get("/")
 def read_root():

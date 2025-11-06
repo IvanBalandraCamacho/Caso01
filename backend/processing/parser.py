@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 import pandas as pd
-import pypdf2
+import PyPDF2
 import docx
 import openpyxl # Necesario para que pandas lea .xlsx
 import mimetypes
@@ -19,7 +19,7 @@ def extract_text_from_file(file_path: Path) -> str:
     try:
         if file_type == "application/pdf":
             with open(file_path, "rb") as f:
-                reader = pypdf2.PdfReader(f)
+                reader = PyPDF2.PdfReader(f)
                 for page in reader.pages:
                     full_text += page.extract_text() + "\n"
         
