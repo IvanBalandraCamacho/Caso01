@@ -1,8 +1,8 @@
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timezone # <-- AÑADIR timezone
 import uuid
 import mimetypes
-from fastapi import UploadFile # <-- AÑADIDO: Importación necesaria
+from fastapi import UploadFile
 
 # --- Workspace Schemas ---
 
@@ -17,12 +17,10 @@ class WorkspaceCreate(WorkspaceBase):
 
 class WorkspacePublic(WorkspaceBase):
     """Schema para devolver un Workspace (salida)."""
-    id: str  # Usamos str para el UUID
+    id: str
     created_at: datetime
     is_active: bool
 
-    # --- CORREGIDO ---
-    # Solo debe haber una clase Config
     class Config:
         from_attributes = True 
 
@@ -48,11 +46,10 @@ class DocumentPublic(DocumentBase):
         from_attributes = True
 
     @classmethod
-    def from_upload(cls, file: UploadFile, workspace_id: str): # <-- CORREGIDO: Quitado comillas
+    def from_upload(cls, file: UploadFile, workspace_id: str):
         """Helper para crear un DocumentPublic desde un UploadFile."""
         file_type = mimetypes.guess_type(file.filename)[0] or "unknown"
         
-        # Manejo simple del tipo de archivo
         simple_file_type = file_type.split('/')[-1]
         if "openxmlformats-officedocument.wordprocessingml.document" in simple_file_type:
             simple_file_type = "docx"
@@ -60,13 +57,14 @@ class DocumentPublic(DocumentBase):
             simple_file_type = "xlsx"
         
         return cls(
-            id="temp-id", # Se sobreescribirá con el de la BD
+            id="temp-id",
             file_name=file.filename,
             file_type=simple_file_type, 
             workspace_id=workspace_id,
             status="PENDING",
             chunk_count=0,
-            created_at=datetime.utcnow() # Temporal, se sobreescribirá
+            # --- CORRECCIÓN ---
+            created_at=datetime.now(timezone.utc) # Reemplaza utcnow()
         )
         
 # --- Chat Schemas ---
@@ -80,10 +78,10 @@ class DocumentChunk(BaseModel):
     document_id: str
     chunk_text: str
     chunk_index: int
-    score: float # La puntuación de similitud de Qdrant
+    score: float
 
 class ChatResponse(BaseModel):
     """Schema para la respuesta del chat (ahora con respuesta del LLM)."""
     query: str
-    llm_response: str  # <-- AÑADIR ESTA LÍNEA
+    llm_response: str
     relevant_chunks: list[DocumentChunk]

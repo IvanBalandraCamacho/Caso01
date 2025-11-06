@@ -1,8 +1,8 @@
 import { type Config } from "tailwindcss"
-import animatePlugin from "tailwindcss-animate" // shadcn usa esto
+import animatePlugin from "tailwindcss-animate" // <-- CORREGIDO: Importación correcta
 
 export default {
-  darkMode: ["class"],
+  darkMode: "class", // <-- CORRECCIÓN: Quitado los corchetes []
   content: [
     './pages/**/*.{ts,tsx}',
     './components/**/*.{ts,tsx}',
@@ -19,9 +19,8 @@ export default {
       },
     },
     extend: {
-      // --- AÑADIR FUENTE Y COLORES DE TU PROTOTIPO ---
       fontFamily: {
-        sans: ["Roboto", "sans-serif"], // Usar Roboto como fuente principal
+        sans: ["Roboto", "sans-serif"], 
       },
       colors: {
         brand: {
@@ -31,7 +30,6 @@ export default {
           light: "#FFFFFF",
           "light-secondary": "#F9FAFB",
         },
-      // --- FIN DE LA ADICIÓN ---
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -87,5 +85,5 @@ export default {
       },
     },
   },
-  plugins: [animatePlugin],
+  plugins: [animatePlugin], // <-- CORREGIDO: Usando la variable importada
 } satisfies Config

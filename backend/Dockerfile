@@ -7,14 +7,11 @@ WORKDIR /app
 # 3. Copiar el archivo de requerimientos
 COPY requirements.txt .
 
-# 4. Instalar las dependencias de Python en pasos separados
-#    (Esto optimiza el caché de Docker)
-RUN pip install --no-cache-dir --upgrade pip
-
-RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
-
-# --- ESTA ES LA LÍNEA QUE FALTABA ---
-RUN pip install --no-cache-dir -r requirements.txt
+# 4. --- CORRECCIÓN ---
+# Instalar todas las dependencias en una sola capa (layer)
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir -r requirements.txt
 
 # 5. Copiar el código de la aplicación
 COPY . .

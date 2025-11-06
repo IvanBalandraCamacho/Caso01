@@ -14,7 +14,8 @@ def create_tables_with_retry(max_retries=5, delay=3):
             database.Base.metadata.create_all(bind=database.engine)
             print("✅ Tablas creadas exitosamente.")
             return
-        except OperationalError as e:
+        # --- CORRECCIÓN ---
+        except OperationalError: # Se quitó 'as e'
             if attempt < max_retries - 1:
                 print(f"⚠️  MySQL no está listo aún. Reintentando en {delay} segundos...")
                 time.sleep(delay)
