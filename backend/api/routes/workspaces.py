@@ -182,3 +182,18 @@ def chat_with_workspace(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error al procesar la solicitud de chat: {e}"
         )
+
+@router.get(
+    "/workspaces",
+    response_model=list[schemas.WorkspacePublic],
+    summary="Obtener todos los Workspaces"
+)
+def get_workspaces(db: Session = Depends(database.get_db)):
+    """
+    Obtiene una lista de todos los workspaces activos.
+    """
+    workspaces = db.query(workspace_model.Workspace).filter(
+        workspace_model.Workspace.is_active == True
+    ).all()
+    
+    return workspaces

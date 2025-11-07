@@ -1,6 +1,5 @@
 "use client";
-// --- CORRECCIÓN ---
-// Se eliminaron 'MoreHorizontal', 'Avatar', 'AvatarFallback', 'AvatarImage'
+import { useState, useEffect } from "react"; // <-- AÑADIDO: Hooks de React
 import { Settings, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,7 +12,46 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 
+// --- AÑADIDO: Definimos un tipo para los datos del workspace ---
+interface Workspace {
+  id: string;
+  name: string;
+  description: string | null;
+}
+// -----------------------------------------------------------
+
 export function Sidebar() {
+  
+  // --- AÑADIDO: Estado para almacenar los workspaces ---
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  // ----------------------------------------------------
+
+  // --- AÑADIDO: Hook para cargar datos al montar el componente ---
+  useEffect(() => {
+    async function fetchWorkspaces() {
+      try {
+        // Usamos la variable de entorno que definimos en docker-compose
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+        const response = await fetch(`${apiUrl}/api/v1/workspaces`);
+        
+        if (!response.ok) {
+          throw new Error("No se pudieron cargar los workspaces");
+        }
+        
+        const data: Workspace[] = await response.json();
+        setWorkspaces(data);
+      } catch (error) {
+        console.error("Error al cargar workspaces:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchWorkspaces();
+  }, []); // El array vacío [] asegura que esto se ejecute solo una vez
+  // -----------------------------------------------------------
+
   return (
     <aside className="w-72 bg-brand-dark-secondary flex flex-col p-4 border-r border-gray-800/50">
       <div className="mb-8">
@@ -51,18 +89,28 @@ export function Sidebar() {
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
             Workspace
           </h2>
-          {/* --- CORRECCIÓN: href="#" cambiado por href="/" --- */}
+          
+          {/* --- MODIFICADO: Lista dinámica de Workspaces --- */}
           <div className="space-y-2">
-            <a className="block text-gray-300 hover:text-white transition-colors" href="/">
-              Recursos Humanos
-            </a>
-            <a className="block text-gray-300 hover:text-white transition-colors" href="/">
-              Digital
-            </a>
-            <a className="block text-gray-300 hover:text-white transition-colors" href="/">
-              Helpdesk
-            </a>
+            {isLoading ? (
+              <p className="text-gray-400 text-sm">Cargando...</p>
+            ) : (
+              workspaces.map((ws) => (
+                <a 
+                  key={ws.id} 
+                  className="block text-gray-300 hover:text-white transition-colors" 
+                  href={`/`} // Por ahora, el href es "/"
+                >
+                  {ws.name}
+                </a>
+              ))
+            )}
+            {!isLoading && workspaces.length === 0 && (
+              <p className="text-gray-400 text-sm">No hay workspaces.</p>
+            )}
           </div>
+          {/* ------------------------------------------------- */}
+
         </div>
         
         <Separator className="bg-gray-800/50" />
@@ -73,7 +121,6 @@ export function Sidebar() {
           </h2>
           <ScrollArea className="h-64">
             <div className="space-y-2 pr-2">
-              {/* --- CORRECCIÓN: href="#" cambiado por href="/" --- */}
               <a className="block text-gray-400 hover:text-white transition-colors text-sm truncate" href="/">
                 Análisis de la propuesta Q4...
               </a>

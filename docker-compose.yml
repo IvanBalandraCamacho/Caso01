@@ -22,18 +22,31 @@ services:
 
   # 2. Frontend (Next.js)
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      target: deps 
     container_name: ia_frontend
     ports:
       - "3000:3000"
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      # Monta solo las carpetas de código fuente y archivos de config
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/components.json:/app/components.json
+      - ./frontend/next.config.mjs:/app/next.config.mjs
+      - ./frontend/postcss.config.mjs:/app/postcss.config.mjs
+      - ./frontend/tailwind.config.ts:/app/tailwind.config.ts
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/package.json:/app/package.json
+      - ./frontend/package-lock.json:/app/package-lock.json
+      
+      # Mantenemos un volumen para el caché de build de Next.js
       - /app/.next
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
     depends_on:
       - backend
+    command: npm run dev
 
   # 3. Base de Datos (Metadata)
   mysql:

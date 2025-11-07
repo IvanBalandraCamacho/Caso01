@@ -4,6 +4,12 @@ from core.config import settings
 from models import database
 import time
 from sqlalchemy.exc import OperationalError
+from starlette.middleware.cors import CORSMiddleware
+
+# --- Definir orígenes permitidos ---
+origins = [
+    "http://localhost:3000", # La URL de tu frontend en desarrollo
+]
 
 # Crear las tablas en la base de datos con reintentos
 def create_tables_with_retry(max_retries=5, delay=3):
@@ -31,7 +37,13 @@ app = FastAPI(
     description="Backend para RAG, gestión de documentos y análisis de propuestas.",
     version="0.1.0"
 )
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"], # Permitir todos los métodos (GET, POST, etc.)
+    allow_headers=["*"], # Permitir todos los headers
+)
 # --- Registrar Routers ---
 app.include_router(health.router, prefix="/api/v1", tags=["Health Check"])
 app.include_router(workspaces.router, prefix="/api/v1", tags=["Workspaces"])

@@ -13,6 +13,7 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
+    "typeRoots": ["./node_modules/@types", "./src/types"],
     "plugins": [
       {
         "name": "next"
@@ -28,7 +29,8 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
+    "src/types/custom.d.ts",
     "**/*.mts"
-, "tailwind.config.ts.backup"  ],
+, "tailwind.config.ts"  ],
   "exclude": ["node_modules"]
 }
