@@ -116,6 +116,38 @@ def upload_document_to_workspace(
     print(f"API: Tarea para Documento {db_document.id} enviada a Celery.")
 
     return db_document
+
+@router.get(
+    "/workspaces/{workspace_id}/documents",
+    response_model=list[schemas.DocumentPublic],
+    summary="Obtener todos los documentos de un Workspace"
+)
+def get_workspace_documents(
+    workspace_id: str,
+    db: Session = Depends(database.get_db)
+):
+    """
+    Obtiene una lista de todos los documentos para un workspace_id específico.
+    """
+    # Primero, verificar que el workspace exista (buena práctica)
+    db_workspace = db.query(workspace_model.Workspace).filter(
+        workspace_model.Workspace.id == workspace_id
+    ).first()
+    
+    if not db_workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workspace con id {workspace_id} no encontrado."
+        )
+    
+    # Si existe, obtener sus documentos
+    documents = db.query(document_model.Document).filter(
+        document_model.Document.workspace_id == workspace_id
+    ).all()
+    
+    return documents
+
+
 @router.post(
     "/workspaces/{workspace_id}/chat",
     response_model=schemas.ChatResponse,
