@@ -10,6 +10,7 @@ class WorkspaceBase(BaseModel):
     """Schema base, tiene los campos comunes."""
     name: str
     description: str | None = None
+    instructions: str | None = None
 
 class WorkspaceCreate(WorkspaceBase):
     """Schema para crear un Workspace (solo entrada)."""
@@ -85,3 +86,8 @@ class ChatResponse(BaseModel):
     query: str
     llm_response: str
     relevant_chunks: list[DocumentChunk]
+    
+class WorkspaceUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    instructions: str | None = None

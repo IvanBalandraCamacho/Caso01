@@ -116,3 +116,28 @@ def search_similar_chunks(query: str, workspace_id: str, top_k: int = 5) -> list
     
     print(f"VECTOR_STORE: Encontrados {len(chunks)} chunks relevantes.")
     return chunks
+
+def delete_document_vectors(workspace_id: str, document_id: str):
+    """
+    Elimina todos los vectores asociados con un document_id específico
+    de una colección (workspace) en Qdrant.
+    """
+    collection_name = f"workspace_{workspace_id}"
+    print(f"VECTOR_STORE: Eliminando vectores para doc {document_id} de {collection_name}...")
+
+    qdrant_client.delete(
+        collection_name=collection_name,
+        points_selector=models.FilterSelector(
+            filter=models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key="document_id",
+                        match=models.MatchValue(value=document_id),
+                    )
+                ]
+            )
+        ),
+        wait=True,
+    )
+    
+    print(f"VECTOR_STORE: Vectores eliminados para doc {document_id}.")

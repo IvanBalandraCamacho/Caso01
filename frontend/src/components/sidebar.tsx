@@ -1,7 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Settings, Plus } from "lucide-react";
+import { Settings, Plus, MoreVertical } from "lucide-react"; // Importar MoreVertical
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"; // Importar Dropdown
 import {
   Select,
   SelectContent,
@@ -11,156 +17,181 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { useWorkspaces } from "@/context/WorkspaceContext"; // Importar hook
-import { cn } from "@/lib/utils"; // Importar cn
+import { useWorkspaces, Workspace } from "@/context/WorkspaceContext"; // Importar hook y tipo
+import { cn } from "@/lib/utils";
+import { EditWorkspaceModal } from "./EditWorkspaceModal"; // Importar el nuevo modal
 
 export function Sidebar() {
-  
-  // Usamos el contexto global
   const { 
     workspaces, 
-    setWorkspaces, 
     activeWorkspace, 
-    setActiveWorkspace 
+    setActiveWorkspace,
+    deleteWorkspace // Traer la función de borrado
   } = useWorkspaces();
   
   const [isLoading, setIsLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
 
-  // --- CORRECCIÓN: useEffect para cargar datos (se ejecuta 1 vez) ---
+  // Estado para el modal de edición
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [workspaceToEdit, setWorkspaceToEdit] = useState<Workspace | null>(null);
+
+  // Cargar workspaces al inicio (el contexto ya lo hace, pero
+  // mantenemos isLoading para la UI local)
   useEffect(() => {
-    async function fetchWorkspaces() {
+    // El contexto se carga solo, solo manejamos el estado visual
+    if (workspaces.length > 0 || !activeWorkspace) {
+      setIsLoading(false);
+    }
+    setIsClient(true);
+  }, [workspaces, activeWorkspace]);
+
+  // Funciones para controlar el modal de edición
+  const openEditModal = (workspace: Workspace) => {
+    setWorkspaceToEdit(workspace);
+    setIsEditModalOpen(true);
+  };
+
+  const closeEditModal = () => {
+    setWorkspaceToEdit(null);
+    setIsEditModalOpen(false);
+  };
+
+  // Función para manejar el borrado
+  const handleDelete = async (workspaceId: string) => {
+    if (confirm("¿Estás seguro de que quieres eliminar este workspace? Esta acción es irreversible.")) {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-        const response = await fetch(`${apiUrl}/api/v1/workspaces`);
-        
-        if (!response.ok) {
-          throw new Error("No se pudieron cargar los workspaces");
-        }
-        
-        const data = await response.json();
-        setWorkspaces(data); // Guardar en contexto global
-        
+        await deleteWorkspace(workspaceId);
       } catch (error) {
-        console.error("Error al cargar workspaces:", error);
-      } finally {
-        setIsLoading(false);
+        console.error("Error al eliminar workspace", error);
+        // Aquí podrías mostrar una notificación de error al usuario
       }
     }
-
-    fetchWorkspaces();
-    setIsClient(true);
-    
-    // El array vacío [] asegura que esto se ejecute solo una vez
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); 
-
-  // --- CORRECCIÓN: useEffect para establecer el workspace por defecto ---
-  // Este hook se ejecuta *después* de que 'workspaces' se haya cargado
-  useEffect(() => {
-    // Si ya tenemos un workspace activo, no hacemos nada
-    if (activeWorkspace) {
-      return;
-    }
-
-    // Si la lista de workspaces tiene elementos y no hay uno activo,
-    // seleccionamos el primero.
-    if (workspaces.length > 0 && !activeWorkspace) {
-      setActiveWorkspace(workspaces[0]);
-    }
-  }, [workspaces, activeWorkspace, setActiveWorkspace]); // Depende de estos valores
+  };
 
   return (
-    <aside className="w-72 bg-brand-dark-secondary flex flex-col p-4 border-r border-gray-800/50">
-      {/* ... (La parte superior no cambia: TIVIT, Velvet, Select, New Conversation) ... */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-brand-light">TIVIT</h1>
-      </div>
-
-      <div className="flex flex-col mb-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-brand-light">Velvet</h1>
-          <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
-            <Settings className="h-5 w-5" />
-          </Button>
-        </div>
-        
-        <div className="relative mt-2">
-          {isClient ? (
-            <Select defaultValue="gemini">
-              <SelectTrigger className="w-full bg-black/30 border border-gray-700 text-sm text-gray-300 focus:ring-2 focus:ring-brand-red focus:border-brand-red">
-                <SelectValue placeholder="Select a model" />
-              </SelectTrigger>
-              <SelectContent className="bg-brand-dark-secondary border-gray-700 text-gray-300">
-                <SelectItem value="gpt4">GPT-4o</SelectItem>
-                <SelectItem value="llama3">Llama 3</SelectItem>
-                <SelectItem value="gemini">Gemini 1.5</SelectItem>
-              </SelectContent>
-            </Select>
-          ) : (
-            <div className="h-9 w-full rounded-md border border-gray-700 bg-black/30" />
-          )}
+    <>
+      <aside className="w-72 bg-brand-dark-secondary flex flex-col p-4 border-r border-gray-800/50">
+        {/* Header: TIVIT */}
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-brand-light">TIVIT</h1>
         </div>
 
-      </div>
-
-      <Button className="w-full bg-brand-red text-white hover:bg-red-700 font-medium">
-        <Plus className="mr-2 h-4 w-4" />
-        New Conversation
-      </Button>
-      {/* ... (Fin de la parte superior) ... */}
-
-      <nav className="flex flex-col space-y-6 mt-8">
-        <div>
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-            Workspace
-          </h2>
+        {/* Header: Velvet y Modelo */}
+        <div className="flex flex-col mb-6">
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold text-brand-light">Velvet</h1>
+            <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
+              <Settings className="h-5 w-5" />
+            </Button>
+          </div>
           
-          <div className="space-y-2">
-            {isLoading ? (
-              <p className="text-gray-400 text-sm">Cargando...</p>
+          <div className="relative mt-2">
+            {isClient ? (
+              <Select defaultValue="gemini">
+                <SelectTrigger className="w-full bg-black/30 border border-gray-700 text-sm text-gray-300 focus:ring-2 focus:ring-brand-red focus:border-brand-red">
+                  <SelectValue placeholder="Select a model" />
+                </SelectTrigger>
+                <SelectContent className="bg-brand-dark-secondary border-gray-700 text-gray-300">
+                  <SelectItem value="gpt4">GPT-4o</SelectItem>
+                  <SelectItem value="llama3">Llama 3</SelectItem>
+                  <SelectItem value="gemini">Gemini 1.5</SelectItem>
+                </SelectContent>
+              </Select>
             ) : (
-              workspaces.map((ws) => (
-                // --- CORRECCIÓN: Usamos <button> para la acción de clic ---
-                <button 
-                  key={ws.id} 
-                  className={cn(
-                    "block w-full text-left text-gray-300 hover:text-white transition-colors p-1 rounded",
-                    // Comprobamos si el 'activeWorkspace' existe y si su 'id' coincide
-                    activeWorkspace && activeWorkspace.id === ws.id && "bg-brand-red/20 text-white" 
-                  )}
-                  onClick={() => setActiveWorkspace(ws)} // <-- Cambia el workspace activo
-                >
-                  {ws.name}
-                </button>
-              ))
-            )}
-            {!isLoading && workspaces.length === 0 && (
-              <p className="text-gray-400 text-sm">No hay workspaces.</p>
+              <div className="h-9 w-full rounded-md border border-gray-700 bg-black/30" />
             )}
           </div>
+        </div>
 
-        </div>
-        
-        <Separator className="bg-gray-800/50" />
-        
-        {/* ... (La sección "Your Conversations" no cambia) ... */}
-        <div>
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-            Your Conversations
-          </h2>
-          <ScrollArea className="h-64">
-            <div className="space-y-2 pr-2">
-              <a className="block text-gray-400 hover:text-white transition-colors text-sm truncate" href="/">
-                Análisis de la propuesta Q4...
-              </a>
-              <a className="block text-gray-400 hover:text-white transition-colors text-sm truncate" href="/">
-                Resumen de métricas de Helpdesk
-              </a>
+        {/* Nueva Conversación */}
+        <Button className="w-full bg-brand-red text-white hover:bg-red-700 font-medium">
+          <Plus className="mr-2 h-4 w-4" />
+          New Conversation
+        </Button>
+
+        {/* Navegación */}
+        <nav className="flex flex-col space-y-6 mt-8">
+          {/* Workspaces */}
+          <div>
+            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+              Workspace
+            </h2>
+            
+            <div className="space-y-2">
+              {isLoading && workspaces.length === 0 ? (
+                <p className="text-gray-400 text-sm">Cargando...</p>
+              ) : (
+                workspaces.map((ws) => (
+                  <div key={ws.id} className="flex items-center justify-between group">
+                    <button 
+                      className={cn(
+                        "flex-1 text-left text-gray-300 hover:text-white transition-colors p-1 rounded truncate",
+                        activeWorkspace && activeWorkspace.id === ws.id && "bg-brand-red/20 text-white" 
+                      )}
+                      onClick={() => setActiveWorkspace(ws)}
+                    >
+                      {ws.name}
+                    </button>
+                    
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="bg-brand-dark-secondary border-gray-700 text-gray-300">
+                        <DropdownMenuItem onClick={() => openEditModal(ws)}>
+                          Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="text-red-500" onClick={() => handleDelete(ws.id)}>
+                          Eliminar
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                ))
+              )}
+              {!isLoading && workspaces.length === 0 && (
+                <p className="text-gray-400 text-sm">No hay workspaces.</p>
+              )}
             </div>
-          </ScrollArea>
-        </div>
-      </nav>
-    </aside>
+          </div>
+          
+          <Separator className="bg-gray-800/50" />
+          
+          {/* Conversaciones */}
+          <div>
+            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+              Your Conversations
+            </h2>
+            <ScrollArea className="h-64">
+              <div className="space-y-2 pr-2">
+                {/* Ejemplo estático */}
+                <a className="block text-gray-400 hover:text-white transition-colors text-sm truncate" href="/">
+                  Análisis de la propuesta Q4...
+                </a>
+                <a className="block text-gray-400 hover:text-white transition-colors text-sm truncate" href="/">
+                  Resumen de métricas de Helpdesk
+                </a>
+              </div>
+            </ScrollArea>
+          </div>
+        </nav>
+      </aside>
+
+      {/* El Modal de Edición (se renderiza aquí pero se muestra centrado) */}
+      {workspaceToEdit && (
+        <EditWorkspaceModal
+          isOpen={isEditModalOpen}
+          onClose={closeEditModal}
+          workspace={workspaceToEdit}
+        />
+      )}
+    </>
   );
 }

@@ -8,6 +8,7 @@ from models import database, workspace as workspace_model, document as document_
 from core.celery_app import celery_app
 from processing import vector_store
 from core import llm_service
+from models.schemas import WorkspaceUpdate 
 
 router = APIRouter()
 
@@ -214,6 +215,111 @@ def chat_with_workspace(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error al procesar la solicitud de chat: {e}"
         )
+
+@router.get(
+    "/workspaces/{workspace_id}",
+    response_model=schemas.WorkspacePublic,
+    summary="Obtener un Workspace por ID"
+)
+def get_workspace(workspace_id: str, db: Session = Depends(database.get_db)):
+    db_workspace = db.query(workspace_model.Workspace).filter(
+        workspace_model.Workspace.id == workspace_id
+    ).first()
+    
+    if not db_workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workspace con id {workspace_id} no encontrado."
+        )
+    return db_workspace
+
+# --- AÑADIDO: Endpoint para actualizar un Workspace ---
+@router.put(
+    "/workspaces/{workspace_id}",
+    response_model=schemas.WorkspacePublic,
+    summary="Actualizar un Workspace"
+)
+def update_workspace(
+    workspace_id: str,
+    workspace_in: schemas.WorkspaceUpdate,
+    db: Session = Depends(database.get_db)
+):
+    db_workspace = db.query(workspace_model.Workspace).filter(
+        workspace_model.Workspace.id == workspace_id
+    ).first()
+    
+    if not db_workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workspace con id {workspace_id} no encontrado."
+        )
+    
+    # Actualizar solo los campos proporcionados (que no sean None)
+    update_data = workspace_in.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_workspace, key, value)
+    
+    db.commit()
+    db.refresh(db_workspace)
+    return db_workspace
+
+# --- AÑADIDO: Endpoint para eliminar un Workspace ---
+@router.delete(
+    "/workspaces/{workspace_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Eliminar un Workspace"
+)
+def delete_workspace(workspace_id: str, db: Session = Depends(database.get_db)):
+    db_workspace = db.query(workspace_model.Workspace).filter(
+        workspace_model.Workspace.id == workspace_id
+    ).first()
+    
+    if not db_workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workspace con id {workspace_id} no encontrado."
+        )
+        
+    # Aquí también deberíamos eliminar documentos asociados y vectores en Qdrant
+    # (Por simplicidad, por ahora solo borramos el workspace)
+    # TODO: Implementar borrado en cascada (vectores y documentos)
+    
+    db.delete(db_workspace)
+    db.commit()
+    return
+
+# --- AÑADIDO: Endpoint para eliminar un Documento ---
+@router.delete(
+    "/documents/{document_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Eliminar un Documento"
+)
+def delete_document(document_id: str, db: Session = Depends(database.get_db)):
+    db_document = db.query(document_model.Document).filter(
+        document_model.Document.id == document_id
+    ).first()
+    
+    if not db_document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Documento con id {document_id} no encontrado."
+        )
+    
+    # 1. Eliminar vectores de Qdrant
+    # (Necesitaremos una nueva función en vector_store.py)
+    try:
+        vector_store.delete_document_vectors(
+            workspace_id=db_document.workspace_id,
+            document_id=db_document.id
+        )
+    except Exception as e:
+        print(f"Error al eliminar vectores de Qdrant: {e}")
+        # Continuar de todos modos para eliminar de la BD
+        
+    # 2. Eliminar de PostgreSQL
+    db.delete(db_document)
+    db.commit()
+    return
 
 @router.get(
     "/workspaces",

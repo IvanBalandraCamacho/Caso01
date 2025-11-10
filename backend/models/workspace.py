@@ -1,8 +1,9 @@
 import uuid
-from sqlalchemy import Column, String, DateTime, Boolean, func
+from sqlalchemy import Column, String, DateTime, Boolean, func,Text
 from sqlalchemy.dialects.mysql import CHAR
 from sqlalchemy.orm import relationship
 from .database import Base
+
 
 class Workspace(Base):
     __tablename__ = "workspaces"
@@ -13,6 +14,9 @@ class Workspace(Base):
     
     name = Column(String(100), nullable=False, index=True)
     description = Column(String(500), nullable=True)
+    
+    # Este será tu "System Prompt"
+    instructions = Column(Text, nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     is_active = Column(Boolean, default=True)
