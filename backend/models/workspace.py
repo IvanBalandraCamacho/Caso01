@@ -18,4 +18,4 @@ class Workspace(Base):
     is_active = Column(Boolean, default=True)
 
     # Relación: Un Workspace puede tener muchos Documentos
-    documents = relationship("Document", back_populates="workspace")
+    documents = relationship("Document", back_populates="workspace", cascade="all, delete-orphan")

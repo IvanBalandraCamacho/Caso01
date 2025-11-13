@@ -26,14 +26,18 @@ services:
     container_name: ia_frontend
     ports:
       - "3000:3000"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
+    # Usar la imagen construida (multi-stage) y ejecutar en modo production.
+    # No montamos volúmenes para evitar sobrescribir los artefactos del build
+    # (./.next y node_modules) dentro de la imagen.
     environment:
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
       - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - BACKEND_URL=http://backend:8000
     depends_on:
       - backend
+    # Ejecutar la imagen runner que ya tiene la build
+    command: npm start
 
   # 3. Base de Datos (Metadata)
   mysql:

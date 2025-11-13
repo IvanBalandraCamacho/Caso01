@@ -87,3 +87,35 @@ class ChatResponse(BaseModel):
     query: str
     llm_response: str  # <-- AÑADIR ESTA LÍNEA
     relevant_chunks: list[DocumentChunk]
+
+
+# --- Settings Schemas ---
+class SettingPublic(BaseModel):
+    key: str
+    value: str | None = None
+
+    class Config:
+        from_attributes = True
+
+class ActiveLLMUpdate(BaseModel):
+    active_llm: str
+
+
+# --- Auth / User Schemas ---
+class UserCreate(BaseModel):
+    username: str
+    password: str
+
+class UserPublic(BaseModel):
+    username: str
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    username: str | None = None

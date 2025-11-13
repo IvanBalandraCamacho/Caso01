@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* TIVIT-like palette: rojo principal y blanco de fondo */
+    --background: 0 0% 100%; /* white */
+    --foreground: 220 10% 10%; /* dark text */
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    /* Primary = TIVIT red (approx HSL for #C8102E) */
+    --primary: 350 79% 40%;
+    --primary-foreground: 0 0% 100%; /* white */
+    --secondary: 0 0% 95%;
+    --secondary-foreground: 220 10% 20%;
+    --muted: 220 10% 96%;
+    --muted-foreground: 220 10% 40%;
+    --accent: 350 79% 40%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 354 74% 40%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 10% 92%;
+    --input: 220 10% 92%;
+    --ring: 350 79% 40%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 220 10% 10%;
+    --foreground: 0 0% 100%;
+    --card: 220 10% 12%;
+    --card-foreground: 0 0% 100%;
+    --popover: 220 10% 12%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 350 79% 40%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 10% 16%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 220 10% 16%;
+    --muted-foreground: 220 10% 70%;
+    --accent: 350 79% 40%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 354 74% 40%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 10% 16%;
+    --input: 220 10% 16%;
+    --ring: 350 79% 40%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

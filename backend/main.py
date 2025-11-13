@@ -1,6 +1,7 @@
 from fastapi import FastAPI
-from api.routes import health, workspaces
-from core.config import settings
+from api.routes import health, workspaces, settings as settings_routes
+from api.routes import auth as auth_routes
+from core.config import settings as core_settings
 from models import database
 import time
 from sqlalchemy.exc import OperationalError
@@ -34,10 +35,12 @@ app = FastAPI(
 # --- Registrar Routers ---
 app.include_router(health.router, prefix="/api/v1", tags=["Health Check"])
 app.include_router(workspaces.router, prefix="/api/v1", tags=["Workspaces"])
+app.include_router(settings_routes.router, prefix="/api/v1", tags=["Settings"])
+app.include_router(auth_routes.router, prefix="/api/v1", tags=["Auth"])
 
 @app.get("/")
 def read_root():
     return {
         "message": "Bienvenido al API del Sistema de IA",
-        "active_llm": settings.ACTIVE_LLM_SERVICE
+        "active_llm": core_settings.ACTIVE_LLM_SERVICE
     }

@@ -22,6 +22,10 @@ qdrant-client
 google-generativeai
 sentence-transformers
 
+# Autenticación
+passlib[bcrypt]
+python-jose[cryptography]
+
 # --- Procesamiento de Documentos ---
 pandas
 openpyxl

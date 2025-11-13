@@ -23,10 +23,10 @@ safety_settings = [
 
 # Inicializar el modelo
 try:
-    model = genai.GenerativeModel(model_name="gemini-2.5-flash", # Usamos el modelo estándar
+    model = genai.GenerativeModel(model_name="gemini-1.5-flash", # Usamos el modelo estándar
                                   generation_config=generation_config,
                                   safety_settings=safety_settings)
-    print("LLM_SERVICE: Modelo Gemini 'gemini-2.5-flash' cargado.")
+    print("LLM_SERVICE: Modelo Gemini 'gemini-1.5-flash' cargado.")
 except Exception as e:
     print(f"LLM_SERVICE: ERROR al cargar el modelo Gemini: {e}")
     model = None

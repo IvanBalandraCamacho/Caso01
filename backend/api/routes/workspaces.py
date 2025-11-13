@@ -11,6 +11,18 @@ from core import llm_service
 
 router = APIRouter()
 
+@router.get(
+    "/workspaces",
+    response_model=list[schemas.WorkspacePublic],
+    summary="Listar todos los Workspaces"
+)
+def list_workspaces(db: Session = Depends(database.get_db)):
+    """
+    Devuelve una lista de todos los workspaces.
+    """
+    workspaces = db.query(workspace_model.Workspace).all()
+    return workspaces
+
 @router.post(
     "/workspaces", 
     response_model=schemas.WorkspacePublic, 
@@ -116,6 +128,68 @@ def upload_document_to_workspace(
     print(f"API: Tarea para Documento {db_document.id} enviada a Celery.")
 
     return db_document
+@router.delete(
+    "/workspaces/{workspace_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Eliminar un Workspace"
+)
+def delete_workspace(
+    workspace_id: str,
+    db: Session = Depends(database.get_db)
+):
+    """
+    Elimina un workspace y todos sus documentos asociados.
+    """
+    # Verificar que el Workspace existe
+    db_workspace = db.query(workspace_model.Workspace).filter(
+        workspace_model.Workspace.id == workspace_id
+    ).first()
+    
+    if not db_workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workspace con id {workspace_id} no encontrado."
+        )
+    
+    # Eliminar el workspace (los documentos se eliminarán en cascada si está configurado)
+    db.delete(db_workspace)
+    db.commit()
+    
+    return None
+
+
+@router.put(
+    "/workspaces/{workspace_id}",
+    response_model=schemas.WorkspacePublic,
+    summary="Actualizar un Workspace"
+)
+def update_workspace(
+    workspace_id: str,
+    workspace_in: schemas.WorkspaceCreate,
+    db: Session = Depends(database.get_db)
+):
+    """
+    Actualiza el nombre y la descripción de un workspace.
+    """
+    db_workspace = db.query(workspace_model.Workspace).filter(
+        workspace_model.Workspace.id == workspace_id
+    ).first()
+
+    if not db_workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workspace con id {workspace_id} no encontrado."
+        )
+
+    # Actualizar campos permitidos
+    db_workspace.name = workspace_in.name
+    db_workspace.description = workspace_in.description
+
+    db.commit()
+    db.refresh(db_workspace)
+
+    return db_workspace
+
 @router.post(
     "/workspaces/{workspace_id}/chat",
     response_model=schemas.ChatResponse,
