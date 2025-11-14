@@ -98,12 +98,12 @@ echo ""
 # 8. Verificar que los archivos necesarios existen
 echo "8️⃣ Verificando archivos de código..."
 FILES=(
-    "frontend/app/globals.css"
-    "frontend/src/components/login.tsx"
+    "frontend/src/app/globals.css"
+    "frontend/src/components/login-modal.tsx"
     "frontend/src/components/sidebar.tsx"
     "frontend/src/components/chat-area.tsx"
     "backend/.env"
-    "backend/init_db.py"
+    "backend/main.py"
 )
 
 ALL_OK=true

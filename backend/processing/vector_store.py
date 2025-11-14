@@ -13,10 +13,10 @@ print("VECTOR_STORE: Cargando modelo de embeddings 'all-MiniLM-L6-v2'...")
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2", device="cpu") 
 print("VECTOR_STORE: Modelo de embeddings cargado.")
 
-# --- Text Splitter ---
+# --- Text Splitter - Optimizado para mejor recuperación ---
 text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=512,
-    chunk_overlap=50
+    chunk_size=800,      # Aumentado para mantener más contexto por chunk
+    chunk_overlap=100    # Más overlap para mejor continuidad
 )
 
 def get_or_create_collection(collection_name: str):
@@ -83,9 +83,10 @@ def process_and_embed_text(text: str, document_id: str, workspace_id: str) -> in
 
 # ... (la función process_and_embed_text está arriba) ...
 
-def search_similar_chunks(query: str, workspace_id: str, top_k: int = 5) -> list[DocumentChunk]:
+def search_similar_chunks(query: str, workspace_id: str, top_k: int = 10) -> list[DocumentChunk]:
     """
     Busca en Qdrant los chunks más relevantes para una consulta.
+    Aumentado a top_k=10 para proporcionar más contexto al LLM.
     """
     collection_name = f"workspace_{workspace_id}"
     

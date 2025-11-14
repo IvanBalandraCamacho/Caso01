@@ -1,11 +1,23 @@
 # Python
 __pycache__/
 *.pyc
+*.pyo
 .venv/
 venv/
 .env
+backend/temp_uploads/
+*.log
+
+# Secrets - NO SUBIR A GIT
+secrets/
 
 # Next.js / Node.js
 /frontend/.next/
 /frontend/node_modules/
 /frontend/out/
+node_modules/
+npm_output.log
+package-lock.json
+
+# Docker
+*.log

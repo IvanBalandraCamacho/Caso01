@@ -21,6 +21,7 @@ export function ChatArea() {
   const [isUploading, setIsUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [authUser, setAuthUser] = useState<string | null>(null);
+  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const { toasts, addToast, removeToast } = useToast();
@@ -34,8 +35,8 @@ export function ChatArea() {
     }
   }, [messages]);
 
+  // Autenticación inicial
   useEffect(() => {
-    // Intenta obtener el usuario autenticado
     const token = localStorage.getItem("access_token");
     if (token) {
       fetch(`${API_URL}/api/v1/auth/me`, {
@@ -46,6 +47,80 @@ export function ChatArea() {
       .catch(() => localStorage.removeItem("access_token"));
     }
   }, []);
+
+  // Cargar historial cuando cambie el workspace
+  useEffect(() => {
+    const workspaceId = localStorage.getItem("selected_workspace_id");
+    
+    // Si cambió el workspace, cargar su historial
+    if (workspaceId && workspaceId !== currentWorkspaceId) {
+      setCurrentWorkspaceId(workspaceId);
+      loadChatHistory(workspaceId);
+    } else if (!workspaceId) {
+      // No hay workspace seleccionado
+      setCurrentWorkspaceId(null);
+      setMessages([]);
+    }
+  }, [currentWorkspaceId]);
+
+  // Escuchar evento personalizado de cambio de workspace
+  useEffect(() => {
+    const handleWorkspaceChange = (event: CustomEvent) => {
+      const workspaceId = event.detail?.workspaceId;
+      console.log("ChatArea: Workspace cambió a", workspaceId);
+      
+      if (workspaceId && workspaceId !== currentWorkspaceId) {
+        setCurrentWorkspaceId(workspaceId);
+        loadChatHistory(workspaceId);
+      } else if (!workspaceId) {
+        setCurrentWorkspaceId(null);
+        setMessages([]);
+      }
+    };
+
+    window.addEventListener("workspaceChanged", handleWorkspaceChange as EventListener);
+    
+    // Cargar workspace inicial
+    const initialWorkspaceId = localStorage.getItem("selected_workspace_id");
+    if (initialWorkspaceId && !currentWorkspaceId) {
+      setCurrentWorkspaceId(initialWorkspaceId);
+      loadChatHistory(initialWorkspaceId);
+    }
+    
+    return () => {
+      window.removeEventListener("workspaceChanged", handleWorkspaceChange as EventListener);
+    };
+  }, [currentWorkspaceId]);
+
+  // Función para cargar el historial de chat
+  const loadChatHistory = async (workspaceId: string) => {
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/v1/workspaces/${workspaceId}/chat/history?limit=100`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.ok) {
+        const history = await response.json();
+        // Convertir el formato del backend al formato del frontend
+        const formattedMessages: Message[] = history.map((msg: any) => ({
+          role: msg.role,
+          content: msg.content,
+          sources: msg.sources ? JSON.parse(msg.sources).map((s: any) => s.chunk_text) : undefined,
+        }));
+        setMessages(formattedMessages);
+      } else {
+        console.error("Error loading chat history");
+        setMessages([]);
+      }
+    } catch (error) {
+      console.error("Error fetching chat history:", error);
+      setMessages([]);
+    }
+  };
 
   // Maneja la selección de archivos desde el input
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -74,18 +149,49 @@ export function ChatArea() {
     
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
-      if ([".pdf", ".docx", ".xlsx", ".pptx", ".txt"].some(ext => file.name.endsWith(ext))) {
-        setSelectedFile(file);
-        addToast(`Archivo "${file.name}" seleccionado`, "info");
-      } else {
-        addToast("Formato de archivo no soportado", "error");
+      
+      // Validar extensión
+      const validExtensions = [".pdf", ".docx", ".xlsx", ".pptx", ".txt"];
+      const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+      
+      if (!validExtensions.includes(fileExt)) {
+        addToast("Formato de archivo no soportado. Usa: PDF, DOCX, XLSX, PPTX o TXT", "error");
+        return;
       }
+      
+      // Validar tamaño (50MB)
+      const maxSize = 50 * 1024 * 1024;
+      if (file.size > maxSize) {
+        addToast(`Archivo muy grande. Máximo: 50MB (Tu archivo: ${(file.size / 1024 / 1024).toFixed(2)}MB)`, "error");
+        return;
+      }
+      
+      if (file.size === 0) {
+        addToast("El archivo está vacío", "error");
+        return;
+      }
+      
+      setSelectedFile(file);
+      addToast(`Archivo "${file.name}" seleccionado (${(file.size / 1024 / 1024).toFixed(2)}MB)`, "info");
     }
   };
 
   // Sube el archivo seleccionado al servidor
   const uploadFile = async () => {
     if (!selectedFile) return;
+    
+    // Validar nuevamente antes de subir
+    const maxSize = 50 * 1024 * 1024;
+    if (selectedFile.size > maxSize) {
+      addToast("Archivo muy grande. Máximo: 50MB", "error");
+      return;
+    }
+
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      addToast("Debes iniciar sesión para subir archivos", "error");
+      return;
+    }
 
     setIsUploading(true);
     try {
@@ -95,6 +201,9 @@ export function ChatArea() {
       const workspaceId = localStorage.getItem("selected_workspace_id") || "1";
       const response = await fetch(`${API_URL}/api/v1/workspaces/${workspaceId}/upload`, {
         method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
         body: formData,
       });
 
@@ -122,8 +231,15 @@ export function ChatArea() {
   const sendMessage = async () => {
     if (!input.trim()) return;
 
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      addToast("Debes iniciar sesión para enviar mensajes", "error");
+      return;
+    }
+
     const userMessage: Message = { role: "user", content: input };
     setMessages(prev => [...prev, userMessage]);
+    const userInput = input;
     setInput("");
     setIsLoading(true);
 
@@ -131,8 +247,11 @@ export function ChatArea() {
       const workspaceId = localStorage.getItem("selected_workspace_id") || "1";
       const response = await fetch(`${API_URL}/api/v1/workspaces/${workspaceId}/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: input }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ query: userInput }),
       });
 
       if (response.ok) {

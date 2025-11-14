@@ -48,16 +48,23 @@ class DocumentPublic(DocumentBase):
         from_attributes = True
 
     @classmethod
-    def from_upload(cls, file: UploadFile, workspace_id: str): # <-- CORREGIDO: Quitado comillas
+    def from_upload(cls, file: UploadFile, workspace_id: str):
         """Helper para crear un DocumentPublic desde un UploadFile."""
-        file_type = mimetypes.guess_type(file.filename)[0] or "unknown"
+        # Detectar el tipo de archivo por extensión
+        file_extension = file.filename.split('.')[-1].lower()
         
-        # Manejo simple del tipo de archivo
-        simple_file_type = file_type.split('/')[-1]
-        if "openxmlformats-officedocument.wordprocessingml.document" in simple_file_type:
-            simple_file_type = "docx"
-        elif "openxmlformats-officedocument.spreadsheetml.sheet" in simple_file_type:
-            simple_file_type = "xlsx"
+        # Mapeo de extensiones a tipos
+        extension_map = {
+            'pdf': 'pdf',
+            'docx': 'docx',
+            'doc': 'doc',
+            'txt': 'txt',
+            'xlsx': 'xlsx',
+            'xls': 'xls',
+            'csv': 'csv'
+        }
+        
+        simple_file_type = extension_map.get(file_extension, 'unknown')
         
         return cls(
             id="temp-id", # Se sobreescribirá con el de la BD
@@ -89,6 +96,31 @@ class ChatResponse(BaseModel):
     relevant_chunks: list[DocumentChunk]
 
 
+# --- Chat History Schemas ---
+class ChatMessageCreate(BaseModel):
+    """Schema para crear un mensaje de chat"""
+    workspace_id: str
+    role: str  # 'user' o 'assistant'
+    content: str
+    sources: str | None = None  # JSON string
+
+class ChatMessagePublic(BaseModel):
+    """Schema para retornar un mensaje de chat"""
+    id: str
+    workspace_id: str
+    role: str
+    content: str
+    sources: str | None = None
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class ChatHistoryExport(BaseModel):
+    """Schema para exportar historial de chat"""
+    format: str  # 'pdf' o 'txt'
+
+
 # --- Settings Schemas ---
 class SettingPublic(BaseModel):
     key: str
@@ -115,7 +147,11 @@ class UserPublic(BaseModel):
 
 class Token(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
 
 class TokenData(BaseModel):
     username: str | None = None

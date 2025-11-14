@@ -4,6 +4,8 @@ uvicorn[standard]
 python-dotenv
 pydantic
 python-multipart
+slowapi  # Rate limiting
+websockets  # WebSockets para notificaciones en tiempo real
 
 # --- Configuración ---
 pydantic-settings
@@ -33,3 +35,11 @@ python-docx
 python-pptx
 PyPDF2
 pdfplumber
+reportlab  # Para exportar chat a PDF
+pytesseract  # OCR para PDFs escaneados
+pdf2image  # Convertir PDF a imágenes para OCR
+pillow  # Procesamiento de imágenes
+odfpy  # Para archivos ODT
+striprtf  # Para archivos RTF
+langdetect  # Detección automática de idioma
+tabulate  # Para formatear tablas extraídas

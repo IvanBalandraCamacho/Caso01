@@ -19,3 +19,6 @@ class Workspace(Base):
 
     # Relación: Un Workspace puede tener muchos Documentos
     documents = relationship("Document", back_populates="workspace", cascade="all, delete-orphan")
+    
+    # Relación: Un Workspace puede tener muchos ChatMessages
+    chat_messages = relationship("ChatMessage", back_populates="workspace", cascade="all, delete-orphan")

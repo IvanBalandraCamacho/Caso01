@@ -7,11 +7,11 @@ import {
   PlusCircle, FileText, Trash2, Edit3, LogOut, Menu, X, Zap,
   Settings, User, ChevronDown, Check, Briefcase
 } from "lucide-react";
-import { useToast } from "@/components/toast";
+import { useToast, ToastContainer } from "@/components/toast";
 
 // Define la estructura de un Workspace
 interface Workspace {
-  id: number;
+  id: string;
   name: string;
   created_at: string;
 }
@@ -19,12 +19,12 @@ interface Workspace {
 export function Sidebar() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<number | null>(null);
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [authUser, setAuthUser] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
-  const { addToast } = useToast();
+  const { toasts, addToast, removeToast } = useToast();
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -57,14 +57,24 @@ export function Sidebar() {
     // Sincronizar el workspace seleccionado desde localStorage
     const storedWorkspaceId = localStorage.getItem("selected_workspace_id");
     if (storedWorkspaceId) {
-      setSelectedWorkspaceId(Number(storedWorkspaceId));
+      setSelectedWorkspaceId(storedWorkspaceId);
     }
   }, []);
 
   // Obtiene los workspaces desde el API
   const fetchWorkspaces = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/v1/workspaces`);
+      const token = localStorage.getItem("access_token");
+      const headers: HeadersInit = {};
+      
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+      
+      const response = await fetch(`${API_URL}/api/v1/workspaces`, {
+        headers
+      });
+      
       if (response.ok) {
         const data: Workspace[] = await response.json();
         setWorkspaces(data);
@@ -72,6 +82,10 @@ export function Sidebar() {
         if (!localStorage.getItem("selected_workspace_id") && data.length > 0) {
           handleWorkspaceSelect(data[0].id);
         }
+      } else if (response.status === 401) {
+        // Token inválido o expirado
+        localStorage.removeItem("access_token");
+        setWorkspaces([]);
       }
     } catch (error) {
       console.error("Error fetching workspaces:", error);
@@ -79,11 +93,20 @@ export function Sidebar() {
   };
 
   // Actualiza el nombre de un workspace
-  const updateWorkspace = async (id: number, name: string) => {
+  const updateWorkspace = async (id: string, name: string) => {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      addToast("Debes iniciar sesión", "error");
+      return;
+    }
+
     try {
       const response = await fetch(`${API_URL}/api/v1/workspaces/${id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ name }),
       });
       if (response.ok) {
@@ -134,10 +157,19 @@ export function Sidebar() {
   };
 
   // Elimina un workspace
-  const deleteWorkspace = async (id: number) => {
+  const deleteWorkspace = async (id: string) => {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      addToast("Debes iniciar sesión", "error");
+      return;
+    }
+
     try {
       if (confirm("¿Estás seguro de que quieres eliminar este espacio de trabajo?")) {
-        const response = await fetch(`${API_URL}/api/v1/workspaces/${id}`, { method: "DELETE" });
+        const response = await fetch(`${API_URL}/api/v1/workspaces/${id}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        });
         if (response.ok) {
           setWorkspaces(prev => prev.filter(w => w.id !== id));
           if (selectedWorkspaceId === id) {
@@ -152,12 +184,15 @@ export function Sidebar() {
   };
 
   // Maneja la selección de un workspace
-  const handleWorkspaceSelect = (id: number | null) => {
+  const handleWorkspaceSelect = (id: string | null) => {
     setSelectedWorkspaceId(id);
     if (id !== null) {
       localStorage.setItem("selected_workspace_id", String(id));
+      // Disparar evento personalizado para notificar al ChatArea
+      window.dispatchEvent(new CustomEvent("workspaceChanged", { detail: { workspaceId: id } }));
     } else {
       localStorage.removeItem("selected_workspace_id");
+      window.dispatchEvent(new CustomEvent("workspaceChanged", { detail: { workspaceId: null } }));
     }
   };
 
@@ -268,25 +303,6 @@ export function Sidebar() {
               <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">Activo</span>
            </div>
         </div>
-
-        {/* Sección de Chats Creados */}
-        <div>
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">Chats Creados</h3>
-          <div className="space-y-2">
-            <div className="group flex items-center justify-between p-2.5 rounded-lg cursor-pointer transition-colors text-foreground hover:bg-secondary">
-              <div className="flex items-center gap-3">
-                <FileText className="h-4 w-4" />
-                <span className="text-sm truncate">Chat 1</span>
-              </div>
-            </div>
-            <div className="group flex items-center justify-between p-2.5 rounded-lg cursor-pointer transition-colors text-foreground hover:bg-secondary">
-              <div className="flex items-center gap-3">
-                <FileText className="h-4 w-4" />
-                <span className="text-sm truncate">Chat 2</span>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Footer - Sección de Usuario */}
@@ -305,6 +321,9 @@ export function Sidebar() {
           </div>
         ) : null}
       </div>
+      
+      {/* Toast Container */}
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
     </div>
   );
 }

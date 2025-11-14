@@ -9,11 +9,14 @@ services:
       - ./backend:/app
     env_file:
       - ./backend/.env
+    secrets:
+      - gemini_api_key
     environment:
       # CAMBIO: Usar pymysql en lugar de mysqlclient
       - DATABASE_URL=mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
       - REDIS_URL=redis://redis:6379
       - QDRANT_URL=http://qdrant:6333
+      - ACTIVE_LLM_SERVICE=GEMINI
     depends_on:
       - mysql
       - qdrant
@@ -80,12 +83,15 @@ services:
       - ./backend:/app
     env_file:
       - ./backend/.env
+    secrets:
+      - gemini_api_key
     environment:
       - PYTHONPATH=/app  # <-- ¡ESTA ES LA SOLUCIÓN!
       # CAMBIO: Usar pymysql en lugar de mysqlclient
       - DATABASE_URL=mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
       - REDIS_URL=redis://redis:6379
       - QDRANT_URL=http://qdrant:6333
+      - ACTIVE_LLM_SERVICE=GEMINI
     depends_on:
       - backend
       - redis
@@ -95,3 +101,7 @@ services:
 volumes:
   mysql_data:
   qdrant_data:
+
+secrets:
+  gemini_api_key:
+    file: ./secrets/gemini_api_key.txt
