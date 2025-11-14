@@ -3,8 +3,13 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, FileText, Trash2, Edit3, LogOut, Menu, X, Zap } from "lucide-react";
+import {
+  PlusCircle, FileText, Trash2, Edit3, LogOut, Menu, X, Zap,
+  Settings, User, ChevronDown, Check, Briefcase
+} from "lucide-react";
+import { useToast } from "@/components/toast";
 
+// Define la estructura de un Workspace
 interface Workspace {
   id: number;
   name: string;
@@ -16,62 +21,64 @@ export function Sidebar() {
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<number | null>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [selectedLLM, setSelectedLLM] = useState<string>("GEMINI");
-  const [token, setToken] = useState<string | null>(null);
   const [authUser, setAuthUser] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const { addToast } = useToast();
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-  // Cargar workspaces al montar el componente
+  // Efecto para manejar el tamaño de la pantalla y la visibilidad del sidebar
   useEffect(() => {
-    fetchWorkspaces();
-    // Inicializar LLM desde localStorage o desde el backend root
-    try {
-      const stored = localStorage.getItem("selected_llm");
-      if (stored) setSelectedLLM(stored);
-      else {
-        // intentar obtener el valor por defecto del backend desde el endpoint de settings
-        fetch(`${API_URL}/api/v1/settings/active_llm`).then(async (r) => {
-          if (r.ok) {
-            const j = await r.json();
-            // j can be { key, value }
-            if (j && j.value) setSelectedLLM(j.value);
-          }
-        }).catch(() => {});
-      }
-    } catch (err) {
-      // ignore
-    }
-    // Inicializar token/usuario si existe en localStorage
-    try {
-      const t = localStorage.getItem("access_token");
-      if (t) {
-        setToken(t);
-        fetch(`${API_URL}/api/v1/auth/me`, {
-          headers: { Authorization: `Bearer ${t}` },
-        })
-          .then((r) => r.json())
-          .then((j) => {
-            if (j && j.username) setAuthUser(j.username);
-          })
-          .catch(() => {});
-      }
-    } catch (err) {}
+    const checkScreenSize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) setSidebarOpen(true);
+      else setSidebarOpen(false);
+    };
+    checkScreenSize();
+    window.addEventListener("resize", checkScreenSize);
+    return () => window.removeEventListener("resize", checkScreenSize);
   }, []);
 
+  // Efecto para cargar datos iniciales
+  useEffect(() => {
+    fetchWorkspaces();
+    // Intenta obtener el usuario autenticado
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      fetch(`${API_URL}/api/v1/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(user => setAuthUser(user.username))
+      .catch(() => localStorage.removeItem("access_token"));
+    }
+    // Sincronizar el workspace seleccionado desde localStorage
+    const storedWorkspaceId = localStorage.getItem("selected_workspace_id");
+    if (storedWorkspaceId) {
+      setSelectedWorkspaceId(Number(storedWorkspaceId));
+    }
+  }, []);
+
+  // Obtiene los workspaces desde el API
   const fetchWorkspaces = async () => {
     try {
       const response = await fetch(`${API_URL}/api/v1/workspaces`);
       if (response.ok) {
-        const data = await response.json();
+        const data: Workspace[] = await response.json();
         setWorkspaces(data);
+        // Si no hay workspace seleccionado, elige el primero
+        if (!localStorage.getItem("selected_workspace_id") && data.length > 0) {
+          handleWorkspaceSelect(data[0].id);
+        }
       }
     } catch (error) {
       console.error("Error fetching workspaces:", error);
     }
   };
 
+  // Actualiza el nombre de un workspace
   const updateWorkspace = async (id: number, name: string) => {
     try {
       const response = await fetch(`${API_URL}/api/v1/workspaces/${id}`, {
@@ -79,52 +86,64 @@ export function Sidebar() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
-
       if (response.ok) {
         const updated = await response.json();
-        setWorkspaces((prev) => prev.map((w) => (w.id === updated.id ? updated : w)));
+        setWorkspaces(prev => prev.map(w => w.id === updated.id ? updated : w));
       }
     } catch (err) {
-      console.error("Error updating workspace", err);
+      console.error("Error updating workspace:", err);
     }
   };
 
+  // Crea un nuevo workspace
   const createWorkspace = async () => {
     if (!newWorkspaceName.trim()) return;
+
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      addToast("Debes iniciar sesión para crear un workspace", "error");
+      return;
+    }
 
     setIsCreating(true);
     try {
       const response = await fetch(`${API_URL}/api/v1/workspaces`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ name: newWorkspaceName }),
       });
 
       if (response.ok) {
         const newWorkspace = await response.json();
-        setWorkspaces([...workspaces, newWorkspace]);
+        setWorkspaces(prev => [...prev, newWorkspace]);
         setNewWorkspaceName("");
-        setSelectedWorkspaceId(newWorkspace.id);
-        try { localStorage.setItem("selected_workspace_id", String(newWorkspace.id)); } catch {}
+        handleWorkspaceSelect(newWorkspace.id);
+        addToast("Workspace creado exitosamente", "success");
+      } else {
+        addToast("Error al crear el workspace", "error");
       }
     } catch (error) {
       console.error("Error creating workspace:", error);
+      addToast("Error de red al crear el workspace", "error");
     } finally {
       setIsCreating(false);
     }
   };
 
+  // Elimina un workspace
   const deleteWorkspace = async (id: number) => {
     try {
-      const response = await fetch(`${API_URL}/api/v1/workspaces/${id}`, {
-        method: "DELETE",
-      });
-
-      if (response.ok) {
-        setWorkspaces(workspaces.filter((w) => w.id !== id));
-        if (selectedWorkspaceId === id) {
-          setSelectedWorkspaceId(null);
-          try { localStorage.removeItem("selected_workspace_id"); } catch {}
+      if (confirm("¿Estás seguro de que quieres eliminar este espacio de trabajo?")) {
+        const response = await fetch(`${API_URL}/api/v1/workspaces/${id}`, { method: "DELETE" });
+        if (response.ok) {
+          setWorkspaces(prev => prev.filter(w => w.id !== id));
+          if (selectedWorkspaceId === id) {
+            const firstWorkspace = workspaces[0];
+            handleWorkspaceSelect(firstWorkspace ? firstWorkspace.id : null);
+          }
         }
       }
     } catch (error) {
@@ -132,157 +151,159 @@ export function Sidebar() {
     }
   };
 
+  // Maneja la selección de un workspace
+  const handleWorkspaceSelect = (id: number | null) => {
+    setSelectedWorkspaceId(id);
+    if (id !== null) {
+      localStorage.setItem("selected_workspace_id", String(id));
+    } else {
+      localStorage.removeItem("selected_workspace_id");
+    }
+  };
+
+  // Cierra sesión
+  const handleLogout = () => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("selected_workspace_id");
+    window.location.reload();
+  };
+
+  // Componente para el botón de abrir sidebar en móvil
   if (!sidebarOpen) {
     return (
       <button
         onClick={() => setSidebarOpen(true)}
-        className="fixed left-0 top-4 z-40 p-2 rounded-r-lg bg-[hsl(var(--primary))]/10 hover:bg-[hsl(var(--primary))]/20 transition-colors"
+        className="fixed left-4 top-4 z-50 p-2 rounded-md bg-background/80 backdrop-blur-sm shadow-md hover:bg-secondary transition-colors"
       >
-        <Menu className="h-5 w-5 text-[hsl(var(--primary))]" />
+        <Menu className="h-5 w-5 text-foreground" />
       </button>
     );
   }
 
   return (
-    <div className="w-80 bg-gradient-to-b from-white to-gray-50 border-r border-gray-200 flex flex-col shadow-sm h-screen">
+    <div className={`
+      ${isMobile ? 'fixed inset-0 z-40' : 'relative'}
+      w-72 bg-background border-r border-border flex flex-col h-screen transition-transform duration-300
+      ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+    `}>
       {/* Header */}
-      <div className="px-6 py-4 flex items-start justify-between border-b border-gray-200">
-        <div>
-          <h1 className="text-2xl font-bold text-[hsl(var(--primary))]">Velvet AI</h1>
-          <p className="text-xs text-gray-500 mt-1">Sistema RAG</p>
+      <div className="px-4 py-4 flex items-center justify-between border-b border-border">
+        <div className="flex items-center gap-2">
+            <span className="p-2 bg-primary/10 rounded-lg">
+                <Briefcase className="h-5 w-5 text-primary"/>
+            </span>
+            <h1 className="text-xl font-bold text-foreground">Velvet AI</h1>
         </div>
-        <button
-          onClick={() => setSidebarOpen(false)}
-          className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-        >
-          <X className="h-4 w-4 text-gray-400" />
-        </button>
+        {isMobile && (
+          <button onClick={() => setSidebarOpen(false)} className="p-2 hover:bg-secondary rounded-md">
+            <X className="h-4 w-4 text-muted-foreground" />
+          </button>
+        )}
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 overflow-y-auto">
-        {/* LLM Section */}
-        <div className="px-6 py-4 border-b border-gray-200">
-          <div className="flex items-center gap-2 mb-3">
-            <Zap className="h-4 w-4 text-[hsl(var(--primary))]" />
-            <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wide">Modelo LLM</h3>
+      {/* Contenido principal del Sidebar */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        {/* Sección de Workspaces */}
+        <div>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">Espacios de Trabajo</h3>
+          <div className="space-y-2">
+            {workspaces.map(ws => (
+              <div
+                key={ws.id}
+                onClick={() => handleWorkspaceSelect(ws.id)}
+                className={`group flex items-center justify-between p-2.5 rounded-lg cursor-pointer transition-colors ${
+                  selectedWorkspaceId === ws.id
+                    ? "bg-primary/10 text-primary font-semibold"
+                    : "text-foreground hover:bg-secondary"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <FileText className="h-4 w-4" />
+                  <span className="text-sm truncate">{ws.name}</span>
+                </div>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    variant="ghost" size="icon" className="h-6 w-6"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const newName = prompt("Nuevo nombre:", ws.name);
+                      if (newName?.trim()) updateWorkspace(ws.id, newName.trim());
+                    }}
+                  >
+                    <Edit3 className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost" size="icon" className="h-6 w-6 hover:bg-red-100/50 hover:text-red-600"
+                    onClick={(e) => { e.stopPropagation(); deleteWorkspace(ws.id); }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="p-3 bg-gradient-to-br from-[hsl(var(--primary))]/10 to-[hsl(var(--primary))]/5 border border-[hsl(var(--primary))]/20 rounded-lg">
-            <p className="text-sm font-semibold text-[hsl(var(--primary))] flex items-center gap-2">
-              <span className="text-lg">🤖</span> GEMINI
-            </p>
-            <p className="text-xs text-gray-600 mt-1">Modelo de IA avanzado</p>
-          </div>
-        </div>
-
-        {/* Workspaces Section */}
-        <div className="px-6 py-4">
-          <div className="flex items-center gap-2 mb-4">
-            <FileText className="h-4 w-4 text-[hsl(var(--primary))]" />
-            <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wide">Espacios de Trabajo</h3>
-          </div>
-
-          {/* Create Workspace */}
-          <div className="flex gap-2 mb-4">
+          {/* Crear Workspace */}
+          <div className="mt-3 flex gap-2">
             <Input
-              placeholder="Nuevo workspace..."
+              placeholder="Nuevo..."
               value={newWorkspaceName}
               onChange={(e) => setNewWorkspaceName(e.target.value)}
               onKeyPress={(e) => e.key === "Enter" && createWorkspace()}
-              className="flex-1 h-10 text-sm"
+              className="h-9 text-sm"
             />
-            <Button
-              onClick={createWorkspace}
-              disabled={isCreating || !newWorkspaceName.trim()}
-              size="icon"
-              className="bg-[hsl(var(--primary))] hover:bg-[hsl(0_85%_45%)] text-white transition-all hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+            <Button onClick={createWorkspace} disabled={isCreating} size="icon" className="h-9 w-9 flex-shrink-0">
               <PlusCircle className="h-4 w-4" />
             </Button>
           </div>
+        </div>
 
-          {/* Workspaces List */}
+        {/* Sección de Modelo LLM */}
+        <div>
+           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">Modelo LLM</h3>
+           <div className="p-3 bg-secondary rounded-lg flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Zap className="h-4 w-4 text-primary"/>
+                <span className="text-sm font-semibold text-foreground">GEMINI</span>
+              </div>
+              <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">Activo</span>
+           </div>
+        </div>
+
+        {/* Sección de Chats Creados */}
+        <div>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">Chats Creados</h3>
           <div className="space-y-2">
-            {workspaces.length === 0 ? (
-              <p className="text-xs text-gray-400 py-4 text-center">No hay workspaces aún</p>
-            ) : (
-              workspaces.map((workspace) => (
-                <div
-                  key={workspace.id}
-                  className={`p-3 rounded-lg cursor-pointer flex items-center justify-between group transition-all duration-200 ${
-                    selectedWorkspaceId === workspace.id
-                      ? "bg-[hsl(var(--primary))]/10 border border-[hsl(var(--primary))]/30 shadow-sm"
-                      : "bg-white hover:bg-gray-100 border border-gray-200 hover:shadow-sm"
-                  }`}
-                  onClick={() => {
-                    setSelectedWorkspaceId(workspace.id);
-                    try { localStorage.setItem("selected_workspace_id", String(workspace.id)); } catch {}
-                  }}
-                >
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <FileText className="h-4 w-4 text-[hsl(var(--primary))] flex-shrink-0" />
-                    <span className="text-sm font-medium truncate text-gray-700">{workspace.name}</span>
-                  </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 hover:bg-[hsl(var(--primary))]/20 transition-colors"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const newName = prompt("Nuevo nombre para workspace:", workspace.name);
-                        if (newName && newName.trim() && newName !== workspace.name) {
-                          updateWorkspace(workspace.id, newName.trim());
-                        }
-                      }}
-                    >
-                      <Edit3 className="h-3.5 w-3.5 text-[hsl(var(--primary))]" />
-                    </Button>
-
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 hover:bg-red-50 transition-colors"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (confirm("¿Eliminar este workspace?")) {
-                          deleteWorkspace(workspace.id);
-                        }
-                      }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                    </Button>
-                  </div>
-                </div>
-              ))
-            )}
+            <div className="group flex items-center justify-between p-2.5 rounded-lg cursor-pointer transition-colors text-foreground hover:bg-secondary">
+              <div className="flex items-center gap-3">
+                <FileText className="h-4 w-4" />
+                <span className="text-sm truncate">Chat 1</span>
+              </div>
+            </div>
+            <div className="group flex items-center justify-between p-2.5 rounded-lg cursor-pointer transition-colors text-foreground hover:bg-secondary">
+              <div className="flex items-center gap-3">
+                <FileText className="h-4 w-4" />
+                <span className="text-sm truncate">Chat 2</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Footer - User Section */}
-      <div className="px-6 py-4 border-t border-gray-200 bg-white">
+      {/* Footer - Sección de Usuario */}
+      <div className="p-4 border-t border-border">
         {authUser ? (
-          <div className="space-y-3">
-            <div className="p-3 bg-[hsl(var(--primary))]/5 rounded-lg border border-[hsl(var(--primary))]/20">
-              <p className="text-xs text-gray-600 mb-1">Conectado como</p>
-              <p className="text-sm font-semibold text-[hsl(var(--primary))]">{authUser}</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
+                <User className="w-5 h-5 text-muted-foreground"/>
+              </div>
+              <span className="text-sm font-medium text-foreground">{authUser}</span>
             </div>
-            <Button
-              onClick={() => {
-                localStorage.removeItem("access_token");
-                localStorage.removeItem("user_id");
-                window.location.reload();
-              }}
-              className="w-full bg-red-50 hover:bg-red-100 text-red-700 font-medium transition-colors"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Cerrar sesión
+            <Button onClick={handleLogout} variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-600">
+              <LogOut className="h-4 w-4" />
             </Button>
           </div>
-        ) : (
-          <p className="text-xs text-gray-500 text-center">Inicia sesión para continuar</p>
-        )}
+        ) : null}
       </div>
     </div>
   );
