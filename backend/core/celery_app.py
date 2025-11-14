@@ -1,5 +1,5 @@
 from celery import Celery
-from .config import settings
+from ...backend1.core.config import settings
 
 celery_app = Celery(
     "ia_worker",

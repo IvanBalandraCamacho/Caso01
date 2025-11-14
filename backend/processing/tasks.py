@@ -1,11 +1,11 @@
 import time
 import os
 from pathlib import Path
-from core.celery_app import celery_app
+from backend1.core.celery_app import celery_app
 from models import database, document as document_model, workspace as workspace_model
 from sqlalchemy.orm import Session
 from . import parser
-from . import vector_store
+from ...backend.processing import vector_store
 
 @celery_app.task
 def process_document(document_id: str, temp_file_path_str: str):

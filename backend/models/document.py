@@ -2,7 +2,7 @@ import uuid
 from sqlalchemy import Column, String, DateTime, func, ForeignKey, Integer
 from sqlalchemy.dialects.mysql import CHAR
 from sqlalchemy.orm import relationship
-from .database import Base
+from ...backend1.models.database import Base
 
 class Document(Base):
     __tablename__ = "documents"

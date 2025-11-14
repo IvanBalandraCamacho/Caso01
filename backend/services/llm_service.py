@@ -1,5 +1,5 @@
 import google.generativeai as genai
-from core.config import settings
+from backend1.core.config import settings
 from models.schemas import DocumentChunk
 
 # Configurar el cliente de Google AI

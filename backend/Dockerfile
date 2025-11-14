@@ -16,4 +16,5 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # 5. Copiar el código de la aplicación
 COPY . .
 
-# (El 'command' se proporciona en docker-compose.yml)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1

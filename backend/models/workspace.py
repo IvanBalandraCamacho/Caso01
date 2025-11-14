@@ -2,7 +2,7 @@ import uuid
 from sqlalchemy import Column, String, DateTime, Boolean, func,Text
 from sqlalchemy.dialects.mysql import CHAR
 from sqlalchemy.orm import relationship
-from .database import Base
+from ...backend1.models.database import Base
 
 
 class Workspace(Base):
