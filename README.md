@@ -145,3 +145,7 @@ Puede probar el pipeline completo usando la documentación de la API:
    (puede monitorear esto con `docker-compose logs -f celery_worker`)  
 6. Use el endpoint **POST /api/v1/workspaces/{workspace_id}/chat** para hacer una pregunta sobre su documento  
 7. Revise la respuesta JSON: contendrá la `llm_response` (respuesta de Gemini) y los `relevant_chunks` (contexto de Qdrant)
+
+## IMPORTANTE ⚠
+
+Se añadio un login de emergencia (admin:admin), debido al no tener acceso a la db, retirar en producción.
