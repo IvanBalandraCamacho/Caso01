@@ -18,7 +18,9 @@ class Document(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Clave foránea para la relación
-    workspace_id = Column(CHAR(36), ForeignKey("workspaces.id"), nullable=False)
+    workspace_id = Column(
+        CHAR(36), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False
+    )
     
     # Relación: Un Documento pertenece a un Workspace
     workspace = relationship("Workspace", back_populates="documents")

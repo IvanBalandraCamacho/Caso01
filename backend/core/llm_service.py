@@ -8,9 +8,9 @@ genai.configure(api_key=settings.GEMINI_API_KEY)
 
 # Configuración de generación y seguridad
 generation_config = {
-  "temperature": 0.7,  # Aumentado para respuestas más creativas y naturales
-  "top_p": 0.95,       # Permite más diversidad en las respuestas
-  "top_k": 40,         # Considera más opciones para generar texto
+  "temperature": 0.2, # Un valor bajo para respuestas más consistentes y basadas en hechos
+  "top_p": 1,
+  "top_k": 1,
   "max_output_tokens": 2048,
 }
 
@@ -23,10 +23,10 @@ safety_settings = [
 
 # Inicializar el modelo
 try:
-    model = genai.GenerativeModel(model_name="gemini-2.0-flash", # Modelo actualizado y disponible
+    model = genai.GenerativeModel(model_name="gemini-2.5-flash", # Usamos el modelo estándar
                                   generation_config=generation_config,
                                   safety_settings=safety_settings)
-    print("LLM_SERVICE: Modelo Gemini 'gemini-2.0-flash' cargado.")
+    print("LLM_SERVICE: Modelo Gemini 'gemini-2.5-flash' cargado.")
 except Exception as e:
     print(f"LLM_SERVICE: ERROR al cargar el modelo Gemini: {e}")
     model = None
@@ -43,33 +43,22 @@ def _build_prompt(query: str, context_chunks: list[DocumentChunk]) -> str:
         context_string += chunk.chunk_text
         context_string += "\n--------------------------------------------------\n\n"
         
-    # 2. Crear el prompt final - Más inteligente y menos restrictivo
-    prompt = f"""Eres un asistente inteligente especializado en analizar documentos y proporcionar respuestas útiles y conversacionales.
-
-Tu tarea:
-1. Analiza cuidadosamente el CONTEXTO proporcionado
-2. Responde la pregunta del usuario de manera clara, completa y amigable
-3. Si encuentras información relevante, sintetízala de forma natural y útil
-4. Puedes hacer inferencias razonables basándote en la información disponible
-5. Si la pregunta pide algo específico (como "un dato curioso"), busca información interesante o relevante en el contexto
-6. Si realmente NO hay información suficiente en el contexto para responder, sé honesto y dilo claramente
-
-**IMPORTANTE**: 
-- Responde en un tono conversacional y amigable
-- No repitas literalmente el contexto, sintetiza y presenta la información de manera útil
-- Si el usuario hace preguntas abiertas ("algo más?", "qué me puedes decir?"), explora TODO el contexto y proporciona información valiosa
-- Para preguntas sobre "datos curiosos" o similares, busca información interesante, logros, certificaciones, o detalles únicos
-
-=========================
-CONTEXTO PROPORCIONADO:
-{context_string}
-=========================
-
-PREGUNTA DEL USUARIO:
-{query}
-
-RESPUESTA (recuerda ser útil, conversacional y aprovechar toda la información disponible):
-"""
+    # 2. Crear el prompt final
+    prompt = f"""
+    Eres un asistente de IA experto en analizar documentos. Tu tarea es responder la pregunta del usuario basándote ÚNICA Y EXCLUSIVAMENTE en el contexto proporcionado.
+    
+    No utilices ningún conocimiento externo. Si la respuesta no se encuentra en el contexto, di "No encontré información suficiente en los documentos para responder a esa pregunta."
+    
+    =========================
+    CONTEXTO PROPORCIONADO:
+    {context_string}
+    =========================
+    
+    PREGUNTA DEL USUARIO:
+    {query}
+    
+    RESPUESTA:
+    """
     return prompt
 
 def generate_response(query: str, context_chunks: list[DocumentChunk]) -> str:

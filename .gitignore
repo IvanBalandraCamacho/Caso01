@@ -1,23 +1,39 @@
-# Python
+# ===== PYTHON =====
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
+*.db
+*.sqlite3
+
+# Entornos virtuales
 .venv/
 venv/
+
+# Config y entorno
 .env
+*.env
+
+# Archivos temporales
+*.log
+*.tmp
+
+# Uploads temporales del backend
 backend/temp_uploads/
-*.log
 
-# Secrets - NO SUBIR A GIT
-secrets/
+# Documentos que no deberían entrar al repo
+*.docx
 
-# Next.js / Node.js
-/frontend/.next/
-/frontend/node_modules/
-/frontend/out/
-node_modules/
-npm_output.log
-package-lock.json
+# ===== NEXT.JS / NODE =====
+frontend/.next/
+frontend/node_modules/
+frontend/out/
+frontend/.turbo/
+frontend/.vercel/
 
-# Docker
-*.log
+# ===== EDITORES =====
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store

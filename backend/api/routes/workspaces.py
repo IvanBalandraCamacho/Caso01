@@ -1,97 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
-from typing import List
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi.responses import StreamingResponse, FileResponse
 import shutil 
 import os
-import uuid
-import json
-import logging
+import uuid  
 from pathlib import Path
 from sqlalchemy.orm import Session
-from models import database, workspace as workspace_model, document as document_model, schemas, chat_message as chat_model, user as user_model
-from api.routes import auth
+from models import database, workspace as workspace_model, document as document_model, schemas
 from core.celery_app import celery_app
 from processing import vector_store
 from core import llm_service
-from core.config import settings
-from core.rate_limit import limiter
-from core.websocket_manager import ws_manager
+from models.schemas import WorkspaceUpdate
+import csv
+import io
+from datetime import datetime 
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
-
-# Directorio temporal para uploads
-TEMP_UPLOAD_DIR = Path("temp_uploads")
-TEMP_UPLOAD_DIR.mkdir(exist_ok=True)
-
-
-def validate_file(file: UploadFile) -> None:
-    """Valida el archivo antes de subirlo"""
-    # Validar nombre de archivo
-    if not file.filename or file.filename.strip() == "":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El archivo debe tener un nombre válido"
-        )
-    
-    # Validar extensión
-    file_ext = Path(file.filename).suffix.lower()
-    if file_ext not in settings.ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Extensión no permitida. Extensiones válidas: {', '.join(settings.ALLOWED_EXTENSIONS)}"
-        )
-    
-    # Validar tamaño leyendo el contenido
-    file.file.seek(0, 2)  # Ir al final del archivo
-    file_size = file.file.tell()
-    file.file.seek(0)  # Volver al inicio
-    
-    if file_size == 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El archivo está vacío"
-        )
-    
-    if file_size > settings.MAX_UPLOAD_SIZE:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"Archivo muy grande. Máximo permitido: {settings.MAX_UPLOAD_SIZE // (1024*1024)}MB"
-        )
-    
-    # Validar magic bytes para archivos comunes (detección básica de corrupción)
-    magic_bytes = file.file.read(8)
-    file.file.seek(0)
-    
-    valid_signatures = {
-        b'%PDF': '.pdf',
-        b'PK\x03\x04': '.docx',  # ZIP-based files (docx, xlsx, pptx)
-        b'PK\x05\x06': '.docx',
-        b'PK\x07\x08': '.docx',
-    }
-    
-    # Verificar que el archivo tenga una firma válida si es binario
-    if file_ext in ['.pdf', '.docx', '.xlsx', '.pptx']:
-        is_valid = any(magic_bytes.startswith(sig) for sig in valid_signatures.keys())
-        if not is_valid and file_ext != '.txt':  # .txt no tiene magic bytes
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="El archivo parece estar corrupto o no corresponde a su extensión"
-            )
-
-
-@router.get(
-    "/workspaces",
-    response_model=List[schemas.WorkspacePublic],
-    summary="Listar todos los Workspaces"
-)
-def list_workspaces(
-    db: Session = Depends(database.get_db),
-    current_user: user_model.User = Depends(auth.get_current_user)
-):
-    """Devuelve una lista de todos los workspaces."""
-    return db.query(workspace_model.Workspace).all()
-
 
 @router.post(
     "/workspaces", 
@@ -109,41 +32,45 @@ def create_workspace(
     - **name**: El nombre del workspace (requerido).
     - **description**: Descripción opcional.
     """
+    
+    # Crear la nueva instancia del modelo SQLAlchemy
     db_workspace = workspace_model.Workspace(
         name=workspace_in.name,
         description=workspace_in.description
     )
     
+    # Añadir a la sesión y confirmar en la BD
     db.add(db_workspace)
     db.commit()
     db.refresh(db_workspace)
     
     return db_workspace
 
+TEMP_UPLOAD_DIR = Path("temp_uploads")
+os.makedirs(TEMP_UPLOAD_DIR, exist_ok=True)
+
 
 @router.post(
     "/workspaces/{workspace_id}/upload",
     response_model=schemas.DocumentPublic,
-    status_code=status.HTTP_202_ACCEPTED,
+    status_code=status.HTTP_202_ACCEPTED, # 202 (Aceptado) porque es asíncrono
     summary="Subir un documento a un Workspace"
 )
-@limiter.limit("10/minute")  # Límite específico para uploads
 def upload_document_to_workspace(
-    request: Request,
     workspace_id: str,
     file: UploadFile = File(...),
     db: Session = Depends(database.get_db)
 ):
     """
-    Sube un documento para procesamiento asíncrono.
+    Sube un documento. El procesamiento es asíncrono.
     
+    El endpoint:
     1. Verifica que el Workspace exista.
-    2. Valida el archivo.
-    3. Verifica límite de documentos por workspace.
-    4. Guarda el archivo temporalmente.
-    5. Crea un registro 'Document' en la BD con estado 'PENDING'.
-    6. Envía una tarea a Celery para procesarlo.
+    2. Guarda el archivo en un directorio temporal.
+    3. Crea un registro 'Document' en la BD con estado 'PENDING'.
+    4. (Próximamente) Envía una tarea a Celery para procesarlo.
     """
+    
     # 1. Verificar que el Workspace existe
     db_workspace = db.query(workspace_model.Workspace).filter(
         workspace_model.Workspace.id == workspace_id
@@ -154,110 +81,76 @@ def upload_document_to_workspace(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Workspace con id {workspace_id} no encontrado."
         )
-    
-    # 2. Validar archivo
-    validate_file(file)
-    
-    # 3. Verificar límite de documentos por workspace
-    document_count = db.query(document_model.Document).filter(
-        document_model.Document.workspace_id == workspace_id
-    ).count()
-    
-    if document_count >= settings.MAX_DOCUMENTS_PER_WORKSPACE:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Límite de {settings.MAX_DOCUMENTS_PER_WORKSPACE} documentos alcanzado para este workspace."
-        )
 
-    # 4. Guardar el archivo temporalmente
-    temp_file_path = TEMP_UPLOAD_DIR / f"{uuid.uuid4()}_{file.filename}"
-    
+    # 2. Guardar el archivo temporalmente
     try:
+        temp_file_path = TEMP_UPLOAD_DIR / f"{uuid.uuid4()}_{file.filename}"
         with open(temp_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al guardar el archivo: {str(e)}"
+            detail=f"Error al guardar el archivo temporalmente: {e}"
         )
     finally:
         file.file.close()
 
-    # 4. Crear el registro 'Document' en la BD
+    # 3. Crear el registro 'Document' en la BD
+    
+    # Usamos el helper del schema para obtener el file_type
     doc_data = schemas.DocumentPublic.from_upload(file, workspace_id)
     
     db_document = document_model.Document(
         file_name=doc_data.file_name,
         file_type=doc_data.file_type,
         workspace_id=workspace_id,
-        status="PENDING"
+        status="PENDING" # Estado inicial
+        # 'chunk_count' y 'created_at' tienen valores por defecto
     )
     
     db.add(db_document)
     db.commit()
     db.refresh(db_document)
 
-    # 5. Enviar tarea a Celery
+    # 4. TODO: Enviar tarea a Celery
     celery_app.send_task(
-        'processing.tasks.process_document',
-        args=[db_document.id, str(temp_file_path)]
-    )
+         'processing.tasks.process_document',
+         args=[db_document.id, str(temp_file_path)]
+     )
 
-    print(f"API: Documento {db_document.id} enviado a procesamiento.")
+    print(f"API: Tarea para Documento {db_document.id} enviada a Celery.")
+
     return db_document
 
-
-@router.delete(
-    "/workspaces/{workspace_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Eliminar un Workspace"
+@router.get(
+    "/workspaces/{workspace_id}/documents",
+    response_model=list[schemas.DocumentPublic],
+    summary="Obtener todos los documentos de un Workspace"
 )
-def delete_workspace(workspace_id: str, db: Session = Depends(database.get_db)):
-    """Elimina un workspace y todos sus documentos asociados."""
-    db_workspace = db.query(workspace_model.Workspace).filter(
-        workspace_model.Workspace.id == workspace_id
-    ).first()
-    
-    if not db_workspace:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Workspace con id {workspace_id} no encontrado."
-        )
-    
-    db.delete(db_workspace)
-    db.commit()
-    
-    return None
-
-
-@router.put(
-    "/workspaces/{workspace_id}",
-    response_model=schemas.WorkspacePublic,
-    summary="Actualizar un Workspace"
-)
-def update_workspace(
+def get_workspace_documents(
     workspace_id: str,
-    workspace_in: schemas.WorkspaceCreate,
     db: Session = Depends(database.get_db)
 ):
-    """Actualiza el nombre y la descripción de un workspace."""
+    """
+    Obtiene una lista de todos los documentos para un workspace_id específico.
+    """
+    # Primero, verificar que el workspace exista (buena práctica)
     db_workspace = db.query(workspace_model.Workspace).filter(
         workspace_model.Workspace.id == workspace_id
     ).first()
-
+    
     if not db_workspace:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Workspace con id {workspace_id} no encontrado."
         )
-
-    db_workspace.name = workspace_in.name
-    db_workspace.description = workspace_in.description
-
-    db.commit()
-    db.refresh(db_workspace)
-
-    return db_workspace
+    
+    # Si existe, obtener sus documentos
+    documents = db.query(document_model.Document).filter(
+        document_model.Document.workspace_id == workspace_id
+    ).all()
+    
+    return documents
 
 
 @router.post(
@@ -265,9 +158,7 @@ def update_workspace(
     response_model=schemas.ChatResponse,
     summary="Procesar una pregunta de chat (Pipeline RAG Completo)"
 )
-@limiter.limit("20/minute")  # Límite para chat
 def chat_with_workspace(
-    request: Request,
     workspace_id: str,
     chat_request: schemas.ChatRequest,
     db: Session = Depends(database.get_db)
@@ -275,9 +166,14 @@ def chat_with_workspace(
     """
     Maneja una consulta de chat contra un workspace (Pipeline RAG Completo).
     
-    Paso 1 (Retrieve): Busca en Qdrant los chunks más relevantes.
-    Paso 2 (Augment & Generate): Construye un prompt y llama al LLM.
+    Paso 1 (Retrieve):
+    - Busca en Qdrant los chunks más relevantes de este workspace.
+    
+    Paso 2 (Augment & Generate):
+    - Construye un prompt con la pregunta y los chunks.
+    - Llama al LLM (Gemini) para obtener una respuesta en lenguaje natural.
     """
+    
     # 1. Verificar que el Workspace exista
     db_workspace = db.query(workspace_model.Workspace).filter(
         workspace_model.Workspace.id == workspace_id
@@ -290,61 +186,27 @@ def chat_with_workspace(
         )
 
     try:
-        # Guardar pregunta del usuario en BD
-        user_message = chat_model.ChatMessage(
-            workspace_id=workspace_id,
-            role="user",
-            content=chat_request.query
-        )
-        db.add(user_message)
-        db.commit()
-        
-        # 2. Recuperación (Retrieve)
+        # 2. Paso de Recuperación (Retrieve)
         relevant_chunks = vector_store.search_similar_chunks(
             query=chat_request.query,
             workspace_id=workspace_id
         )
         
         if not relevant_chunks:
-            response_text = "No encontré documentos relevantes. Por favor, sube un documento primero para poder responder tus preguntas."
-            
-            # Guardar respuesta en BD
-            assistant_message = chat_model.ChatMessage(
-                workspace_id=workspace_id,
-                role="assistant",
-                content=response_text
-            )
-            db.add(assistant_message)
-            db.commit()
-            
+            # Si no hay chunks, no podemos contestar
             return schemas.ChatResponse(
                 query=chat_request.query,
-                llm_response=response_text,
+                llm_response="No encontré documentos relevantes para esta consulta. Intente subir un archivo primero.",
                 relevant_chunks=[]
             )
 
-        # 3. Generación (Generate)
+        # 3. Paso de Generación (Generate)
         llm_response_text = llm_service.generate_response(
             query=chat_request.query,
             context_chunks=relevant_chunks
         )
         
-        # Guardar respuesta del asistente en BD con sources
-        sources_json = json.dumps([{
-            "chunk_text": chunk.chunk_text,
-            "score": chunk.score,
-            "chunk_index": chunk.chunk_index
-        } for chunk in relevant_chunks])
-        
-        assistant_message = chat_model.ChatMessage(
-            workspace_id=workspace_id,
-            role="assistant",
-            content=llm_response_text,
-            sources=sources_json
-        )
-        db.add(assistant_message)
-        db.commit()
-        
+        # 4. Devolver la respuesta completa
         return schemas.ChatResponse(
             query=chat_request.query,
             llm_response=llm_response_text,
@@ -352,251 +214,326 @@ def chat_with_workspace(
         )
         
     except Exception as e:
-        print(f"ERROR en chat: {e}")
-        # Si es un error de colección no encontrada, dar un mensaje amigable
-        if "doesn't exist" in str(e) or "Not found: Collection" in str(e):
-            response_text = "Este workspace aún no tiene documentos. Por favor, sube un documento primero para poder ayudarte."
-            
-            # Guardar respuesta en BD
-            assistant_message = chat_model.ChatMessage(
-                workspace_id=workspace_id,
-                role="assistant",
-                content=response_text
-            )
-            db.add(assistant_message)
-            db.commit()
-            
-            return schemas.ChatResponse(
-                query=chat_request.query,
-                llm_response=response_text,
-                relevant_chunks=[]
-            )
-        # Para otros errores, dar un mensaje genérico sin detalles técnicos
-        response_text = "Lo siento, ocurrió un error al procesar tu pregunta. Por favor, intenta de nuevo o sube un documento si aún no lo has hecho."
-        
-        # Guardar respuesta en BD
-        assistant_message = chat_model.ChatMessage(
-            workspace_id=workspace_id,
-            role="assistant",
-            content=response_text
+        print(f"API_CHAT: Error al procesar el chat: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al procesar la solicitud de chat: {e}"
         )
-        db.add(assistant_message)
-        db.commit()
-        
-        return schemas.ChatResponse(
-            query=chat_request.query,
-            llm_response=response_text,
-            relevant_chunks=[]
-        )
-
-
-@router.websocket("/ws/{workspace_id}")
-async def websocket_endpoint(websocket: WebSocket, workspace_id: str):
-    """
-    WebSocket endpoint para notificaciones en tiempo real de un workspace
-    """
-    await ws_manager.connect(websocket, workspace_id)
-    try:
-        while True:
-            # Mantener la conexión abierta y escuchar mensajes del cliente
-            data = await websocket.receive_text()
-            # Echo para mantener conexión viva (ping/pong)
-            await ws_manager.send_personal_message(f"Mensaje recibido: {data}", websocket)
-    except WebSocketDisconnect:
-        ws_manager.disconnect(websocket, workspace_id)
-
 
 @router.get(
-    "/workspaces/{workspace_id}/documents/search",
-    response_model=List[schemas.DocumentPublic],
-    summary="Buscar documentos con filtros"
+    "/workspaces/{workspace_id}",
+    response_model=schemas.WorkspacePublic,
+    summary="Obtener un Workspace por ID"
 )
-def search_documents(
-    workspace_id: str,
-    query: str = None,
-    file_type: str = None,
-    status: str = None,
-    date_from: str = None,
-    date_to: str = None,
-    db: Session = Depends(database.get_db)
-):
-    """
-    Busca documentos con filtros avanzados
+def get_workspace(workspace_id: str, db: Session = Depends(database.get_db)):
+    db_workspace = db.query(workspace_model.Workspace).filter(
+        workspace_model.Workspace.id == workspace_id
+    ).first()
     
-    - **query**: Búsqueda por nombre de archivo
-    - **file_type**: Filtrar por tipo (pdf, docx, etc)
-    - **status**: Filtrar por estado (PENDING, PROCESSING, COMPLETED, FAILED)
-    - **date_from**: Fecha inicio (YYYY-MM-DD)
-    - **date_to**: Fecha fin (YYYY-MM-DD)
-    """
-    from datetime import datetime
-    
-    # Iniciar query base
-    db_query = db.query(document_model.Document).filter(
-        document_model.Document.workspace_id == workspace_id
-    )
-    
-    # Aplicar filtros
-    if query:
-        db_query = db_query.filter(
-            document_model.Document.file_name.contains(query)
-        )
-    
-    if file_type:
-        db_query = db_query.filter(
-            document_model.Document.file_type == file_type
-        )
-    
-    if status:
-        db_query = db_query.filter(
-            document_model.Document.status == status
-        )
-    
-    if date_from:
-        try:
-            date_from_obj = datetime.strptime(date_from, "%Y-%m-%d")
-            db_query = db_query.filter(
-                document_model.Document.created_at >= date_from_obj
-            )
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Formato de fecha inválido. Use YYYY-MM-DD"
-            )
-    
-    if date_to:
-        try:
-            date_to_obj = datetime.strptime(date_to, "%Y-%m-%d")
-            db_query = db_query.filter(
-                document_model.Document.created_at <= date_to_obj
-            )
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Formato de fecha inválido. Use YYYY-MM-DD"
-            )
-    
-    documents = db_query.order_by(document_model.Document.created_at.desc()).all()
-    
-    return documents
-
-
-@router.get(
-    "/workspaces/{workspace_id}/documents/export-csv",
-    summary="Exportar lista de documentos a CSV"
-)
-def export_documents_list(
-    workspace_id: str,
-    db: Session = Depends(database.get_db)
-):
-    """
-    Exporta la lista de documentos de un workspace a CSV
-    """
-    import csv
-    import tempfile
-    from datetime import datetime
-    
-    documents = db.query(document_model.Document).filter(
-        document_model.Document.workspace_id == workspace_id
-    ).all()
-    
-    if not documents:
+    if not db_workspace:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No hay documentos en este workspace"
+            detail=f"Workspace con id {workspace_id} no encontrado."
         )
-    
-    # Crear archivo temporal CSV
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.csv', newline='', encoding='utf-8') as f:
-        writer = csv.writer(f)
-        
-        # Escribir encabezados
-        writer.writerow(['ID', 'Nombre', 'Tipo', 'Estado', 'Chunks', 'Fecha Creación'])
-        
-        # Escribir datos
-        for doc in documents:
-            writer.writerow([
-                doc.id,
-                doc.file_name,
-                doc.file_type,
-                doc.status,
-                doc.chunk_count,
-                doc.created_at.strftime('%Y-%m-%d %H:%M:%S')
-            ])
-        
-        temp_path = f.name
-    
-    return FileResponse(
-        temp_path,
-        media_type='text/csv',
-        filename=f'documents_{workspace_id}_{datetime.utcnow().strftime("%Y%m%d")}.csv'
-    )
+    return db_workspace
 
-
-@router.get(
-    "/workspaces/fulltext-search",
-    summary="Búsqueda de texto completo en todos los workspaces"
+# --- AÑADIDO: Endpoint para actualizar un Workspace ---
+@router.put(
+    "/workspaces/{workspace_id}",
+    response_model=schemas.WorkspacePublic,
+    summary="Actualizar un Workspace"
 )
-def fulltext_search(
-    query: str,
-    workspace_id: str = None,
-    limit: int = 10,
+def update_workspace(
+    workspace_id: str,
+    workspace_in: schemas.WorkspaceUpdate,
     db: Session = Depends(database.get_db)
 ):
-    """
-    Búsqueda de texto completo usando el vector store
+    db_workspace = db.query(workspace_model.Workspace).filter(
+        workspace_model.Workspace.id == workspace_id
+    ).first()
     
-    - **query**: Texto a buscar
-    - **workspace_id**: Opcional, limitar a un workspace
-    - **limit**: Número máximo de resultados
-    """
-    if not query or len(query.strip()) < 3:
+    if not db_workspace:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La consulta debe tener al menos 3 caracteres"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workspace con id {workspace_id} no encontrado."
         )
     
-    # Si hay workspace_id específico, buscar solo ahí
-    if workspace_id:
-        chunks = vector_store.search_similar_chunks(
-            query=query,
-            workspace_id=workspace_id,
-            top_k=limit
+    # Actualizar solo los campos proporcionados (que no sean None)
+    update_data = workspace_in.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_workspace, key, value)
+    
+    db.commit()
+    db.refresh(db_workspace)
+    return db_workspace
+
+# --- AÑADIDO: Endpoint para eliminar un Workspace ---
+@router.delete(
+    "/workspaces/{workspace_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Eliminar un Workspace"
+)
+def delete_workspace(workspace_id: str, db: Session = Depends(database.get_db)):
+    db_workspace = db.query(workspace_model.Workspace).filter(
+        workspace_model.Workspace.id == workspace_id
+    ).first()
+    
+    if not db_workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workspace con id {workspace_id} no encontrado."
         )
         
-        return {
-            "query": query,
-            "workspace_id": workspace_id,
-            "results": chunks
-        }
+    documents = list(db_workspace.documents)
+
+    for document in documents:
+        try:
+            vector_store.delete_document_vectors(
+                workspace_id=document.workspace_id,
+                document_id=document.id,
+            )
+        except Exception as exc:  # noqa: BLE001 - logging purpose only
+            print(f"ERROR eliminando vectores del documento {document.id}: {exc}")
+
+        db.delete(document)
+
+    try:
+        vector_store.delete_workspace_vectors(workspace_id)
+    except Exception as exc:  # noqa: BLE001 - logging purpose only
+        print(f"ERROR eliminando colección del workspace {workspace_id}: {exc}")
+
+    db.delete(db_workspace)
+    db.commit()
+    return
+
+# --- AÑADIDO: Endpoint para eliminar un Documento ---
+@router.delete(
+    "/documents/{document_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Eliminar un Documento"
+)
+def delete_document(document_id: str, db: Session = Depends(database.get_db)):
+    db_document = db.query(document_model.Document).filter(
+        document_model.Document.id == document_id
+    ).first()
     
-    # Buscar en todos los workspaces
+    if not db_document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Documento con id {document_id} no encontrado."
+        )
+    
+    # 1. Eliminar vectores de Qdrant
+    # (Necesitaremos una nueva función en vector_store.py)
+    try:
+        vector_store.delete_document_vectors(
+            workspace_id=db_document.workspace_id,
+            document_id=db_document.id
+        )
+    except Exception as e:
+        print(f"Error al eliminar vectores de Qdrant: {e}")
+        # Continuar de todos modos para eliminar de la BD
+        
+    # 2. Eliminar de PostgreSQL
+    db.delete(db_document)
+    db.commit()
+    return
+
+@router.get(
+    "/workspaces",
+    response_model=list[schemas.WorkspacePublic],
+    summary="Obtener todos los Workspaces"
+)
+def get_workspaces(db: Session = Depends(database.get_db)):
+    """
+    Obtiene una lista de todos los workspaces activos.
+    """
     workspaces = db.query(workspace_model.Workspace).filter(
         workspace_model.Workspace.is_active == True
     ).all()
     
-    all_results = []
-    for ws in workspaces:
-        try:
-            chunks = vector_store.search_similar_chunks(
-                query=query,
-                workspace_id=ws.id,
-                top_k=3  # Menos resultados por workspace
-            )
-            
-            if chunks:
-                all_results.append({
-                    "workspace_id": ws.id,
-                    "workspace_name": ws.name,
-                    "chunks": chunks
-                })
-        except Exception as e:
-            logger.warning(f"Error buscando en workspace {ws.id}: {e}")
-            continue
+    return workspaces
+
+# --- EXPORT ENDPOINTS ---
+
+@router.get(
+    "/workspaces/{workspace_id}/documents/export-csv",
+    summary="Exportar documentos a CSV"
+)
+def export_documents_csv(
+    workspace_id: str,
+    db: Session = Depends(database.get_db)
+):
+    """
+    Exporta la lista de documentos de un workspace a CSV.
+    """
+    # Verificar que el workspace existe
+    db_workspace = db.query(workspace_model.Workspace).filter(
+        workspace_model.Workspace.id == workspace_id
+    ).first()
     
-    return {
-        "query": query,
-        "total_workspaces_searched": len(workspaces),
-        "workspaces_with_results": len(all_results),
-        "results": all_results[:limit]
-    }
+    if not db_workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workspace con id {workspace_id} no encontrado."
+        )
+    
+    # Obtener documentos
+    documents = db.query(document_model.Document).filter(
+        document_model.Document.workspace_id == workspace_id
+    ).all()
+    
+    # Crear CSV en memoria
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Escribir encabezados
+    writer.writerow(['ID', 'Nombre', 'Tipo', 'Estado', 'Chunks', 'Fecha Creación'])
+    
+    # Escribir datos
+    for doc in documents:
+        writer.writerow([
+            doc.id,
+            doc.file_name,
+            doc.file_type,
+            doc.status,
+            doc.chunk_count,
+            doc.created_at.strftime('%Y-%m-%d %H:%M:%S') if doc.created_at else ''
+        ])
+    
+    # Preparar respuesta
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=documents_{workspace_id}_{datetime.now().strftime('%Y%m%d')}.csv"
+        }
+    )
+
+@router.get(
+    "/workspaces/{workspace_id}/chat/export/txt",
+    summary="Exportar historial de chat a TXT"
+)
+def export_chat_txt(
+    workspace_id: str,
+    db: Session = Depends(database.get_db)
+):
+    """
+    Exporta el historial de chat de un workspace a TXT.
+    Nota: Como no tenemos una tabla de historial de chat,
+    esto devolverá información del workspace y sus documentos.
+    """
+    # Verificar que el workspace existe
+    db_workspace = db.query(workspace_model.Workspace).filter(
+        workspace_model.Workspace.id == workspace_id
+    ).first()
+    
+    if not db_workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workspace con id {workspace_id} no encontrado."
+        )
+    
+    # Crear contenido TXT
+    content = f"CHAT EXPORT - {db_workspace.name}\n"
+    content += f"{'='*60}\n"
+    content += f"Workspace ID: {workspace_id}\n"
+    content += f"Descripción: {db_workspace.description or 'N/A'}\n"
+    content += f"Fecha de exportación: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+    content += f"{'='*60}\n\n"
+    
+    # Obtener documentos del workspace
+    documents = db.query(document_model.Document).filter(
+        document_model.Document.workspace_id == workspace_id
+    ).all()
+    
+    content += f"DOCUMENTOS DEL WORKSPACE ({len(documents)} total):\n"
+    content += f"{'-'*60}\n"
+    for doc in documents:
+        content += f"- {doc.file_name} ({doc.file_type}) - {doc.status} - {doc.chunk_count} chunks\n"
+    
+    content += f"\n{'-'*60}\n"
+    content += "Nota: El historial completo de conversaciones estará disponible en futuras versiones.\n"
+    
+    # Preparar respuesta
+    return StreamingResponse(
+        iter([content]),
+        media_type="text/plain",
+        headers={
+            "Content-Disposition": f"attachment; filename=chat_{workspace_id}_{datetime.now().strftime('%Y%m%d')}.txt"
+        }
+    )
+
+@router.get(
+    "/workspaces/{workspace_id}/chat/export/pdf",
+    summary="Exportar historial de chat a PDF"
+)
+def export_chat_pdf(
+    workspace_id: str,
+    db: Session = Depends(database.get_db)
+):
+    """
+    Exporta el historial de chat de un workspace a PDF.
+    Nota: Esta es una implementación básica. Para PDF real necesitarías
+    una librería como reportlab o weasyprint.
+    """
+    # Verificar que el workspace existe
+    db_workspace = db.query(workspace_model.Workspace).filter(
+        workspace_model.Workspace.id == workspace_id
+    ).first()
+    
+    if not db_workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workspace con id {workspace_id} no encontrado."
+        )
+    
+    # Por ahora, devolver un mensaje de texto indicando que PDF no está implementado
+    # En producción, aquí usarías una librería para generar PDF
+    content = f"""EXPORT PDF - {db_workspace.name}
+    
+Workspace ID: {workspace_id}
+Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+Nota: La exportación a PDF completa estará disponible próximamente.
+Por ahora, usa la exportación a TXT o CSV.
+
+Para implementar PDF completo, instala: pip install reportlab
+"""
+    
+    return StreamingResponse(
+        iter([content]),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=chat_{workspace_id}_{datetime.now().strftime('%Y%m%d')}.pdf"
+        }
+    )
+
+@router.delete(
+    "/workspaces/{workspace_id}/chat/history",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Eliminar historial de chat"
+)
+def delete_chat_history(
+    workspace_id: str,
+    db: Session = Depends(database.get_db)
+):
+    """
+    Elimina el historial de chat de un workspace.
+    Nota: Como no tenemos tabla de historial, esto es un placeholder.
+    """
+    # Verificar que el workspace existe
+    db_workspace = db.query(workspace_model.Workspace).filter(
+        workspace_model.Workspace.id == workspace_id
+    ).first()
+    
+    if not db_workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workspace con id {workspace_id} no encontrado."
+        )
+    
+    # TODO: Implementar eliminación de historial de chat cuando exista la tabla
+    print(f"Delete chat history requested for workspace {workspace_id}")
+    return

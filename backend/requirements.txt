@@ -4,8 +4,6 @@ uvicorn[standard]
 python-dotenv
 pydantic
 python-multipart
-slowapi  # Rate limiting
-websockets  # WebSockets para notificaciones en tiempo real
 
 # --- Configuración ---
 pydantic-settings
@@ -18,15 +16,11 @@ redis
 celery
 
 # --- IA y RAG ---
-langchain-text-splitters  # <-- CAMBIO: Paquete separado en LangChain 0.1+
-langchain-core
-qdrant-client
-google-generativeai
-sentence-transformers
-
-# Autenticación
-passlib[bcrypt]
-python-jose[cryptography]
+langchain-text-splitters>=0.2.0  # <-- Paquete separado en LangChain 0.1+
+langchain-core>=0.2.0
+qdrant-client>=1.7.0,<2.0.0  # Fijada para evitar breaking changes en la API
+google-generativeai>=0.3.0
+sentence-transformers>=2.2.0
 
 # --- Procesamiento de Documentos ---
 pandas
@@ -35,11 +29,3 @@ python-docx
 python-pptx
 PyPDF2
 pdfplumber
-reportlab  # Para exportar chat a PDF
-pytesseract  # OCR para PDFs escaneados
-pdf2image  # Convertir PDF a imágenes para OCR
-pillow  # Procesamiento de imágenes
-odfpy  # Para archivos ODT
-striprtf  # Para archivos RTF
-langdetect  # Detección automática de idioma
-tabulate  # Para formatear tablas extraídas

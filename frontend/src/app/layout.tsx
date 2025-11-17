@@ -1,21 +1,31 @@
-import { Inter } from "next/font/google";
-import "./globals.css";
+import type { Metadata } from "next";
+import Script from "next/script";
+import "./globals.css"; // La importación de CSS en el layout raíz es correcta
+import QueryProvider from "@/providers/QueryProvider";
 
-const inter = Inter({ subsets: ["latin"] });
-
-export const metadata = {
-  title: "Velvet AI",
-  description: "Sistema RAG para interactuar con documentos",
+export const metadata: Metadata = {
+  title: "Velvet Chat",
+  description: "Velvet AI Chat Interface",
 };
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
-    <html lang="es" className="dark">
-      <body className={inter.className}>{children}</body>
+    // Aplicamos la fuente (importada en globals.css) y el modo 'dark'
+    <html lang="en" className="dark" style={{ fontFamily: 'Roboto, sans-serif' }}>
+      <body>
+        <QueryProvider>
+          {children}
+        </QueryProvider>
+        {/* Polyfill para Speech Recognition en navegadores que lo necesiten */}
+        <Script
+          src="https://unpkg.com/regenerator-runtime@0.13.11/runtime.js"
+          strategy="beforeInteractive"
+        />
+      </body>
     </html>
   );
 }

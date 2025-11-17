@@ -1,40 +1,19 @@
-# Multi-stage build para optimizar tamaño de imagen
+# 1. Usar la imagen oficial de Python
 FROM python:3.11-slim
 
-# Establecer variables de entorno
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
-
-# Establecer el directorio de trabajo
+# 2. Establecer el directorio de trabajo
 WORKDIR /app
 
-# Copiar solo requirements primero para aprovechar cache de Docker
+# 3. Copiar el archivo de requerimientos
 COPY requirements.txt .
 
-# Instalar dependencias del sistema si son necesarias
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    gcc \
-    tesseract-ocr \
-    tesseract-ocr-spa \
-    tesseract-ocr-eng \
-    poppler-utils \
-    && rm -rf /var/lib/apt/lists/*
+# 4. --- CORRECCIÓN ---
+# Instalar todas las dependencias en una sola capa (layer)
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir -r requirements.txt
 
-# Instalar dependencias de Python
-RUN pip install --upgrade pip && \
-    pip install torch --index-url https://download.pytorch.org/whl/cpu && \
-    pip install -r requirements.txt
-
-# Copiar el código de la aplicación
+# 5. Copiar el código de la aplicación
 COPY . .
 
-# Crear directorio para uploads temporales
-RUN mkdir -p temp_uploads
-
-# Exponer puerto
-EXPOSE 8000
-
-# El comando se proporciona en docker-compose.yml
+# (El 'command' se proporciona en docker-compose.yml)

@@ -1,8 +1,9 @@
 import uuid
-from sqlalchemy import Column, String, DateTime, Boolean, func
+from sqlalchemy import Column, String, DateTime, Boolean, func,Text
 from sqlalchemy.dialects.mysql import CHAR
 from sqlalchemy.orm import relationship
 from .database import Base
+
 
 class Workspace(Base):
     __tablename__ = "workspaces"
@@ -14,11 +15,16 @@ class Workspace(Base):
     name = Column(String(100), nullable=False, index=True)
     description = Column(String(500), nullable=True)
     
+    # Este será tu "System Prompt"
+    instructions = Column(Text, nullable=True)
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     is_active = Column(Boolean, default=True)
 
     # Relación: Un Workspace puede tener muchos Documentos
-    documents = relationship("Document", back_populates="workspace", cascade="all, delete-orphan")
-    
-    # Relación: Un Workspace puede tener muchos ChatMessages
-    chat_messages = relationship("ChatMessage", back_populates="workspace", cascade="all, delete-orphan")
+    documents = relationship(
+        "Document",
+        back_populates="workspace",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )

@@ -9,14 +9,11 @@ services:
       - ./backend:/app
     env_file:
       - ./backend/.env
-    secrets:
-      - gemini_api_key
     environment:
       # CAMBIO: Usar pymysql en lugar de mysqlclient
       - DATABASE_URL=mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
       - REDIS_URL=redis://redis:6379
       - QDRANT_URL=http://qdrant:6333
-      - ACTIVE_LLM_SERVICE=GEMINI
     depends_on:
       - mysql
       - qdrant
@@ -25,22 +22,31 @@ services:
 
   # 2. Frontend (Next.js)
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      target: deps 
     container_name: ia_frontend
     ports:
       - "3000:3000"
-    # Usar la imagen construida (multi-stage) y ejecutar en modo production.
-    # No montamos volúmenes para evitar sobrescribir los artefactos del build
-    # (./.next y node_modules) dentro de la imagen.
+    volumes:
+      # Monta solo las carpetas de código fuente y archivos de config
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/components.json:/app/components.json
+      - ./frontend/next.config.mjs:/app/next.config.mjs
+      - ./frontend/postcss.config.mjs:/app/postcss.config.mjs
+      - ./frontend/tailwind.config.ts:/app/tailwind.config.ts
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/package.json:/app/package.json
+      - ./frontend/package-lock.json:/app/package-lock.json
+      
+      # Mantenemos un volumen para el caché de build de Next.js
+      - /app/.next
     environment:
-      - NODE_ENV=production
-      - NEXT_TELEMETRY_DISABLED=1
       - NEXT_PUBLIC_API_URL=http://localhost:8000
-      - BACKEND_URL=http://backend:8000
     depends_on:
       - backend
-    # Ejecutar la imagen runner que ya tiene la build
-    command: npm start
+    command: npm run dev
 
   # 3. Base de Datos (Metadata)
   mysql:
@@ -83,15 +89,12 @@ services:
       - ./backend:/app
     env_file:
       - ./backend/.env
-    secrets:
-      - gemini_api_key
     environment:
       - PYTHONPATH=/app  # <-- ¡ESTA ES LA SOLUCIÓN!
       # CAMBIO: Usar pymysql en lugar de mysqlclient
       - DATABASE_URL=mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
       - REDIS_URL=redis://redis:6379
       - QDRANT_URL=http://qdrant:6333
-      - ACTIVE_LLM_SERVICE=GEMINI
     depends_on:
       - backend
       - redis
@@ -101,7 +104,3 @@ services:
 volumes:
   mysql_data:
   qdrant_data:
-
-secrets:
-  gemini_api_key:
-    file: ./secrets/gemini_api_key.txt
