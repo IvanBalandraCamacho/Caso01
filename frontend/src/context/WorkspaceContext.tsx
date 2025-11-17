@@ -8,7 +8,6 @@ import {
   useCallback,
   useEffect,
 } from "react";
-import io, { Socket } from "socket.io-client";
 
 // 1. Exportamos las interfaces para que otros archivos las usen
 export interface Workspace {
@@ -91,32 +90,6 @@ export function WorkspaceProvider({
     setNotifications((prev) => [...prev, notification]);
   };
 
-  // --- WebSocket connection ---
-  useEffect(() => {
-    if (activeWorkspace) {
-      const socket: Socket = io(`${apiUrl}/ws/v1/workspaces/${activeWorkspace.id}`);
-
-      socket.on("connect", () => {
-        console.log("Connected to WebSocket");
-      });
-
-      socket.on("disconnect", () => {
-        console.log("Disconnected from WebSocket");
-      });
-
-      socket.on("notification", (data: Notification) => {
-        addNotification(data);
-        if (data.type === "success") {
-          fetchDocuments(activeWorkspace.id);
-        }
-      });
-
-      return () => {
-        socket.disconnect();
-      };
-    }
-  }, [activeWorkspace, apiUrl]);
-
   // --- Función para cargar workspaces ---
   const fetchWorkspaces = useCallback(async () => {
     if (!apiUrl) return;
@@ -155,6 +128,26 @@ export function WorkspaceProvider({
     },
     [apiUrl]
   );
+
+  // --- Polling automático para documentos en procesamiento ---
+  useEffect(() => {
+    if (!activeWorkspace) return;
+    
+    // Verificar si hay documentos en estado PROCESSING o PENDING
+    const hasProcessingDocuments = documents.some(
+      doc => doc.status === "PROCESSING" || doc.status === "PENDING"
+    );
+    
+    if (hasProcessingDocuments) {
+      const intervalId = setInterval(() => {
+        fetchDocuments(activeWorkspace.id);
+      }, 3000); // Refrescar cada 3 segundos
+      
+      return () => {
+        clearInterval(intervalId);
+      };
+    }
+  }, [activeWorkspace, documents, fetchDocuments]);
 
   // --- Función para actualizar workspace ---
   const updateWorkspace = useCallback(
@@ -219,7 +212,6 @@ export function WorkspaceProvider({
     async (workspaceId: string) => {
       if (!apiUrl) return;
       try {
-        console.log('Exportando documentos a CSV...');
         const response = await fetch(
           `${apiUrl}/api/v1/workspaces/${workspaceId}/documents/export-csv`
         );
@@ -229,22 +221,19 @@ export function WorkspaceProvider({
           throw new Error(`No se pudo exportar a CSV: ${response.status}`);
         }
         const blob = await response.blob();
-        console.log('Blob recibido:', blob.size, 'bytes');
         
         const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `documents_${workspaceId}.csv`;
-        document.body.appendChild(a);
-        a.click();
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `documents_${workspaceId}.csv`;
+        document.body.appendChild(link);
+        link.click();
         
         // Cleanup
         setTimeout(() => {
-          document.body.removeChild(a);
+          document.body.removeChild(link);
           window.URL.revokeObjectURL(url);
         }, 100);
-        
-        console.log('✅ CSV descargado exitosamente');
       } catch (error: any) {
         console.error("Error al exportar a CSV:", error);
         alert(`Error al exportar CSV: ${error.message}`);
@@ -259,7 +248,6 @@ export function WorkspaceProvider({
     async (workspaceId: string) => {
       if (!apiUrl) return;
       try {
-        console.log('Exportando chat a TXT...');
         const response = await fetch(
           `${apiUrl}/api/v1/workspaces/${workspaceId}/chat/export/txt`
         );
@@ -269,7 +257,6 @@ export function WorkspaceProvider({
           throw new Error(`No se pudo exportar a TXT: ${response.status}`);
         }
         const blob = await response.blob();
-        console.log('Blob recibido:', blob.size, 'bytes');
         
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -283,8 +270,6 @@ export function WorkspaceProvider({
           document.body.removeChild(a);
           window.URL.revokeObjectURL(url);
         }, 100);
-        
-        console.log('✅ TXT descargado exitosamente');
       } catch (error: any) {
         console.error("Error al exportar a TXT:", error);
         alert(`Error al exportar TXT: ${error.message}`);
@@ -299,7 +284,6 @@ export function WorkspaceProvider({
     async (workspaceId: string) => {
       if (!apiUrl) return;
       try {
-        console.log('Exportando chat a PDF...');
         const response = await fetch(
           `${apiUrl}/api/v1/workspaces/${workspaceId}/chat/export/pdf`
         );
@@ -309,7 +293,6 @@ export function WorkspaceProvider({
           throw new Error(`No se pudo exportar a PDF: ${response.status}`);
         }
         const blob = await response.blob();
-        console.log('Blob recibido:', blob.size, 'bytes');
         
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -323,8 +306,6 @@ export function WorkspaceProvider({
           document.body.removeChild(a);
           window.URL.revokeObjectURL(url);
         }, 100);
-        
-        console.log('✅ PDF descargado exitosamente');
       } catch (error: any) {
         console.error("Error al exportar a PDF:", error);
         alert(`Error al exportar PDF: ${error.message}`);

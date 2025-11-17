@@ -14,6 +14,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useWorkspaces, Workspace, Document } from "@/context/WorkspaceContext";
 import { FileText, Trash2, Plus, Loader2 } from "lucide-react";
 import { UploadModal } from "./UploadModal"; // Reusamos el modal de subida
+import { useDeleteDocument, useUpdateWorkspace } from "@/hooks/useApi";
 
 interface EditWorkspaceModalProps {
   isOpen: boolean;
@@ -33,6 +34,10 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
 
   // Estado para la lógica de guardado
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Hooks de mutación
+  const updateWorkspaceMutation = useUpdateWorkspace();
+  const deleteDocumentMutation = useDeleteDocument();
 
   // Cargar datos del workspace (incluyendo 'instructions') y sus documentos
   useEffect(() => {
@@ -62,19 +67,38 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
   // Lógica para guardar los cambios del workspace
   const handleUpdate = async () => {
     setIsSaving(true);
-    // TODO: Llamar a la función del contexto que actualiza
-    // await updateWorkspace(workspace.id, { name, description, instructions });
-    console.log("Guardando:", { name, description, instructions });
-    setIsSaving(false);
-    onClose(); // Cerrar al guardar
+    
+    try {
+      await updateWorkspaceMutation.mutateAsync({
+        id: workspace.id,
+        updates: { name, description, instructions }
+      });
+      onClose(); // Cerrar al guardar
+    } catch (error: any) {
+      console.error("Error al actualizar workspace:", error);
+      const errorMessage = error?.response?.data?.detail || error?.message || "Error desconocido";
+      alert(`Error al actualizar el workspace: ${errorMessage}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Lógica para eliminar un documento
-  const handleDeleteDocument = async (docId: string) => {
-    if (!confirm("¿Estás seguro de que quieres eliminar este documento?")) return;
-    // TODO: Llamar a la función del contexto que elimina
-    // await deleteDocument(docId);
-    console.log("Eliminando documento:", docId);
+  const handleDeleteDocument = async (docId: string, fileName: string) => {
+    if (!confirm(`¿Estás seguro de que quieres eliminar "${fileName}"?`)) return;
+    
+    try {
+      await deleteDocumentMutation.mutateAsync({ 
+        documentId: docId, 
+        workspaceId: workspace.id 
+      });
+      // Refrescar la lista de documentos
+      fetchDocuments(workspace.id);
+    } catch (error: any) {
+      console.error("Error al eliminar documento:", error);
+      const errorMessage = error?.response?.data?.detail || error?.message || "Error desconocido";
+      alert(`Error al eliminar el documento: ${errorMessage}`);
+    }
   };
 
   return (
@@ -149,9 +173,14 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
                       variant="ghost" 
                       size="icon" 
                       className="text-red-500 hover:text-red-400 shrink-0"
-                      onClick={() => handleDeleteDocument(doc.id)}
+                      onClick={() => handleDeleteDocument(doc.id, doc.file_name)}
+                      disabled={deleteDocumentMutation.isPending}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      {deleteDocumentMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
                     </Button>
                   </div>
                 ))}

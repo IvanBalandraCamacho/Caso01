@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { EditWorkspaceModal } from "./EditWorkspaceModal";
 import { AddWorkspaceModal } from "./AddWorkspaceModal";
 import { useDeleteWorkspace } from "@/hooks/useApi";
+import Image from "next/image";
 
 export function Sidebar() {
   const {
@@ -90,9 +91,16 @@ export function Sidebar() {
   return (
     <>
       <aside className="w-72 bg-brand-dark-secondary flex flex-col p-4 border-r border-gray-800/50">
-        {/* Header: TIVIT */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-brand-light">TIVIT</h1>
+        {/* Header: Logo */}
+        <div className="mb-8 flex items-center justify-center">
+          <Image 
+            src="/logo.svg" 
+            alt="Logo de la empresa" 
+            width={600} 
+            height={152}
+            className="w-full h-auto max-w-[250px]"
+            priority
+          />
         </div>
 
         {/* Header: Velvet y Modelo */}

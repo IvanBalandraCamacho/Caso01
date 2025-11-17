@@ -66,12 +66,7 @@ export function ChatArea() {
     setChatHistory([]);
   }, [activeWorkspace?.id]);
 
-  // Debug: Verificar soporte de voz
-  useEffect(() => {
-    console.log('🔊 Browser supports speech recognition:', browserSupportsSpeechRecognition);
-    console.log('🎤 Listening:', listening);
-    console.log('💬 Transcript:', transcript);
-  }, [browserSupportsSpeechRecognition, listening, transcript]);
+
 
   const handleSendMessage = () => {
     if (!message.trim() || !activeWorkspace) return;
@@ -139,7 +134,6 @@ export function ChatArea() {
           continuous: true,
           language: 'es-ES', // Español de España
         });
-        console.log('✅ Reconocimiento de voz iniciado');
       } else {
         throw new Error('Tu navegador no soporta acceso al micrófono');
       }
@@ -157,7 +151,6 @@ export function ChatArea() {
   
   const stopListening = () => {
     SpeechRecognition.stopListening();
-    console.log('⏸️ Reconocimiento de voz detenido');
     setVoiceError(null);
   };
 
@@ -166,25 +159,16 @@ export function ChatArea() {
   }
 
   return (
-    <main className="flex-1 flex flex-col bg-brand-dark">
+    <main className="flex-1 flex flex-col bg-brand-dark h-screen overflow-hidden">
       <UploadModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
 
-      <header className="p-6 border-b border-gray-800/50 flex justify-between items-center">
+      <header className="p-6 border-b border-gray-800/50 flex justify-between items-center flex-shrink-0">
         <h2 className="text-xl font-semibold text-white">
           {activeWorkspace ? activeWorkspace.name : "Chat"}
         </h2>
 
         <div className="flex items-center space-x-3">
-          <Button
-            variant="outline"
-            className="text-gray-300 border-gray-700 hover:bg-gray-800"
-            onClick={() =>
-              activeWorkspace && exportChatToPdf(activeWorkspace.id)
-            }
-            disabled={!activeWorkspace}
-          >
-            Export to PDF
-          </Button>
+        {/* Aqui, por si vienes del Recuerda.md */}
           <Button
             variant="outline"
             className="text-gray-300 border-gray-700 hover:bg-gray-800"
@@ -212,7 +196,7 @@ export function ChatArea() {
       </header>
 
       {/* Área de Mensajes */}
-      <ScrollArea className="flex-1 p-6">
+      <ScrollArea className="flex-1 p-6 overflow-y-auto">
         {chatHistory.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full">
             <div className="text-center">
@@ -237,7 +221,7 @@ export function ChatArea() {
                 }`}
               >
                 <div
-                  className={`max-w-[80%] ${
+                  className={`max-w-[80%] break-words ${
                     msg.role === "user"
                       ? "bg-brand-red text-white"
                       : "bg-gray-800 text-gray-200"
@@ -294,7 +278,7 @@ export function ChatArea() {
       </ScrollArea>
 
       {/* Footer con el Input */}
-      <footer className="p-6">
+      <footer className="p-6 border-t border-gray-800/50 flex-shrink-0 bg-brand-dark">
         {/* Estado del reconocimiento de voz */}
         {listening && (
           <div className="mb-2 text-sm text-red-400 flex items-center gap-2 animate-pulse">

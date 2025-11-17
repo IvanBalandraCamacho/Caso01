@@ -66,6 +66,8 @@
 @layer components {
   .markdown-content {
     @apply text-gray-200;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
   }
   
   .markdown-content h1,
@@ -73,6 +75,7 @@
   .markdown-content h3,
   .markdown-content h4 {
     @apply font-bold text-white mt-4 mb-2;
+    word-wrap: break-word;
   }
   
   .markdown-content h1 { @apply text-2xl; }
@@ -81,6 +84,8 @@
   
   .markdown-content p {
     @apply mb-3 leading-relaxed;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
   }
   
   .markdown-content ul,
@@ -98,6 +103,7 @@
   
   .markdown-content li {
     @apply text-gray-200;
+    word-wrap: break-word;
   }
   
   .markdown-content strong {
@@ -110,26 +116,38 @@
   
   .markdown-content code {
     @apply bg-gray-900 px-1.5 py-0.5 rounded text-sm font-mono;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
   }
   
   .markdown-content pre {
-    @apply bg-gray-900 p-4 rounded-lg mb-3 overflow-x-auto;
+    @apply bg-gray-900 p-4 rounded-lg mb-3;
+    overflow-x: auto;
+    max-width: 100%;
   }
   
   .markdown-content pre code {
     @apply bg-transparent px-0 py-0 text-green-400;
+    white-space: pre;
+    display: block;
   }
   
   .markdown-content blockquote {
     @apply border-l-4 border-gray-600 pl-4 italic text-gray-300 mb-3;
+    word-wrap: break-word;
   }
   
   .markdown-content a {
     @apply text-blue-400 hover:text-blue-300 underline;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
   }
   
   .markdown-content table {
     @apply min-w-full border-collapse border border-gray-700 mb-3;
+    display: block;
+    overflow-x: auto;
+    max-width: 100%;
   }
   
   .markdown-content th {
@@ -138,6 +156,7 @@
   
   .markdown-content td {
     @apply border border-gray-700 px-3 py-2;
+    word-wrap: break-word;
   }
   
   .markdown-content hr {

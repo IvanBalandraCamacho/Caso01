@@ -19,9 +19,10 @@ export function DocumentList({ documents, workspaceId, onDeleteSuccess }: Docume
       try {
         await deleteDocumentMutation.mutateAsync({ documentId, workspaceId: workspaceId || '' });
         onDeleteSuccess?.();
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error al eliminar documento:", error);
-        alert("Error al eliminar el documento. Intenta nuevamente.");
+        const errorMessage = error?.response?.data?.detail || error?.message || "Error desconocido";
+        alert(`Error al eliminar el documento: ${errorMessage}`);
       }
     }
   };
