@@ -91,3 +91,29 @@ class WorkspaceUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
     instructions: str | None = None
+
+
+# --- Summary Schemas ---
+class SummaryRequest(BaseModel):
+    """Solicita un resumen. Proveer `document_id` o subir `file` en multipart/form-data."""
+    document_id: str | None = None
+    # Si se provee documento guardado, se usará su workspace asociado; opcionalmente puede pasarse workspace_id
+    workspace_id: str | None = None
+    # Opciones básicas
+    mode: str | None = "sync"  # sync | async (async no-implementado aún)
+
+
+class SummarySections(BaseModel):
+    administrativo: str
+    posibles_competidores: str
+    tecnico: str
+    viabilidad_del_alcance: str
+
+
+class SummaryResponse(BaseModel):
+    """Respuesta con las cuatro secciones obligatorias según `summary_instructions.md`."""
+    document_id: str | None = None
+    summary: SummarySections
+
+    class Config:
+        from_attributes = True

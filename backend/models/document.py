@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, DateTime, func, ForeignKey, Integer
+from sqlalchemy import Column, String, DateTime, func, ForeignKey, Integer, Text
 from sqlalchemy.dialects.mysql import CHAR
 from sqlalchemy.orm import relationship
 from .database import Base
@@ -14,6 +14,7 @@ class Document(Base):
     status = Column(String(50), nullable=False, default="PENDING") # PENDING -> PROCESSING -> COMPLETED -> FAILED
     
     chunk_count = Column(Integer, default=0) # Cuántos chunks vectoriales tiene en Qdrant
+    
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     

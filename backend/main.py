@@ -2,6 +2,7 @@ import os
 import time
 from fastapi import FastAPI
 from api.routes import health, workspaces
+from api.routes import document_summary
 from core.config import settings
 from models import database
 from sqlalchemy.exc import OperationalError
@@ -50,6 +51,7 @@ app.add_middleware(
 # --- Registrar Routers ---
 app.include_router(health.router, prefix="/api/v1", tags=["Health Check"])
 app.include_router(workspaces.router, prefix="/api/v1", tags=["Workspaces"])
+app.include_router(document_summary.router, prefix="/api/v1", tags=["Documents"])
 
 @app.get("/")
 def read_root():

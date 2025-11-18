@@ -156,3 +156,37 @@ def delete_workspace_vectors(workspace_id: str):
         print(
             f"VECTOR_STORE: No se pudo eliminar la colección {collection_name}: {exc}"
         )
+
+
+def get_document_chunks(document_id: str, workspace_id: str, limit: int = 1000) -> list[DocumentChunk]:
+    """
+    Recupera todos los chunks (hasta `limit`) asociados a un `document_id`
+    recorriendo la colección y filtrando por payload.
+    """
+    collection_name = f"workspace_{workspace_id}"
+    print(f"VECTOR_STORE: Recuperando chunks para document_id={document_id} en {collection_name}...")
+
+    try:
+        # Usar scroll para obtener puntos con payload
+        all_points = qdrant_client.scroll(collection_name=collection_name, with_payload=True, limit=limit).points
+    except Exception as e:
+        print(f"VECTOR_STORE: Error al hacer scroll en Qdrant: {e}")
+        return []
+
+    chunks: list[DocumentChunk] = []
+    for p in all_points:
+        payload = getattr(p, 'payload', {}) or {}
+        if payload.get('document_id') == document_id:
+            chunks.append(
+                DocumentChunk(
+                    document_id=payload.get('document_id'),
+                    chunk_text=payload.get('chunk_text'),
+                    chunk_index=payload.get('chunk_index', 0),
+                    score=getattr(p, 'score', 0.0)
+                )
+            )
+
+    # Ordenar por índice de chunk para intentar reconstruir el texto en orden
+    chunks.sort(key=lambda c: c.chunk_index)
+    print(f"VECTOR_STORE: {len(chunks)} chunks recuperados para documento {document_id}.")
+    return chunks
