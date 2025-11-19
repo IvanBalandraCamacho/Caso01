@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import StreamingResponse, FileResponse
-import shutil 
+import shutil
 import os
-import uuid  
+import uuid
 from pathlib import Path
 from sqlalchemy.orm import Session
 from models import database, workspace as workspace_model, document as document_model, schemas
@@ -10,9 +10,11 @@ from core.celery_app import celery_app
 from processing import vector_store
 from core import llm_service
 from models.schemas import WorkspaceUpdate
+from models.conversation import Conversation, Message
 import csv
 import io
-from datetime import datetime 
+from datetime import datetime
+import json
 
 router = APIRouter()
 
@@ -178,40 +180,85 @@ def chat_with_workspace(
     db_workspace = db.query(workspace_model.Workspace).filter(
         workspace_model.Workspace.id == workspace_id
     ).first()
-    
-    if not db_workspace:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Workspace con id {workspace_id} no encontrado."
-        )
-
     try:
-        # 2. Paso de Recuperación (Retrieve)
+        # 2. Obtener o crear conversación
+        conversation = None
+        if chat_request.conversation_id:
+            conversation = db.query(Conversation).filter(
+                Conversation.id == chat_request.conversation_id,
+                Conversation.workspace_id == workspace_id
+            ).first()
+            if not conversation:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversación no encontrada.")
+        else:
+            title = chat_request.query[:50] + "..." if len(chat_request.query) > 50 else chat_request.query
+            conversation = Conversation(workspace_id=workspace_id, title=title)
+            db.add(conversation)
+            db.commit()
+            db.refresh(conversation)
+
+        # Guardar mensaje del usuario
+        user_message = Message(conversation_id=conversation.id, role="user", content=chat_request.query)
+        db.add(user_message)
+        db.commit()
+
+        # Recuperación (Retrieve) con top_k dinámico
+        query_length = len(chat_request.query.split())
+        top_k = 15 if query_length > 20 else 10
+
         relevant_chunks = vector_store.search_similar_chunks(
             query=chat_request.query,
-            workspace_id=workspace_id
+            workspace_id=workspace_id,
+            top_k=top_k
         )
-        
+
+        # Si no hay chunks, devolver mensaje informativo
         if not relevant_chunks:
-            # Si no hay chunks, no podemos contestar
             return schemas.ChatResponse(
                 query=chat_request.query,
                 llm_response="No encontré documentos relevantes para esta consulta. Intente subir un archivo primero.",
                 relevant_chunks=[]
             )
 
-        # 3. Paso de Generación (Generate)
-        llm_response_text = llm_service.generate_response(
-            query=chat_request.query,
-            context_chunks=relevant_chunks
-        )
-        
-        # 4. Devolver la respuesta completa
-        return schemas.ChatResponse(
-            query=chat_request.query,
-            llm_response=llm_response_text,
-            relevant_chunks=relevant_chunks
-        )
+        # Generador para streaming NDJSON
+        def stream_response_generator(conversation_id, relevant_chunks):
+            # Emitir fuentes/metadatos primero
+            sources_data = [
+                schemas.DocumentChunk(
+                    document_id=chunk.document_id,
+                    chunk_text=chunk.chunk_text,
+                    chunk_index=chunk.chunk_index,
+                    score=chunk.score,
+                ).model_dump() for chunk in relevant_chunks
+            ]
+
+            yield json.dumps({
+                "type": "sources",
+                "relevant_chunks": sources_data,
+                "conversation_id": conversation_id
+            }) + "\n"
+
+            full_response_text = ""
+            try:
+                for token in llm_service.generate_response_stream(chat_request.query, relevant_chunks):
+                    full_response_text += token
+                    yield json.dumps({"type": "content", "text": token}) + "\n"
+            except Exception as e:
+                print(f"API_CHAT: Error durante streaming: {e}")
+                yield json.dumps({"type": "error", "detail": str(e)}) + "\n"
+                return
+
+            # Guardar mensaje del asistente al final del stream
+            try:
+                with database.SessionLocal() as db_session:
+                    assistant_message = Message(conversation_id=conversation_id, role="assistant", content=full_response_text)
+                    db_session.add(assistant_message)
+                    db_session.commit()
+                    print(f"API_CHAT: Respuesta guardada para conversación {conversation_id}")
+            except Exception as e:
+                print(f"API_CHAT: Error guardando historial: {e}")
+
+        return StreamingResponse(stream_response_generator(conversation.id, relevant_chunks), media_type="application/x-ndjson")
         
     except Exception as e:
         print(f"API_CHAT: Error al procesar el chat: {e}")

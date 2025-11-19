@@ -8,6 +8,11 @@ python-multipart
 # --- Configuración ---
 pydantic-settings
 
+# --- Seguridad ---
+pyjwt
+passlib[bcrypt]
+slowapi
+
 # --- Base de datos y Cache ---
 pymysql
 cryptography  # Requerido por PyMySQL
@@ -19,7 +24,7 @@ celery
 langchain-text-splitters>=0.2.0  # <-- Paquete separado en LangChain 0.1+
 langchain-core>=0.2.0
 qdrant-client>=1.7.0,<2.0.0  # Fijada para evitar breaking changes en la API
-google-generativeai>=0.3.0
+google-generativeai>=0.5.2
 sentence-transformers>=2.2.0
 
 # --- Procesamiento de Documentos ---
@@ -27,5 +32,6 @@ pandas
 openpyxl
 python-docx
 python-pptx
-PyPDF2
+pypdf
 pdfplumber
+reportlab  # Para generar PDFs con formato profesional

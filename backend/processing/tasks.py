@@ -27,19 +27,23 @@ def process_document(document_id: str, temp_file_path_str: str):
             print(f"WORKER: ERROR - Documento ID {document_id} no encontrado.")
             return
 
+        # --- OPTIMIZACIÓN: Evitar re-procesamiento ---
+        if db_document.status == "COMPLETED":
+            print(f"WORKER: Documento {document_id} ya está completado. Saltando.")
+            return
+
         db_document.status = "PROCESSING"
         db.commit()
         print(f"WORKER: Documento {document_id} en estado PROCESSING.")
 
-        # 3. --- LÓGICA RAG REAL ---
-        print(f"WORKER: Extrayendo texto de {temp_file_path}...")
-        full_text = parser.extract_text_from_file(temp_file_path)
+        # 3. --- LÓGICA RAG REAL (STREAMING) ---
+        print(f"WORKER: Iniciando extracción streaming de {temp_file_path}...")
+        text_iterator = parser.extract_text_from_file(temp_file_path)
         
-        # --- CORRECCIÓN (Esta era la línea del error) ---
-        print("WORKER: Vectorizando e indexando texto...") # Se quitó la 'f'
+        print("WORKER: Vectorizando e indexando texto (Streaming)...")
         
         chunk_count = vector_store.process_and_embed_text(
-            text=full_text,
+            text_iterator=text_iterator,
             document_id=db_document.id,
             workspace_id=db_document.workspace_id
         )

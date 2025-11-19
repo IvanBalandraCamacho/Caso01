@@ -73,6 +73,7 @@ class DocumentPublic(DocumentBase):
 class ChatRequest(BaseModel):
     """Schema para la pregunta del usuario."""
     query: str
+    conversation_id: str | None = None  # Opcional: ID de conversación existente
     
 class DocumentChunk(BaseModel):
     """Representa un chunk de contexto recuperado."""
@@ -86,34 +87,104 @@ class ChatResponse(BaseModel):
     query: str
     llm_response: str
     relevant_chunks: list[DocumentChunk]
+    conversation_id: str  # ID de la conversación creada o usada
     
 class WorkspaceUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
     instructions: str | None = None
 
+# --- Conversation Schemas ---
 
-# --- Summary Schemas ---
-class SummaryRequest(BaseModel):
-    """Solicita un resumen. Proveer `document_id` o subir `file` en multipart/form-data."""
-    document_id: str | None = None
-    # Si se provee documento guardado, se usará su workspace asociado; opcionalmente puede pasarse workspace_id
-    workspace_id: str | None = None
-    # Opciones básicas
-    mode: str | None = "sync"  # sync | async (async no-implementado aún)
+class MessageCreate(BaseModel):
+    """Schema para crear un mensaje."""
+    role: str  # 'user' o 'assistant'
+    content: str
+    chunk_references: str | None = None
 
-
-class SummarySections(BaseModel):
-    administrativo: str
-    posibles_competidores: str
-    tecnico: str
-    viabilidad_del_alcance: str
-
-
-class SummaryResponse(BaseModel):
-    """Respuesta con las cuatro secciones obligatorias según `summary_instructions.md`."""
-    document_id: str | None = None
-    summary: SummarySections
-
+class MessagePublic(BaseModel):
+    """Schema para devolver un mensaje."""
+    id: str
+    conversation_id: str
+    role: str
+    content: str
+    chunk_references: str | None = None
+    created_at: datetime
+    
     class Config:
         from_attributes = True
+
+class ConversationCreate(BaseModel):
+    """Schema para crear una conversación."""
+    workspace_id: str
+    title: str
+
+class ConversationUpdate(BaseModel):
+    """Schema para actualizar una conversación."""
+    title: str
+
+class ConversationPublic(BaseModel):
+    """Schema para devolver una conversación."""
+    id: str
+    workspace_id: str
+    title: str
+    created_at: datetime
+    updated_at: datetime
+    message_count: int = 0  # Calculado
+    
+    class Config:
+        from_attributes = True
+
+class ConversationWithMessages(ConversationPublic):
+    """Schema para conversación con todos sus mensajes."""
+    messages: list[MessagePublic] = []
+
+# ========================
+# Document Generation Schemas
+# ========================
+
+# --- Schemas para Generación de Documentos Descargables ---
+
+class GenerateDownloadableDocRequest(BaseModel):
+    """Schema para solicitar generación de documento descargable."""
+    format: str = "markdown"  # 'txt', 'markdown', 'pdf'
+    document_type: str = "complete"  # 'complete', 'summary', 'key_points'
+    include_metadata: bool = True
+    custom_instructions: str | None = None
+
+class DownloadableDocumentResponse(BaseModel):
+    """Schema para respuesta de documento descargable."""
+    content: str
+    filename: str
+    format: str
+    word_count: int
+    message: str
+
+
+# --- User Schemas (Autenticación) ---
+
+class UserBase(BaseModel):
+    email: str
+    full_name: str | None = None
+
+class UserCreate(UserBase):
+    password: str
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class UserPublic(UserBase):
+    id: str
+    is_active: bool
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+class TokenData(BaseModel):
+    email: str | None = None

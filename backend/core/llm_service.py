@@ -1,185 +1,156 @@
+import json
+import time
 import google.generativeai as genai
 from core.config import settings
 from models.schemas import DocumentChunk
 
-# Configurar el cliente de Google AI
+# Inicializar cliente Gemini
 print("LLM_SERVICE: Configurando el cliente de Gemini...")
 genai.configure(api_key=settings.GEMINI_API_KEY)
 
-# Configuración de generación y seguridad
+# Configuración (preferimos esta variante stashed)
 generation_config = {
-  "temperature": 0.2, # Un valor bajo para respuestas más consistentes y basadas en hechos
-  "top_p": 1,
-  "top_k": 1,
-  "max_output_tokens": 2048,
+    "temperature": 0.8,
+    "top_p": 0.95,
+    "top_k": 64,
+    "max_output_tokens": 8192,
+    "response_mime_type": "text/plain",
 }
 
 safety_settings = [
-  {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-  {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-  {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-  {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
 ]
 
-# Inicializar el modelo
 try:
-    model = genai.GenerativeModel(model_name="gemini-2.5-flash", # Usamos el modelo estándar
-                                  generation_config=generation_config,
-                                  safety_settings=safety_settings)
-    print("LLM_SERVICE: Modelo Gemini 'gemini-2.5-flash' cargado.")
+    model = genai.GenerativeModel(
+        model_name="gemini-1.5-flash",
+        generation_config=generation_config,
+        safety_settings=safety_settings,
+    )
+    print("LLM_SERVICE: Modelo Gemini cargado correctamente.")
 except Exception as e:
-    print(f"LLM_SERVICE: ERROR al cargar el modelo Gemini: {e}")
-    model = None
+    from typing import List
+    import time
+    import google.generativeai as genai
+    from core.config import settings
+    from models.schemas import DocumentChunk
 
-def _build_prompt(query: str, context_chunks: list[DocumentChunk]) -> str:
-    """
-    Construye el prompt para el LLM, combinando la consulta y el contexto.
-    """
-    
-    # 1. Formatear el contexto
-    context_string = ""
-    for i, chunk in enumerate(context_chunks):
-        context_string += f"--- Contexto Chunk {i+1} (del Documento {chunk.document_id}) ---\n"
-        context_string += chunk.chunk_text
-        context_string += "\n--------------------------------------------------\n\n"
-        
-    # 2. Crear el prompt final
-    prompt = f"""
-    Eres un asistente de IA experto en analizar documentos. Tu tarea es responder la pregunta del usuario basándote ÚNICA Y EXCLUSIVAMENTE en el contexto proporcionado.
-    
-    No utilices ningún conocimiento externo. Si la respuesta no se encuentra en el contexto, di "No encontré información suficiente en los documentos para responder a esa pregunta."
-    
-    =========================
-    CONTEXTO PROPORCIONADO:
+    # Configurar el cliente Gemini
+    genai.configure(api_key=settings.GEMINI_API_KEY)
+
+    # Configuración recomendada (Stashed)
+    generation_config = {
+        "temperature": 0.8,
+        "top_p": 0.95,
+        "top_k": 64,
+        "max_output_tokens": 8192,
+        "response_mime_type": "text/plain",
+    }
+
+    safety_settings = [
+        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+    ]
+
+    try:
+        model = genai.GenerativeModel(
+            model_name="gemini-1.5-flash",
+            generation_config=generation_config,
+            safety_settings=safety_settings,
+        )
+    except Exception:
+        model = None
+
+
+    def _build_prompt(query: str, context_chunks: List[DocumentChunk]) -> str:
+        if context_chunks:
+            context_string = "=== CONTEXTO DE LOS DOCUMENTOS ===\n\n"
+            for i, chunk in enumerate(context_chunks):
+                score = getattr(chunk, "score", 0.0)
+                context_string += f"📄 Fragmento {i+1} (Relevancia: {score:.2f}):\n"
+                context_string += chunk.chunk_text.strip() + "\n"
+                context_string += "\n" + ("=" * 80) + "\n\n"
+        else:
+            context_string = "=== CONTEXTO ===\nNo hay documentos disponibles para esta consulta.\n\n"
+
+        prompt = f"""Eres un asistente de IA profesional, preciso y detallado especializado en análisis de documentos.
+
     {context_string}
-    =========================
-    
-    PREGUNTA DEL USUARIO:
+
+    === PREGUNTA DEL USUARIO ===
     {query}
-    
-    RESPUESTA:
+
+    === INSTRUCCIONES ===
+    - Responde usando solo la información provista en el contexto cuando exista.
+    - Organiza la respuesta en secciones claras; usa listas cuando sea apropiado.
+    - Proporciona recomendaciones accionables si corresponde.
+
+    === RESPUESTA ===
     """
-    return prompt
-
-def generate_response(query: str, context_chunks: list[DocumentChunk]) -> str:
-    """
-    Genera una respuesta de lenguaje natural usando el LLM.
-    """
-    if model is None:
-        return "Error: El modelo LLM no se inicializó correctamente."
-
-    # 1. Construir el prompt
-    prompt = _build_prompt(query, context_chunks)
-    
-    print(f"LLM_SERVICE: Enviando prompt a Gemini (longitud: {len(prompt)})...")
-    
-    try:
-        # 2. Llamar a la API de Gemini
-        response = model.generate_content(prompt)
-        
-        print("LLM_SERVICE: Respuesta recibida de Gemini.")
-        return response.text
-    
-    except Exception as e:
-        print(f"LLM_SERVICE: Error durante la generación de contenido: {e}")
-        return f"Error al contactar la API de Gemini: {e}"
+        return prompt
 
 
-def _build_summary_prompt(text: str, instructions_text: str | None = None) -> str:
-    """
-    Construye un prompt estrictamente enfocado a generar las 4 secciones
-    requeridas por `summary_instructions.md`. El LLM debe usar únicamente el texto
-    proporcionado y no inventar información.
-    """
-    # If an instructions file/text is provided, use it verbatim (trusted source).
-    if instructions_text:
-        instr = instructions_text.strip()
-    else:
-        instr = """
-Eres un asistente experto en análisis de propuestas comerciales.
-Analiza el siguiente documento y genera un resumen estructurado siguiendo EXACTAMENTE las cuatro secciones y criterios indicados:
+    def generate_response(query: str, context_chunks: List[DocumentChunk]) -> str:
+        if model is None:
+            raise RuntimeError("El modelo LLM no se inicializó correctamente.")
 
-1. Administrativo
- - Nivel de entendimiento de deadlines y cronograma (RFI/RFP).
- - Grado de cumplimiento con indicadores financieros y evidencia de experiencias pasadas relevantes al objeto del proceso licitatorio.
- - Certificaciones normativas, historial de cumplimiento, referencias de clientes y experiencias en operaciones similares.
+        prompt = _build_prompt(query, context_chunks)
 
-2. Posibles competidores
- - Identifica competidores mencionados o inferidos, incluyendo incumbentes o proveedores actuales.
-
-3. Técnico
- - Volumetría presentada o requerida.
- - Línea base de requisitos: parámetros necesarios para el proyecto (frameworks, requerimientos evolutivos, solicitudes adicionales).
- - Tecnologías, herramientas y recursos necesarios o propuestos.
-
-4. Viabilidad del alcance
- - Ajuste entre lo propuesto y las necesidades del proyecto.
- - Riesgos evidentes.
- - Brechas críticas.
- - Factores que favorecen o limitan la ejecución realista del alcance.
-
-INSTRUCCIONES IMPORTANTES:
-- Utiliza ÚNICA Y EXCLUSIVAMENTE la información presente en el documento abajo. No inventes, no supongas nada que no esté explícito.
-- Organiza la salida con los cuatro subtítulos: "Administrativo:", "Posibles competidores:", "Técnico:", "Viabilidad del alcance:".
-- Sé conciso y directo.
-"""
-
-    prompt = f"""
-{instr}
-
-DOCUMENTO:
-{text}
-
-SALIDA:
-"""
-    return prompt
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = model.generate_content(prompt)
+                text = getattr(response, "text", None)
+                if not text:
+                    raise ValueError("Respuesta vacía del modelo")
+                return text
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    raise RuntimeError(f"Fallo al generar respuesta: {e}") from e
+                time.sleep(1)
 
 
-def generate_summary_from_text(text: str, instructions_text: str | None = None) -> dict:
-    """Genera un resumen estructurado (4 secciones) a partir del texto completo del documento.
+    def generate_response_stream(query: str, context_chunks: List[DocumentChunk]):
+        if model is None:
+            raise RuntimeError("El modelo LLM no se inicializó correctamente.")
 
-    If `instructions_text` is provided, it will be used verbatim as the instruction template
-    (this allows using an external `summary_instructions.md` file to control the exact summary format).
-    """
-    if model is None:
-        return {"error": "LLM no inicializado"}
-    prompt = _build_summary_prompt(text, instructions_text=instructions_text)
-    print(f"LLM_SERVICE: Enviando prompt de resumen a Gemini (longitud: {len(prompt)})...")
-    try:
-        response = model.generate_content(prompt)
-        raw = response.text
+        prompt = _build_prompt(query, context_chunks)
 
-        # Intentamos dividir la respuesta en secciones según los subtítulos esperados.
-        # Esto no sustituye validación humana, pero ayuda a estructurar la salida.
-        sections = {
-            "administrativo": "",
-            "posibles_competidores": "",
-            "tecnico": "",
-            "viabilidad_del_alcance": ""
-        }
+        try:
+            stream = model.generate_content(prompt, stream=True)
+            for chunk in stream:
+                text = getattr(chunk, "text", None)
+                if text:
+                    yield text
+        except Exception as e:
+            raise RuntimeError(f"Error en streaming: {e}") from e
 
-        # Buscamos los encabezados en la respuesta (caso-insensible)
-        lower = raw.lower()
-        def extract_between(start_marker, end_marker=None):
-            s = lower.find(start_marker)
-            if s == -1:
-                return ""
-            s += len(start_marker)
-            if end_marker:
-                e = lower.find(end_marker, s)
-                if e == -1:
-                    return raw[s:].strip()
-                return raw[s:e].strip()
-            else:
-                return raw[s:].strip()
 
-        sections["administrativo"] = extract_between("administrativo", "posibles competidores")
-        sections["posibles_competidores"] = extract_between("posibles competidores", "técnico")
-        sections["tecnico"] = extract_between("técnico", "viabilidad del alcance")
-        sections["viabilidad_del_alcance"] = extract_between("viabilidad del alcance")
+    def _build_summary_prompt(text: str, instructions_text: str | None = None) -> str:
+        if instructions_text:
+            instr = instructions_text.strip()
+        else:
+            instr = (
+                "Eres un asistente experto en análisis de propuestas comerciales. "
+                "Genera un resumen estructurado en las secciones: Administrativo, Posibles competidores, Técnico, Viabilidad del alcance."
+            )
 
-        return sections
+        prompt = f"""{instr}\n\nDOCUMENTO:\n{text}\n\nSALIDA:"""
+        return prompt
 
-    except Exception as e:
-        print(f"LLM_SERVICE: Error al generar resumen: {e}")
-        return {"error": str(e)}
+
+    def generate_summary_from_text(text: str, instructions_text: str | None = None) -> dict:
+        if model is None:
+            return {"error": "LLM no inicializado"}
+        prompt = _build_summary_prompt(text, instructions_text=instructions_text)
+        try:
+            response = model.generate_content(prompt)
+            raw = getattr(response, "text", "")
+            return {"summary_raw": raw}
+        except Exception as e:
+            return {"error": str(e)}

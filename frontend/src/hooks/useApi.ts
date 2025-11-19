@@ -8,6 +8,8 @@ import {
   ChatRequest,
   ChatResponse,
   UploadDocumentParams,
+  ConversationWithMessages,
+  ConversationUpdate,
 } from '@/types/api';
 
 // ============================================
@@ -15,6 +17,8 @@ import {
 // ============================================
 const WORKSPACES_QUERY_KEY = 'workspaces';
 const DOCUMENTS_QUERY_KEY = 'documents';
+const CONVERSATIONS_QUERY_KEY = 'conversations';
+const CONVERSATION_DETAILS_QUERY_KEY = 'conversation-details';
 
 // ============================================
 // API FUNCTIONS - WORKSPACES
@@ -123,14 +127,88 @@ const deleteDocument = async ({ documentId, workspaceId }: { documentId: string;
 const postChatQuery = async ({
   workspaceId,
   query,
+  conversationId,
 }: {
   workspaceId: string;
   query: string;
+  conversationId?: string;
 }): Promise<ChatResponse> => {
-  const { data } = await apiClient.post<ChatResponse>(`/workspaces/${workspaceId}/chat`, {
+  const requestBody: ChatRequest = {
     query,
-  });
+    ...(conversationId && { conversation_id: conversationId }),
+  };
+
+  const { data } = await apiClient.post<ChatResponse>(
+    `/workspaces/${workspaceId}/chat`,
+    requestBody
+  );
   return data;
+};
+
+/**
+ * Enviar una consulta al chat con streaming (NDJSON)
+ */
+export const streamChatQuery = async ({
+  workspaceId,
+  query,
+  conversationId,
+  onChunk,
+  onError,
+  onFinish
+}: {
+  workspaceId: string;
+  query: string;
+  conversationId?: string;
+  onChunk: (chunk: any) => void;
+  onError: (error: any) => void;
+  onFinish: () => void;
+}) => {
+  const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1';
+
+  try {
+    const response = await fetch(`${baseURL}/workspaces/${workspaceId}/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query,
+        conversation_id: conversationId,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Error ${response.status}: ${response.statusText}`);
+    }
+
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+
+    if (!reader) throw new Error('No readable stream');
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\n');
+
+      for (const line of lines) {
+        if (line.trim()) {
+          try {
+            const data = JSON.parse(line);
+            onChunk(data);
+          } catch (e) {
+            console.warn('Error parsing JSON chunk:', line);
+          }
+        }
+      }
+    }
+    onFinish();
+  } catch (error) {
+    onError(error);
+  }
 };
 
 // ============================================
@@ -163,7 +241,7 @@ export const useWorkspaceById = (id: string) => {
  */
 export const useCreateWorkspace = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: createWorkspace,
     onSuccess: () => {
@@ -178,7 +256,7 @@ export const useCreateWorkspace = () => {
  */
 export const useUpdateWorkspace = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: updateWorkspace,
     onSuccess: (data) => {
@@ -194,7 +272,7 @@ export const useUpdateWorkspace = () => {
  */
 export const useDeleteWorkspace = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: deleteWorkspace,
     onSuccess: () => {
@@ -224,7 +302,7 @@ export const useWorkspaceDocuments = (workspaceId: string) => {
  */
 export const useUploadDocument = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: uploadDocument,
     onSuccess: (data) => {
@@ -239,7 +317,7 @@ export const useUploadDocument = () => {
  */
 export const useDeleteDocument = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: deleteDocument,
     onSuccess: (result) => {
@@ -259,10 +337,126 @@ export const useDeleteDocument = () => {
 
 /**
  * Hook para enviar consultas al chat
- * No invalida queries, solo maneja su propio estado
+ * Invalida conversations para actualizar la lista
  */
 export const useChat = (workspaceId: string) => {
+  const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: (query: string) => postChatQuery({ workspaceId, query }),
+    mutationFn: ({ query, conversationId }: { query: string; conversationId?: string }) =>
+      postChatQuery({ workspaceId, query, conversationId }),
+    onSuccess: () => {
+      // Invalidar conversaciones para que se actualice la lista en el sidebar
+      queryClient.invalidateQueries({ queryKey: [CONVERSATIONS_QUERY_KEY, workspaceId] });
+    },
+  });
+};
+
+// ============================================
+// API FUNCTIONS - CONVERSATIONS
+// ============================================
+
+/**
+ * Obtener una conversación con todos sus mensajes
+ * GET /workspaces/{workspace_id}/conversations/{conversation_id}
+ */
+const fetchConversationWithMessages = async ({
+  workspaceId,
+  conversationId,
+}: {
+  workspaceId: string;
+  conversationId: string;
+}): Promise<ConversationWithMessages> => {
+  const { data } = await apiClient.get<ConversationWithMessages>(
+    `/workspaces/${workspaceId}/conversations/${conversationId}`
+  );
+  return data;
+};
+
+/**
+ * Actualizar título de conversación
+ * PUT /workspaces/{workspace_id}/conversations/{conversation_id}
+ */
+const updateConversation = async ({
+  workspaceId,
+  conversationId,
+  updates,
+}: {
+  workspaceId: string;
+  conversationId: string;
+  updates: ConversationUpdate;
+}): Promise<ConversationWithMessages> => {
+  const { data } = await apiClient.put<ConversationWithMessages>(
+    `/workspaces/${workspaceId}/conversations/${conversationId}`,
+    updates
+  );
+  return data;
+};
+
+/**
+ * Eliminar una conversación
+ * DELETE /workspaces/{workspace_id}/conversations/{conversation_id}
+ */
+const deleteConversation = async ({
+  workspaceId,
+  conversationId,
+}: {
+  workspaceId: string;
+  conversationId: string;
+}): Promise<void> => {
+  await apiClient.delete(
+    `/workspaces/${workspaceId}/conversations/${conversationId}`
+  );
+};
+
+// ============================================
+// HOOKS - CONVERSATIONS
+// ============================================
+
+/**
+ * Hook para obtener una conversación con mensajes
+ */
+export const useConversationWithMessages = ({
+  workspaceId,
+  conversationId,
+}: {
+  workspaceId: string;
+  conversationId?: string;
+}) => {
+  return useQuery({
+    queryKey: [CONVERSATION_DETAILS_QUERY_KEY, workspaceId, conversationId],
+    queryFn: () => fetchConversationWithMessages({ workspaceId, conversationId: conversationId! }),
+    enabled: !!workspaceId && !!conversationId,
+  });
+};
+
+/**
+ * Hook para actualizar conversación
+ */
+export const useUpdateConversation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: updateConversation,
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: [CONVERSATIONS_QUERY_KEY, variables.workspaceId] });
+      queryClient.invalidateQueries({
+        queryKey: [CONVERSATION_DETAILS_QUERY_KEY, variables.workspaceId, variables.conversationId]
+      });
+    },
+  });
+};
+
+/**
+ * Hook para eliminar conversación
+ */
+export const useDeleteConversation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: deleteConversation,
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [CONVERSATIONS_QUERY_KEY, variables.workspaceId] });
+    },
   });
 };

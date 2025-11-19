@@ -3,10 +3,16 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Mic, Loader2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Mic, Loader2, FileText, Copy, Check } from "lucide-react";
 import { useWorkspaces } from "@/context/WorkspaceContext";
 import { UploadModal } from "./UploadModal";
-import { useChat } from "@/hooks/useApi";
+import { useChat, useConversationWithMessages, streamChatQuery } from "@/hooks/useApi";
 import SpeechRecognition, {
   useSpeechRecognition,
 } from "react-speech-recognition";
@@ -14,6 +20,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
+import { QuickPrompts } from "./QuickPrompts";
+import { showToast } from "./Toast";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -28,6 +36,8 @@ interface ChatMessage {
 export function ChatArea() {
   const {
     activeWorkspace,
+    activeConversation,
+    fetchConversations,
     exportChatToPdf,
     exportChatToTxt,
     deleteChatHistory,
@@ -37,8 +47,14 @@ export function ChatArea() {
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [currentConversationId, setCurrentConversationId] = useState<string | undefined>(undefined);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   const {
     transcript,
     listening,
@@ -47,7 +63,13 @@ export function ChatArea() {
   } = useSpeechRecognition();
 
   // Hook de chat - solo se activa si hay workspace activo
-  const chatMutation = useChat(activeWorkspace?.id || '');
+  // const chatMutation = useChat(activeWorkspace?.id || ''); // Deprecated for streaming
+
+  // Hook para cargar conversación con mensajes
+  const { data: conversationData, isLoading: isLoadingConversation } = useConversationWithMessages({
+    workspaceId: activeWorkspace?.id || '',
+    conversationId: activeConversation?.id,
+  });
 
   // Actualizar el mensaje con el transcript
   useEffect(() => {
@@ -64,44 +86,129 @@ export function ChatArea() {
   // Limpiar historial cuando cambia el workspace
   useEffect(() => {
     setChatHistory([]);
+    setCurrentConversationId(undefined);
   }, [activeWorkspace?.id]);
 
+  // Usar activeConversation si está disponible
+  useEffect(() => {
+    if (activeConversation) {
+      setCurrentConversationId(activeConversation.id);
+      // Cargar mensajes de la conversación si están disponibles
+      if (conversationData?.messages) {
+        const loadedMessages: ChatMessage[] = conversationData.messages.map(msg => ({
+          role: msg.role,
+          content: msg.content,
+          chunks: msg.chunk_references ? JSON.parse(msg.chunk_references) : undefined,
+        }));
+        setChatHistory(loadedMessages);
+      }
+    }
+  }, [activeConversation, conversationData]);
 
+  const handleQuickPrompt = (prompt: string) => {
+    setMessage(prompt);
+    // Esperar un momento para que el state se actualice antes de enviar
+    setTimeout(() => {
+      if (activeWorkspace) {
+        handleSendMessage(prompt);
+      }
+    }, 100);
+  };
 
-  const handleSendMessage = () => {
-    if (!message.trim() || !activeWorkspace) return;
+  const handleSendMessage = (overrideMessage?: string) => {
+    const query = overrideMessage || message;
+    if (!query.trim() || !activeWorkspace) return;
 
     // Agregar mensaje del usuario al historial
     const userMessage: ChatMessage = {
       role: "user",
-      content: message,
+      content: query,
     };
     setChatHistory((prev) => [...prev, userMessage]);
 
-    // Enviar consulta al backend
-    chatMutation.mutate(message, {
-      onSuccess: (response) => {
-        // Agregar respuesta del asistente
-        const assistantMessage: ChatMessage = {
-          role: "assistant",
-          content: response.llm_response,
-          chunks: response.relevant_chunks,
-        };
-        setChatHistory((prev) => [...prev, assistantMessage]);
+    // Agregar mensaje placeholder del asistente
+    const assistantMessage: ChatMessage = {
+      role: "assistant",
+      content: "",
+      chunks: [],
+    };
+    setChatHistory((prev) => [...prev, assistantMessage]);
+
+    setIsStreaming(true);
+
+    // Enviar consulta con streaming
+    streamChatQuery({
+      workspaceId: activeWorkspace.id,
+      query: query,
+      conversationId: currentConversationId,
+      onChunk: (data) => {
+        if (data.type === 'sources') {
+          setChatHistory(prev => {
+            const newHistory = [...prev];
+            const lastMsg = newHistory[newHistory.length - 1];
+            if (lastMsg.role === 'assistant') {
+              lastMsg.chunks = data.relevant_chunks;
+            }
+            return newHistory;
+          });
+          if (data.conversation_id && !currentConversationId) {
+            setCurrentConversationId(data.conversation_id);
+          }
+        } else if (data.type === 'content') {
+          setChatHistory(prev => {
+            const newHistory = [...prev];
+            const lastMsg = newHistory[newHistory.length - 1];
+            if (lastMsg.role === 'assistant') {
+              lastMsg.content += data.text;
+            }
+            return newHistory;
+          });
+        } else if (data.type === 'error') {
+          setChatHistory(prev => {
+            const newHistory = [...prev];
+            const lastMsg = newHistory[newHistory.length - 1];
+            if (lastMsg.role === 'assistant') {
+              lastMsg.content += `\n\n⚠️ Error: ${data.detail}`;
+            }
+            return newHistory;
+          });
+        }
       },
-      onError: (error: any) => {
-        // Agregar mensaje de error
-        const errorMessage: ChatMessage = {
-          role: "assistant",
-          content: `Error al procesar la solicitud de chat: ${error.response?.data?.detail || error.message}`,
-        };
-        setChatHistory((prev) => [...prev, errorMessage]);
+      onError: (err: any) => {
+        setChatHistory(prev => {
+          const newHistory = [...prev];
+          const lastMsg = newHistory[newHistory.length - 1];
+          if (lastMsg.role === 'assistant') {
+            lastMsg.content += `\n\n❌ Error de conexión: ${err.message}`;
+          }
+          return newHistory;
+        });
+        setIsStreaming(false);
       },
+      onFinish: () => {
+        setIsStreaming(false);
+        if (activeWorkspace) {
+          fetchConversations(activeWorkspace.id);
+        }
+      }
     });
 
-    // Limpiar input
+    // Limpiar input y archivos adjuntos
     setMessage("");
+    setAttachedFiles([]);
     resetTranscript();
+  };
+
+  const handleFileAttach = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      const newFiles = Array.from(files);
+      setAttachedFiles((prev) => [...prev, ...newFiles]);
+    }
+  };
+
+  const removeAttachedFile = (index: number) => {
+    setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -128,9 +235,9 @@ export function ChatArea() {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         stream.getTracks().forEach(track => track.stop()); // Detener el stream de prueba
-        
+
         // Iniciar reconocimiento de voz
-        SpeechRecognition.startListening({ 
+        SpeechRecognition.startListening({
           continuous: true,
           language: 'es-ES', // Español de España
         });
@@ -139,16 +246,16 @@ export function ChatArea() {
       }
     } catch (error: any) {
       console.error('❌ Error al iniciar reconocimiento de voz:', error);
-      const errorMsg = error.name === 'NotAllowedError' 
+      const errorMsg = error.name === 'NotAllowedError'
         ? 'Permiso de micrófono denegado. Por favor, permite el acceso al micrófono en la configuración de tu navegador.'
         : error.name === 'NotFoundError'
-        ? 'No se detectó ningún micrófono. Conecta un micrófono e intenta nuevamente.'
-        : `Error: ${error.message}`;
+          ? 'No se detectó ningún micrófono. Conecta un micrófono e intenta nuevamente.'
+          : `Error: ${error.message}`;
       setVoiceError(errorMsg);
       alert(errorMsg);
     }
   };
-  
+
   const stopListening = () => {
     SpeechRecognition.stopListening();
     setVoiceError(null);
@@ -168,10 +275,9 @@ export function ChatArea() {
         </h2>
 
         <div className="flex items-center space-x-3">
-        {/* Aqui, por si vienes del Recuerda.md */}
           <Button
             variant="outline"
-            className="text-gray-300 border-gray-700 hover:bg-gray-800"
+            className="text-gray-300 border-gray-700 hover:bg-gray-800 transition-all"
             onClick={() =>
               activeWorkspace && exportChatToTxt(activeWorkspace.id)
             }
@@ -180,18 +286,38 @@ export function ChatArea() {
             Export to TXT
           </Button>
           <Button
-            variant="destructive"
-            className="text-red-500 border-red-500/50 hover:bg-red-500/10"
-            onClick={handleClearHistory}
-            disabled={!activeWorkspace || chatHistory.length === 0}
+            variant="outline"
+            className="text-gray-300 border-gray-700 hover:bg-gray-800 transition-all"
+            onClick={() =>
+              activeWorkspace && exportChatToPdf(activeWorkspace.id)
+            }
+            disabled={!activeWorkspace}
           >
-            Clear History
+            Export to PDF
           </Button>
-          <Avatar className="h-8 w-8">
-            <AvatarImage src="https://github.com/shadcn.png" alt="JD" />
-            <AvatarFallback>JD</AvatarFallback>
-          </Avatar>
-          <span className="text-sm font-medium text-gray-300">PacoPruebas</span>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="flex items-center space-x-2 hover:bg-gray-800 transition-all">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src="https://github.com/shadcn.png" alt="User" />
+                  <AvatarFallback>PC</AvatarFallback>
+                </Avatar>
+                <span className="text-sm font-medium text-gray-300">PacoPruebas</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="bg-brand-dark-secondary border-gray-700 text-gray-300">
+              <DropdownMenuItem
+                onClick={handleClearHistory}
+                disabled={!activeWorkspace || chatHistory.length === 0}
+                className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+              >
+                Clear History
+              </DropdownMenuItem>
+              <DropdownMenuItem className="hover:bg-gray-700">
+                Settings
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 
@@ -199,16 +325,74 @@ export function ChatArea() {
       <ScrollArea className="flex-1 p-6 overflow-y-auto">
         {chatHistory.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full">
-            <div className="text-center">
-              <Avatar className="h-16 w-16 mx-auto mb-4">
+            <div className="text-center max-w-md">
+              <Avatar className="h-20 w-20 mx-auto mb-6 ring-4 ring-brand-red/20">
                 <AvatarImage src="https://github.com/shadcn.png" alt="Velvet" />
-                <AvatarFallback>V</AvatarFallback>
+                <AvatarFallback className="text-2xl">V</AvatarFallback>
               </Avatar>
-              <p className="text-lg text-gray-400">
-                {activeWorkspace
-                  ? `Bienvenido a ${activeWorkspace.name}. ¿En qué puedo ayudarte?`
-                  : "Selecciona un workspace para comenzar."}
-              </p>
+              {activeWorkspace ? (
+                <>
+                  <h3 className="text-2xl font-bold text-white mb-2">
+                    Bienvenido a {activeWorkspace.name}
+                  </h3>
+                  <p className="text-gray-400 mb-6">
+                    Pregunta lo que necesites sobre tus documentos
+                  </p>
+                  <div
+                    className={`flex flex-col space-y-3 transition-all duration-200 ${isDragging ? 'scale-105' : ''
+                      }`}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setIsDragging(true);
+                    }}
+                    onDragLeave={() => setIsDragging(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDragging(false);
+                      const files = Array.from(e.dataTransfer.files);
+                      if (files.length > 0) {
+                        setIsModalOpen(true);
+                      }
+                    }}
+                  >
+                    <div
+                      className={`border-2 border-dashed rounded-lg p-8 transition-all ${isDragging
+                        ? 'border-brand-red bg-brand-red/10 scale-105'
+                        : 'border-gray-700 bg-transparent'
+                        }`}
+                    >
+                      <Button
+                        onClick={() => setIsModalOpen(true)}
+                        className="w-full bg-brand-red hover:bg-red-700 text-white font-medium py-6 text-base transition-all transform hover:scale-105 shadow-lg hover:shadow-red-500/50"
+                      >
+                        📄 {isDragging ? 'Suelta tus archivos aquí' : 'Subir Documento'}
+                      </Button>
+                      <p className="text-sm text-gray-500 mt-3 text-center">
+                        {isDragging ? 'Suelta para subir' : 'o arrastra archivos aquí'}
+                      </p>
+                    </div>
+                  </div>
+                  <QuickPrompts
+                    onPromptClick={handleQuickPrompt}
+                    hasDocuments={false}
+                  />
+                </>
+              ) : (
+                <>
+                  <h3 className="text-2xl font-bold text-white mb-2">
+                    ¡Empieza ahora!
+                  </h3>
+                  <p className="text-gray-400 mb-6">
+                    Crea o selecciona un workspace desde la barra lateral para comenzar a chatear con tus documentos
+                  </p>
+                  <div className="animate-pulse">
+                    <div className="flex items-center justify-center space-x-2 text-brand-red">
+                      <span className="text-3xl">←</span>
+                      <span className="text-sm font-medium">Selecciona un workspace</span>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         ) : (
@@ -216,17 +400,37 @@ export function ChatArea() {
             {chatHistory.map((msg, index) => (
               <div
                 key={index}
-                className={`flex ${
-                  msg.role === "user" ? "justify-end" : "justify-start"
-                }`}
+                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"
+                  }`}
               >
                 <div
-                  className={`max-w-[80%] break-words ${
-                    msg.role === "user"
-                      ? "bg-brand-red text-white"
-                      : "bg-gray-800 text-gray-200"
-                  } rounded-lg p-4`}
+                  className={`max-w-[80%] break-words ${msg.role === "user"
+                    ? "bg-brand-red text-white"
+                    : "bg-gray-800 text-gray-200"
+                    } rounded-lg p-4 relative group`}
                 >
+                  {/* Botón de copiar (solo para mensajes del asistente) */}
+                  {msg.role === "assistant" && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-700"
+                      onClick={() => {
+                        navigator.clipboard.writeText(msg.content);
+                        setCopiedMessageId(`${index}`);
+                        showToast('Respuesta copiada al portapapeles', 'success');
+                        setTimeout(() => setCopiedMessageId(null), 2000);
+                      }}
+                      title="Copiar respuesta"
+                    >
+                      {copiedMessageId === `${index}` ? (
+                        <Check className="h-4 w-4 text-green-400" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </Button>
+                  )}
+
                   {msg.role === "user" ? (
                     <p className="whitespace-pre-wrap">{msg.content}</p>
                   ) : (
@@ -239,7 +443,7 @@ export function ChatArea() {
                       </ReactMarkdown>
                     </div>
                   )}
-                  
+
                   {/* Mostrar chunks relevantes si existen */}
                   {msg.chunks && msg.chunks.length > 0 && (
                     <div className="mt-4 pt-4 border-t border-gray-700">
@@ -262,23 +466,24 @@ export function ChatArea() {
                 </div>
               </div>
             ))}
-            
-            {/* Indicador de carga */}
-            {chatMutation.isPending && (
+
+            {/* Indicador de "Escribiendo..." */}
+            {isStreaming && (
               <div className="flex justify-start">
-                <div className="bg-gray-800 text-gray-200 rounded-lg p-4">
+                <div className="bg-gray-800 text-gray-200 rounded-lg p-4 flex items-center gap-2">
                   <Loader2 className="h-5 w-5 animate-spin" />
+                  <span className="text-sm">Escribiendo...</span>
                 </div>
               </div>
             )}
-            
+
             <div ref={messagesEndRef} />
           </div>
         )}
       </ScrollArea>
 
       {/* Footer con el Input */}
-      <footer className="p-6 border-t border-gray-800/50 flex-shrink-0 bg-brand-dark">
+      <footer className="p-6 border-t border-gray-800/50 flex-shrink-0 bg-brand-dark shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.3)]">
         {/* Estado del reconocimiento de voz */}
         {listening && (
           <div className="mb-2 text-sm text-red-400 flex items-center gap-2 animate-pulse">
@@ -296,39 +501,101 @@ export function ChatArea() {
             🎤 Transcripción actual: "{transcript}"
           </div>
         )}
-        <div className="relative bg-brand-dark-secondary rounded-lg">
-          <Input
-            className="w-full bg-transparent border border-gray-700 rounded-lg py-3 pl-4 pr-36 focus-visible:ring-brand-red text-gray-300 placeholder-gray-500 h-12"
-            placeholder="Escribe tu mensaje..."
-            disabled={!activeWorkspace || chatMutation.isPending}
+
+        {/* Archivos adjuntos */}
+        {attachedFiles.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-2">
+            {attachedFiles.map((file, index) => (
+              <div
+                key={index}
+                className="flex items-center gap-2 bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300 hover:border-gray-600 transition-all"
+              >
+                <FileText className="h-4 w-4 text-brand-red" />
+                <span className="max-w-[200px] truncate">{file.name}</span>
+                <button
+                  onClick={() => removeAttachedFile(index)}
+                  className="text-gray-500 hover:text-red-400 transition-colors"
+                  title="Eliminar archivo"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="relative bg-brand-dark-secondary rounded-lg border border-gray-700 hover:border-gray-600 focus-within:border-brand-red transition-all">
+          {/* Contador de caracteres */}
+          <div className="absolute top-2 right-2 text-xs text-gray-500 pointer-events-none z-10">
+            {message.length} {message.length > 1000 && <span className="text-yellow-500">(largo)</span>}
+          </div>
+
+          <textarea
+            ref={textareaRef}
+            className="w-full bg-transparent rounded-lg py-3 pl-4 pr-20 focus-visible:ring-0 focus-visible:outline-none text-gray-300 placeholder-gray-500 resize-none min-h-[3rem] max-h-40 leading-relaxed"
+            placeholder="Escribe tu mensaje... (Shift + Enter para nueva línea, @ para mencionar documento)"
+            disabled={!activeWorkspace || isStreaming}
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onChange={(e) => {
+              setMessage(e.target.value);
+              const target = e.target as HTMLTextAreaElement;
+              target.style.height = 'auto';
+              target.style.height = Math.min(target.scrollHeight, 160) + 'px';
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+            }}
+            rows={1}
+            style={{
+              height: 'auto',
+              minHeight: '3rem',
+            }}
           />
-          <div className="absolute inset-y-0 right-0 flex items-center pr-2">
+          <div className="absolute bottom-2 right-2 flex items-center gap-2">
             <Button
               variant="secondary"
-              className={`${listening ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse' : 'bg-gray-700/50 hover:bg-gray-600/50 text-gray-300'}`}
+              size="icon"
+              className={`${listening ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse' : 'bg-gray-700/50 hover:bg-gray-600 text-gray-300'} transition-all transform hover:scale-110`}
               disabled={!activeWorkspace}
               onClick={listening ? stopListening : startListening}
               title={listening ? 'Detener grabación (grabando...)' : 'Iniciar reconocimiento de voz'}
             >
               <Mic className="h-5 w-5" />
             </Button>
+
+            {/* Input oculto para archivos */}
+            <input
+              type="file"
+              id="file-attach"
+              className="hidden"
+              multiple
+              accept=".pdf,.docx,.xlsx,.txt,.csv"
+              onChange={handleFileAttach}
+              disabled={!activeWorkspace}
+            />
             <Button
               variant="secondary"
-              className="bg-gray-700/50 hover:bg-gray-600/50 text-gray-300"
+              className="bg-gray-700/50 hover:bg-gray-600 text-gray-300 transition-all relative group"
               disabled={!activeWorkspace}
-              onClick={() => setIsModalOpen(true)}
+              onClick={() => document.getElementById('file-attach')?.click()}
+              title="Adjuntar archivos"
             >
-              Attach
+              📎 Attach
+              {attachedFiles.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-brand-red text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {attachedFiles.length}
+                </span>
+              )}
             </Button>
             <Button
-              className="ml-2 bg-brand-red text-white hover:bg-red-700"
-              disabled={!activeWorkspace || !message.trim() || chatMutation.isPending}
-              onClick={handleSendMessage}
+              className="bg-brand-red text-white hover:bg-red-600 hover:shadow-lg hover:shadow-red-500/50 transition-all transform hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none"
+              disabled={!activeWorkspace || !message.trim() || isStreaming}
+              onClick={() => handleSendMessage()}
             >
-              {chatMutation.isPending ? (
+              {isStreaming ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 "Send"
