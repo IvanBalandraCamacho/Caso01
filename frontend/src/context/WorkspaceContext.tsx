@@ -26,6 +26,28 @@ export interface Document {
   chunk_count: number;
 }
 
+export interface Message {
+  id: string;
+  conversation_id: string;
+  role: "user" | "assistant";
+  content: string;
+  chunk_references: string | null;
+  created_at: string;
+}
+
+export interface Conversation {
+  id: string;
+  workspace_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+}
+
+export interface ConversationWithMessages extends Conversation {
+  messages: Message[];
+}
+
 export interface Notification {
   message: string;
   type: "success" | "error" | "info";
@@ -49,6 +71,19 @@ interface WorkspaceContextType {
   searchResults: any[];
   setSearchResults: (results: any[]) => void;
 
+  // --- Conversations ---
+  conversations: Conversation[];
+  activeConversation: Conversation | null;
+  setActiveConversation: (conversation: Conversation | null) => void;
+  fetchConversations: (workspaceId: string) => Promise<void>;
+  createConversation: (workspaceId: string, title: string) => Promise<Conversation>;
+  deleteConversation: (conversationId: string) => Promise<void>;
+  fetchConversationMessages: (conversationId: string) => Promise<Message[]>;
+  
+  // Model selection
+  selectedModel: string;
+  setSelectedModel: (model: string) => void;
+
   // --- Funciones CRUD ---
   fetchWorkspaces: () => Promise<void>;
   updateWorkspace: (
@@ -58,8 +93,8 @@ interface WorkspaceContextType {
   deleteWorkspace: (workspaceId: string) => Promise<void>;
   deleteDocument: (documentId: string) => Promise<void>;
   exportDocumentsToCsv: (workspaceId: string) => Promise<void>;
-  exportChatToTxt: (workspaceId: string) => Promise<void>;
-  exportChatToPdf: (workspaceId: string) => Promise<void>;
+  exportChatToTxt: (workspaceId: string, conversationId?: string) => Promise<void>;
+  exportChatToPdf: (workspaceId: string, conversationId?: string) => Promise<void>;
   deleteChatHistory: (workspaceId: string) => Promise<void>;
   fulltextSearch: (query: string) => Promise<any>;
 }
@@ -83,6 +118,13 @@ export function WorkspaceProvider({
   const [errorDocs, setErrorDocs] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  
+  // Estados para conversaciones
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
+  
+  // Estado para el modelo LLM seleccionado
+  const [selectedModel, setSelectedModel] = useState<string>("gemini-2.0");
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
@@ -207,6 +249,99 @@ export function WorkspaceProvider({
     [apiUrl, fetchWorkspaces, activeWorkspace]
   );
 
+  // --- Función para cargar conversaciones ---
+  const fetchConversations = useCallback(
+    async (workspaceId: string) => {
+      if (!apiUrl) return;
+      try {
+        const response = await fetch(
+          `${apiUrl}/api/v1/workspaces/${workspaceId}/conversations`
+        );
+        if (!response.ok)
+          throw new Error("No se pudieron cargar las conversaciones");
+        const data: Conversation[] = await response.json();
+        setConversations(data);
+      } catch (error) {
+        console.error("Error al cargar conversaciones:", error);
+        setConversations([]);
+      }
+    },
+    [apiUrl]
+  );
+
+  // --- Función para crear conversación ---
+  const createConversation = useCallback(
+    async (workspaceId: string, title: string): Promise<Conversation> => {
+      if (!apiUrl) throw new Error("API URL no configurada");
+      try {
+        const response = await fetch(
+          `${apiUrl}/api/v1/workspaces/${workspaceId}/conversations`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title }),
+          }
+        );
+        if (!response.ok) throw new Error("Error al crear la conversación");
+        const newConversation: Conversation = await response.json();
+        
+        // Refrescar lista de conversaciones
+        await fetchConversations(workspaceId);
+        
+        return newConversation;
+      } catch (error) {
+        console.error("Error al crear conversación:", error);
+        throw error;
+      }
+    },
+    [apiUrl, fetchConversations]
+  );
+
+  // --- Función para eliminar conversación ---
+  const deleteConversation = useCallback(
+    async (conversationId: string) => {
+      if (!apiUrl || !activeWorkspace) return;
+      try {
+        const response = await fetch(
+          `${apiUrl}/api/v1/workspaces/${activeWorkspace.id}/conversations/${conversationId}`,
+          {
+            method: "DELETE",
+          }
+        );
+        if (!response.ok) throw new Error("Error al eliminar la conversación");
+        
+        if (activeConversation?.id === conversationId) {
+          setActiveConversation(null);
+        }
+        await fetchConversations(activeWorkspace.id);
+      } catch (error) {
+        console.error("Error al eliminar conversación:", error);
+        throw error;
+      }
+    },
+    [apiUrl, activeWorkspace, activeConversation, fetchConversations]
+  );
+
+  // --- Función para cargar mensajes de una conversación ---
+  const fetchConversationMessages = useCallback(
+    async (conversationId: string): Promise<Message[]> => {
+      if (!apiUrl || !activeWorkspace) return [];
+      try {
+        const response = await fetch(
+          `${apiUrl}/api/v1/workspaces/${activeWorkspace.id}/conversations/${conversationId}`
+        );
+        if (!response.ok)
+          throw new Error("No se pudieron cargar los mensajes");
+        const data: ConversationWithMessages = await response.json();
+        return data.messages;
+      } catch (error) {
+        console.error("Error al cargar mensajes:", error);
+        return [];
+      }
+    },
+    [apiUrl, activeWorkspace]
+  );
+
   // --- Función para exportar a CSV ---
   const exportDocumentsToCsv = useCallback(
     async (workspaceId: string) => {
@@ -245,12 +380,14 @@ export function WorkspaceProvider({
 
   // --- Función para exportar a TXT ---
   const exportChatToTxt = useCallback(
-    async (workspaceId: string) => {
+    async (workspaceId: string, conversationId?: string) => {
       if (!apiUrl) return;
       try {
-        const response = await fetch(
-          `${apiUrl}/api/v1/workspaces/${workspaceId}/chat/export/txt`
-        );
+        const url = conversationId 
+          ? `${apiUrl}/api/v1/workspaces/${workspaceId}/chat/export/txt?conversation_id=${conversationId}`
+          : `${apiUrl}/api/v1/workspaces/${workspaceId}/chat/export/txt`;
+        
+        const response = await fetch(url);
         if (!response.ok) {
           const errorText = await response.text();
           console.error('Error response:', errorText);
@@ -258,17 +395,17 @@ export function WorkspaceProvider({
         }
         const blob = await response.blob();
         
-        const url = window.URL.createObjectURL(blob);
+        const downloadUrl = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
-        a.href = url;
-        a.download = `chat_${workspaceId}.txt`;
+        a.href = downloadUrl;
+        a.download = `chat_${conversationId || workspaceId}_${new Date().getTime()}.txt`;
         document.body.appendChild(a);
         a.click();
         
         // Cleanup
         setTimeout(() => {
           document.body.removeChild(a);
-          window.URL.revokeObjectURL(url);
+          window.URL.revokeObjectURL(downloadUrl);
         }, 100);
       } catch (error: any) {
         console.error("Error al exportar a TXT:", error);
@@ -281,12 +418,14 @@ export function WorkspaceProvider({
 
   // --- Función para exportar a PDF ---
   const exportChatToPdf = useCallback(
-    async (workspaceId: string) => {
+    async (workspaceId: string, conversationId?: string) => {
       if (!apiUrl) return;
       try {
-        const response = await fetch(
-          `${apiUrl}/api/v1/workspaces/${workspaceId}/chat/export/pdf`
-        );
+        const url = conversationId 
+          ? `${apiUrl}/api/v1/workspaces/${workspaceId}/chat/export/pdf?conversation_id=${conversationId}`
+          : `${apiUrl}/api/v1/workspaces/${workspaceId}/chat/export/pdf`;
+        
+        const response = await fetch(url);
         if (!response.ok) {
           const errorText = await response.text();
           console.error('Error response:', errorText);
@@ -294,17 +433,17 @@ export function WorkspaceProvider({
         }
         const blob = await response.blob();
         
-        const url = window.URL.createObjectURL(blob);
+        const downloadUrl = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
-        a.href = url;
-        a.download = `chat_${workspaceId}.pdf`;
+        a.href = downloadUrl;
+        a.download = `chat_${conversationId || workspaceId}_${new Date().getTime()}.pdf`;
         document.body.appendChild(a);
         a.click();
         
         // Cleanup
         setTimeout(() => {
           document.body.removeChild(a);
-          window.URL.revokeObjectURL(url);
+          window.URL.revokeObjectURL(downloadUrl);
         }, 100);
       } catch (error: any) {
         console.error("Error al exportar a PDF:", error);
@@ -408,6 +547,13 @@ export function WorkspaceProvider({
       addNotification,
       searchResults,
       setSearchResults,
+      conversations,
+      activeConversation,
+      setActiveConversation,
+      fetchConversations,
+      createConversation,
+      deleteConversation,
+      fetchConversationMessages,
       fetchWorkspaces,
       updateWorkspace,
       deleteWorkspace,
@@ -417,6 +563,8 @@ export function WorkspaceProvider({
       exportChatToPdf,
       deleteChatHistory,
       fulltextSearch,
+      selectedModel,
+      setSelectedModel,
     }),
     [
       workspaces,
@@ -427,6 +575,12 @@ export function WorkspaceProvider({
       fetchDocuments,
       notifications,
       searchResults,
+      conversations,
+      activeConversation,
+      fetchConversations,
+      createConversation,
+      deleteConversation,
+      fetchConversationMessages,
       fetchWorkspaces,
       updateWorkspace,
       deleteWorkspace,
@@ -436,6 +590,8 @@ export function WorkspaceProvider({
       exportChatToPdf,
       deleteChatHistory,
       fulltextSearch,
+      selectedModel,
+      setSelectedModel,
     ]
   );
 

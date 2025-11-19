@@ -232,15 +232,24 @@ def chat_with_workspace(
                 ).model_dump() for chunk in relevant_chunks
             ]
 
+            # Determinar qué modelo se está usando
+            model_used = chat_request.model or "gemini-2.0"  # Default
+            print(f"API_CHAT: Modelo solicitado: '{chat_request.model}', usando: '{model_used}'")
+            model_name_display = {
+                "gemini-2.0": "Gemini 2.0 Flash",
+                "gpt-4.1-nano": "GPT-4.1 Nano"
+            }.get(model_used, model_used)
+
             yield json.dumps({
                 "type": "sources",
                 "relevant_chunks": sources_data,
-                "conversation_id": conversation_id
+                "conversation_id": conversation_id,
+                "model_used": model_name_display
             }) + "\n"
 
             full_response_text = ""
             try:
-                for token in llm_service.generate_response_stream(chat_request.query, relevant_chunks):
+                for token in llm_service.generate_response_stream(chat_request.query, relevant_chunks, chat_request.model):
                     full_response_text += token
                     yield json.dumps({"type": "content", "text": token}) + "\n"
             except Exception as e:
@@ -464,13 +473,39 @@ def export_documents_csv(
 )
 def export_chat_txt(
     workspace_id: str,
+    conversation_id: str = None,
     db: Session = Depends(database.get_db)
 ):
     """
     Exporta el historial de chat de un workspace a TXT.
-    Nota: Como no tenemos una tabla de historial de chat,
-    esto devolverá información del workspace y sus documentos.
+    Si se proporciona conversation_id, exporta solo esa conversación.
+    Si no, exporta todas las conversaciones del workspace.
     """
+    from models.conversation import Conversation, Message
+    import re
+    
+    def markdown_to_text(markdown_text: str) -> str:
+        """Convierte Markdown a texto plano legible."""
+        text = markdown_text
+        # Headers
+        text = re.sub(r'^#{1,6}\s+(.+)$', r'\1', text, flags=re.MULTILINE)
+        # Bold
+        text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+        text = re.sub(r'__(.+?)__', r'\1', text)
+        # Italic
+        text = re.sub(r'\*(.+?)\*', r'\1', text)
+        text = re.sub(r'_(.+?)_', r'\1', text)
+        # Code blocks
+        text = re.sub(r'```[\w]*\n([\s\S]+?)```', r'\n\1\n', text)
+        # Inline code
+        text = re.sub(r'`(.+?)`', r'\1', text)
+        # Links
+        text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
+        # Lists
+        text = re.sub(r'^[\*\-\+]\s+', '• ', text, flags=re.MULTILINE)
+        text = re.sub(r'^\d+\.\s+', '', text, flags=re.MULTILINE)
+        return text
+    
     # Verificar que el workspace existe
     db_workspace = db.query(workspace_model.Workspace).filter(
         workspace_model.Workspace.id == workspace_id
@@ -484,31 +519,60 @@ def export_chat_txt(
     
     # Crear contenido TXT
     content = f"CHAT EXPORT - {db_workspace.name}\n"
-    content += f"{'='*60}\n"
-    content += f"Workspace ID: {workspace_id}\n"
+    content += f"{'='*80}\n"
+    content += f"Workspace: {db_workspace.name}\n"
     content += f"Descripción: {db_workspace.description or 'N/A'}\n"
     content += f"Fecha de exportación: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-    content += f"{'='*60}\n\n"
+    content += f"{'='*80}\n\n"
     
-    # Obtener documentos del workspace
-    documents = db.query(document_model.Document).filter(
-        document_model.Document.workspace_id == workspace_id
-    ).all()
+    # Obtener conversaciones
+    if conversation_id:
+        conversations = db.query(Conversation).filter(
+            Conversation.id == conversation_id,
+            Conversation.workspace_id == workspace_id
+        ).all()
+        if not conversations:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Conversación {conversation_id} no encontrada."
+            )
+    else:
+        conversations = db.query(Conversation).filter(
+            Conversation.workspace_id == workspace_id
+        ).order_by(Conversation.created_at.desc()).all()
     
-    content += f"DOCUMENTOS DEL WORKSPACE ({len(documents)} total):\n"
-    content += f"{'-'*60}\n"
-    for doc in documents:
-        content += f"- {doc.file_name} ({doc.file_type}) - {doc.status} - {doc.chunk_count} chunks\n"
-    
-    content += f"\n{'-'*60}\n"
-    content += "Nota: El historial completo de conversaciones estará disponible en futuras versiones.\n"
+    if not conversations:
+        content += "No hay conversaciones en este workspace.\n"
+    else:
+        for conv in conversations:
+            content += f"\n{'='*80}\n"
+            content += f"CONVERSACIÓN: {conv.title}\n"
+            content += f"Fecha: {conv.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            content += f"{'='*80}\n\n"
+            
+            # Obtener mensajes de la conversación
+            messages = db.query(Message).filter(
+                Message.conversation_id == conv.id
+            ).order_by(Message.created_at.asc()).all()
+            
+            if not messages:
+                content += "  (Sin mensajes)\n"
+            else:
+                for msg in messages:
+                    role = "Usuario" if msg.role == "user" else "Asistente"
+                    content += f"[{msg.created_at.strftime('%H:%M:%S')}] {role}:\n"
+                    # Convertir markdown a texto plano
+                    formatted_content = markdown_to_text(msg.content)
+                    content += f"{formatted_content}\n\n"
+                    content += f"{'-'*80}\n\n"
     
     # Preparar respuesta
+    filename = f"chat_{conversation_id if conversation_id else workspace_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
     return StreamingResponse(
         iter([content]),
         media_type="text/plain",
         headers={
-            "Content-Disposition": f"attachment; filename=chat_{workspace_id}_{datetime.now().strftime('%Y%m%d')}.txt"
+            "Content-Disposition": f"attachment; filename={filename}"
         }
     )
 
@@ -518,13 +582,90 @@ def export_chat_txt(
 )
 def export_chat_pdf(
     workspace_id: str,
+    conversation_id: str = None,
     db: Session = Depends(database.get_db)
 ):
     """
     Exporta el historial de chat de un workspace a PDF.
-    Nota: Esta es una implementación básica. Para PDF real necesitarías
-    una librería como reportlab o weasyprint.
+    Si se proporciona conversation_id, exporta solo esa conversación.
+    Si no, exporta todas las conversaciones del workspace.
     """
+    from models.conversation import Conversation, Message
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Preformatted
+    from reportlab.lib.enums import TA_LEFT, TA_RIGHT
+    from reportlab.lib.colors import HexColor
+    from io import BytesIO
+    import re
+    
+    def markdown_to_paragraphs(text: str, style, code_style):
+        """Convierte markdown a lista de elementos Platypus."""
+        elements = []
+        lines = text.split('\n')
+        i = 0
+        
+        while i < len(lines):
+            line = lines[i]
+            
+            # Code blocks
+            if line.strip().startswith('```'):
+                code_lines = []
+                i += 1
+                while i < len(lines) and not lines[i].strip().startswith('```'):
+                    code_lines.append(lines[i])
+                    i += 1
+                if code_lines:
+                    code_text = '\n'.join(code_lines)
+                    elements.append(Preformatted(code_text, code_style))
+                    elements.append(Spacer(1, 0.1*inch))
+                i += 1
+                continue
+            
+            # Process inline markdown
+            processed_line = line
+            
+            # Bold
+            processed_line = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', processed_line)
+            processed_line = re.sub(r'__(.+?)__', r'<b>\1</b>', processed_line)
+            
+            # Italic
+            processed_line = re.sub(r'\*(.+?)\*', r'<i>\1</i>', processed_line)
+            processed_line = re.sub(r'_(.+?)_', r'<i>\1</i>', processed_line)
+            
+            # Inline code
+            processed_line = re.sub(r'`(.+?)`', r'<font name="Courier" backColor="#f0f0f0">\1</font>', processed_line)
+            
+            # Links (simplificado)
+            processed_line = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'<u>\1</u>', processed_line)
+            
+            # Headers (h1-h6)
+            header_match = re.match(r'^(#{1,6})\s+(.+)$', processed_line)
+            if header_match:
+                level = len(header_match.group(1))
+                text = header_match.group(2)
+                size = max(12, 18 - level * 2)
+                elements.append(Paragraph(f'<font size="{size}"><b>{text}</b></font>', style))
+                elements.append(Spacer(1, 0.1*inch))
+                i += 1
+                continue
+            
+            # Lists
+            if re.match(r'^[\*\-\+]\s+', processed_line):
+                text = re.sub(r'^[\*\-\+]\s+', '• ', processed_line)
+                elements.append(Paragraph(text, style))
+            elif re.match(r'^\d+\.\s+', processed_line):
+                elements.append(Paragraph(processed_line, style))
+            elif processed_line.strip():  # Regular paragraph
+                elements.append(Paragraph(processed_line, style))
+            else:  # Empty line
+                elements.append(Spacer(1, 0.05*inch))
+            
+            i += 1
+        
+        return elements
+    
     # Verificar que el workspace existe
     db_workspace = db.query(workspace_model.Workspace).filter(
         workspace_model.Workspace.id == workspace_id
@@ -536,24 +677,146 @@ def export_chat_pdf(
             detail=f"Workspace con id {workspace_id} no encontrado."
         )
     
-    # Por ahora, devolver un mensaje de texto indicando que PDF no está implementado
-    # En producción, aquí usarías una librería para generar PDF
-    content = f"""EXPORT PDF - {db_workspace.name}
+    # Crear buffer para el PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter,
+                          rightMargin=72, leftMargin=72,
+                          topMargin=72, bottomMargin=18)
     
-Workspace ID: {workspace_id}
-Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-Nota: La exportación a PDF completa estará disponible próximamente.
-Por ahora, usa la exportación a TXT o CSV.
-
-Para implementar PDF completo, instala: pip install reportlab
-"""
+    # Estilos
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        textColor=HexColor('#1a1a1a'),
+        spaceAfter=30,
+    )
     
+    subtitle_style = ParagraphStyle(
+        'CustomSubtitle',
+        parent=styles['Heading2'],
+        fontSize=14,
+        textColor=HexColor('#333333'),
+        spaceAfter=12,
+    )
+    
+    user_style = ParagraphStyle(
+        'UserMessage',
+        parent=styles['Normal'],
+        fontSize=11,
+        textColor=HexColor('#0066cc'),
+        alignment=TA_RIGHT,
+        spaceAfter=8,
+        leftIndent=100,
+    )
+    
+    assistant_style = ParagraphStyle(
+        'AssistantMessage',
+        parent=styles['Normal'],
+        fontSize=11,
+        textColor=HexColor('#333333'),
+        spaceAfter=8,
+        rightIndent=100,
+    )
+    
+    timestamp_style = ParagraphStyle(
+        'Timestamp',
+        parent=styles['Normal'],
+        fontSize=8,
+        textColor=HexColor('#666666'),
+        spaceAfter=4,
+    )
+    
+    code_style = ParagraphStyle(
+        'CodeBlock',
+        parent=styles['Code'],
+        fontSize=9,
+        textColor=HexColor('#000000'),
+        backColor=HexColor('#f5f5f5'),
+        leftIndent=20,
+        rightIndent=20,
+        spaceAfter=10,
+        fontName='Courier',
+    )
+    
+    # Contenido del PDF
+    story = []
+    
+    # Título
+    story.append(Paragraph(f"Chat Export - {db_workspace.name}", title_style))
+    story.append(Paragraph(f"Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
+    story.append(Spacer(1, 0.3*inch))
+    
+    # Obtener conversaciones
+    if conversation_id:
+        conversations = db.query(Conversation).filter(
+            Conversation.id == conversation_id,
+            Conversation.workspace_id == workspace_id
+        ).all()
+        if not conversations:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Conversación {conversation_id} no encontrada."
+            )
+    else:
+        conversations = db.query(Conversation).filter(
+            Conversation.workspace_id == workspace_id
+        ).order_by(Conversation.created_at.desc()).all()
+    
+    if not conversations:
+        story.append(Paragraph("No hay conversaciones en este workspace.", styles['Normal']))
+    else:
+        for idx, conv in enumerate(conversations):
+            if idx > 0:
+                story.append(PageBreak())
+            
+            story.append(Paragraph(f"Conversación: {conv.title}", subtitle_style))
+            story.append(Paragraph(
+                f"Creada: {conv.created_at.strftime('%Y-%m-%d %H:%M:%S')}",
+                timestamp_style
+            ))
+            story.append(Spacer(1, 0.2*inch))
+            
+            # Obtener mensajes
+            messages = db.query(Message).filter(
+                Message.conversation_id == conv.id
+            ).order_by(Message.created_at.asc()).all()
+            
+            if not messages:
+                story.append(Paragraph("(Sin mensajes)", styles['Italic']))
+            else:
+                for msg in messages:
+                    # Timestamp
+                    story.append(Paragraph(
+                        f"{msg.created_at.strftime('%H:%M:%S')}",
+                        timestamp_style
+                    ))
+                    
+                    # Mensaje con formato markdown
+                    if msg.role == "user":
+                        story.append(Paragraph(f"<b>Usuario:</b>", user_style))
+                        # Usuario: texto simple
+                        story.append(Paragraph(msg.content, user_style))
+                    else:
+                        story.append(Paragraph(f"<b>Asistente:</b>", assistant_style))
+                        # Asistente: parsear markdown
+                        markdown_elements = markdown_to_paragraphs(msg.content, assistant_style, code_style)
+                        story.extend(markdown_elements)
+                    
+                    story.append(Spacer(1, 0.15*inch))
+    
+    # Construir PDF
+    doc.build(story)
+    buffer.seek(0)
+    
+    # Preparar respuesta
+    filename = f"chat_{conversation_id if conversation_id else workspace_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     return StreamingResponse(
-        iter([content]),
+        buffer,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f"attachment; filename=chat_{workspace_id}_{datetime.now().strftime('%Y%m%d')}.pdf"
+            "Content-Disposition": f"attachment; filename={filename}"
         }
     )
 

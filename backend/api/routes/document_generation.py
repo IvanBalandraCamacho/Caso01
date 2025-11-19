@@ -8,7 +8,7 @@ from models import database, schemas
 from models.conversation import Conversation, Message
 from models.document import Document
 from models import workspace as workspace_model
-from core.llm_service import llm_service
+from core import llm_service
 from core.pdf_service import pdf_export_service
 from datetime import datetime
 import io
@@ -138,11 +138,10 @@ Crea un DOCUMENTO COMPLETO Y PROFESIONAL con toda la información de la conversa
     
     synthesis_prompt += "\n=== GENERA EL DOCUMENTO AHORA (solo el contenido en Markdown, sin meta-comentarios) ===\n"
     
-    # Generar contenido con el LLM
-    content = llm_service.generate_text(
-        synthesis_prompt,
-        temperature=0.7,
-        max_tokens=8192
+    # Generar contenido con el LLM usando generate_response sin chunks
+    content = llm_service.generate_response(
+        query=synthesis_prompt,
+        context_chunks=[]
     )
     
     return content

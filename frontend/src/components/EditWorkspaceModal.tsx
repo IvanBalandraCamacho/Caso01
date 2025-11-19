@@ -12,9 +12,55 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea"; // Importar Textarea
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useWorkspaces, Workspace, Document } from "@/context/WorkspaceContext";
-import { FileText, Trash2, Plus, Loader2 } from "lucide-react";
+import { FileText, Trash2, Plus, Loader2, FileSpreadsheet, Presentation, File, FileType } from "lucide-react";
 import { UploadModal } from "./UploadModal"; // Reusamos el modal de subida
 import { useDeleteDocument, useUpdateWorkspace } from "@/hooks/useApi";
+
+// Helper para obtener el icono según el tipo de archivo
+const getFileIcon = (fileName: string, fileType: string) => {
+  const ext = fileName.split('.').pop()?.toLowerCase() || '';
+  const type = fileType?.toLowerCase() || '';
+  
+  // Priorizar la extensión del nombre del archivo
+  if (ext === 'pdf' || type.includes('pdf')) {
+    return <FileType className="h-5 w-5 text-red-500 shrink-0" />;
+  } else if (ext === 'docx' || ext === 'doc' || type.includes('word') || type === 'docx' || type === 'doc') {
+    return <FileText className="h-5 w-5 text-blue-500 shrink-0" />;
+  } else if (ext === 'xlsx' || ext === 'xls' || ext === 'csv' || type.includes('excel') || type === 'xlsx' || type === 'xls' || type === 'csv') {
+    return <FileSpreadsheet className="h-5 w-5 text-green-500 shrink-0" />;
+  } else if (ext === 'pptx' || ext === 'ppt' || type.includes('powerpoint') || type === 'pptx' || type === 'ppt') {
+    return <Presentation className="h-5 w-5 text-orange-500 shrink-0" />;
+  } else if (ext === 'txt' || type.includes('text') || type === 'txt') {
+    return <File className="h-5 w-5 text-gray-400 shrink-0" />;
+  }
+  
+  return <FileText className="h-5 w-5 text-gray-400 shrink-0" />;
+};
+
+// Helper para limpiar el nombre del archivo (quitar extensión)
+const getCleanFileName = (fileName: string) => {
+  return fileName.replace(/\.[^/.]+$/, '');
+};
+
+// Helper para obtener la extensión del archivo
+const getFileExtension = (fileName: string, fileType: string) => {
+  // Primero intentar obtener del nombre del archivo
+  const match = fileName.match(/\.([^/.]+)$/);
+  if (match) {
+    return match[1].toUpperCase();
+  }
+  
+  // Si no, mapear desde el tipo MIME
+  const type = fileType?.toLowerCase() || '';
+  if (type.includes('pdf')) return 'PDF';
+  if (type.includes('word') || type.includes('docx')) return 'DOCX';
+  if (type.includes('excel') || type.includes('xlsx')) return 'XLSX';
+  if (type.includes('powerpoint') || type.includes('pptx')) return 'PPTX';
+  if (type.includes('csv')) return 'CSV';
+  if (type.includes('text') || type.includes('txt')) return 'TXT';
+  
+  return 'FILE';
+};
 
 interface EditWorkspaceModalProps {
   isOpen: boolean;
@@ -163,10 +209,10 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
                 {documents.map((doc) => (
                   <div key={doc.id} className="bg-gray-800 p-3 rounded-lg flex items-center gap-3 justify-between">
                     <div className="flex items-center gap-3 overflow-hidden">
-                      <FileText className="h-5 w-5 text-blue-400 shrink-0" />
+                      {getFileIcon(doc.file_name, doc.file_type)}
                       <div className="flex-grow overflow-hidden">
-                        <p className="text-sm text-white truncate font-medium">{doc.file_name}</p>
-                        <p className="text-xs text-gray-400 uppercase">{doc.file_type}</p>
+                        <p className="text-sm text-white truncate font-medium">{getCleanFileName(doc.file_name)}</p>
+                        <p className="text-xs text-gray-400 uppercase">{getFileExtension(doc.file_name, doc.file_type)}</p>
                       </div>
                     </div>
                     <Button 
@@ -217,8 +263,10 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
         isOpen={isUploading} 
         onClose={() => {
           setIsUploading(false);
-          fetchDocuments(workspace.id); // Refrescar la lista de documentos al cerrar
         }} 
+        onSuccess={() => {
+          fetchDocuments(workspace.id); // Refrescar la lista de documentos
+        }}
       />
     </>
   );

@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 interface UploadModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
 type FileUploadStatus = "pending" | "uploading" | "success" | "error";
@@ -27,7 +28,7 @@ interface UploadableFile {
   errorMessage?: string; // <-- AÑADIDO: Para mostrar errores
 }
 
-export function UploadModal({ isOpen, onClose }: UploadModalProps) {
+export function UploadModal({ isOpen, onClose, onSuccess }: UploadModalProps) {
   const { activeWorkspace } = useWorkspaces();
   const [files, setFiles] = useState<UploadableFile[]>([]);
 
@@ -91,6 +92,11 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
           setFiles(prev => prev.map(f => 
             f.file.name === uploadableFile.file.name ? { ...f, status: 'success' } : f
           ));
+
+          // 3. Notificar éxito para refrescar lista
+          if (onSuccess) {
+            onSuccess();
+          }
 
         } catch (error: any) {
           console.error("Error en la subida:", error);
@@ -156,7 +162,10 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
                 <div className="flex flex-col">
                   <div className="flex items-center gap-2">
                     <FileText className="h-5 w-5 text-gray-300" />
-                    <span className="text-sm text-gray-300">{file.name}</span>
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-300">{file.name}</span>
+                      <span className="text-xs text-gray-500 uppercase">{file.type || file.name.split('.').pop()}</span>
+                    </div>
                   </div>
                   {/* --- AÑADIDO: Mostrar mensaje de error --- */}
                   {status === 'error' && (

@@ -152,6 +152,7 @@ export const streamChatQuery = async ({
   workspaceId,
   query,
   conversationId,
+  model,
   onChunk,
   onError,
   onFinish
@@ -159,6 +160,7 @@ export const streamChatQuery = async ({
   workspaceId: string;
   query: string;
   conversationId?: string;
+  model?: string;
   onChunk: (chunk: any) => void;
   onError: (error: any) => void;
   onFinish: () => void;
@@ -174,6 +176,7 @@ export const streamChatQuery = async ({
       body: JSON.stringify({
         query,
         conversation_id: conversationId,
+        model,
       }),
     });
 
@@ -427,6 +430,8 @@ export const useConversationWithMessages = ({
     queryKey: [CONVERSATION_DETAILS_QUERY_KEY, workspaceId, conversationId],
     queryFn: () => fetchConversationWithMessages({ workspaceId, conversationId: conversationId! }),
     enabled: !!workspaceId && !!conversationId,
+    retry: false, // No reintentar si falla (ej: 404)
+    staleTime: 1000 * 60, // Cache por 1 minuto
   });
 };
 

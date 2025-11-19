@@ -28,3 +28,11 @@ class Workspace(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    
+    # Relación: Un Workspace puede tener muchas Conversaciones
+    conversations = relationship(
+        "Conversation",
+        back_populates="workspace",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )

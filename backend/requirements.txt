@@ -25,6 +25,7 @@ langchain-text-splitters>=0.2.0  # <-- Paquete separado en LangChain 0.1+
 langchain-core>=0.2.0
 qdrant-client>=1.7.0,<2.0.0  # Fijada para evitar breaking changes en la API
 google-generativeai>=0.5.2
+openai>=1.54.0
 sentence-transformers>=2.2.0
 
 # --- Procesamiento de Documentos ---

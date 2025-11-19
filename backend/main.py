@@ -2,7 +2,8 @@ import os
 import time
 from fastapi import FastAPI, Request
 # from starlette.middleware.gzip import GZIPMiddleware
-from api.routes import health, workspaces, conversations, users, document_generation
+from api.routes import health, workspaces, conversations, document_generation
+# from api.routes import users  # Comentado: módulo no existe aún
 from core.config import settings
 from models import database
 from sqlalchemy.exc import OperationalError
@@ -54,7 +55,7 @@ app.add_middleware(
 
 # --- Registrar Routers ---
 app.include_router(health.router, prefix="/api/v1", tags=["Health Check"])
-app.include_router(users.router, prefix="/api/v1/auth", tags=["Authentication & Users"])
+# app.include_router(users.router, prefix="/api/v1/auth", tags=["Authentication & Users"])  # Comentado
 app.include_router(workspaces.router, prefix="/api/v1", tags=["Workspaces"])
 app.include_router(conversations.router, prefix="/api/v1", tags=["Conversations"])
 app.include_router(document_generation.router, prefix="/api/v1", tags=["Document Generation"])

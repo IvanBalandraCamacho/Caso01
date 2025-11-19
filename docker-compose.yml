@@ -10,7 +10,7 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      # CAMBIO: Usar pymysql en lugar de mysqlclient
+      # Database & Services (override con variables desde docker-compose)
       - DATABASE_URL=mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
       - REDIS_URL=redis://redis:6379
       - QDRANT_URL=http://qdrant:6333

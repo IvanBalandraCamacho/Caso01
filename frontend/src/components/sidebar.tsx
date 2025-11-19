@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { useWorkspaces, Workspace } from "@/context/WorkspaceContext";
+import { useWorkspaces, Workspace, Conversation } from "@/context/WorkspaceContext";
 import { cn } from "@/lib/utils";
 import { EditWorkspaceModal } from "./EditWorkspaceModal";
 import { AddWorkspaceModal } from "./AddWorkspaceModal";
@@ -30,8 +30,16 @@ export function Sidebar() {
     workspaces,
     activeWorkspace,
     setActiveWorkspace,
+    conversations,
+    activeConversation,
+    setActiveConversation,
+    fetchConversations,
+    createConversation,
+    deleteConversation,
     fulltextSearch,
     fetchWorkspaces,
+    selectedModel,
+    setSelectedModel,
   } = useWorkspaces();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -53,6 +61,18 @@ export function Sidebar() {
     }
     setIsClient(true);
   }, [workspaces, activeWorkspace]);
+
+  // Cargar conversaciones cuando cambia el workspace activo
+  useEffect(() => {
+    if (activeWorkspace) {
+      fetchConversations(activeWorkspace.id);
+    }
+  }, [activeWorkspace, fetchConversations]);
+
+  // Debug: Log cuando cambia el modelo seleccionado
+  useEffect(() => {
+    console.log("Sidebar: selectedModel actualizado a:", selectedModel);
+  }, [selectedModel]);
 
   const openEditModal = (workspace: Workspace) => {
     setWorkspaceToEdit(workspace);
@@ -88,6 +108,33 @@ export function Sidebar() {
     }
   };
 
+  const handleNewConversation = async () => {
+    if (!activeWorkspace) {
+      alert("Por favor, selecciona un workspace primero");
+      return;
+    }
+    try {
+      const newConv = await createConversation(
+        activeWorkspace.id,
+        "Nueva Conversación"
+      );
+      setActiveConversation(newConv);
+    } catch (error) {
+      console.error("Error al crear conversación:", error);
+      alert("Error al crear la conversación");
+    }
+  };
+
+  const handleDeleteConversation = async (convId: string) => {
+    if (confirm("¿Estas seguro de eliminar esta conversación?")) {
+      try {
+        await deleteConversation(convId);
+      } catch (error) {
+        console.error("Error al eliminar conversación:", error);
+      }
+    }
+  };
+
   return (
     <>
       <aside className="w-72 bg-brand-dark-secondary flex flex-col p-4 border-r border-gray-800/50">
@@ -118,14 +165,17 @@ export function Sidebar() {
 
           <div className="relative mt-2">
             {isClient ? (
-              <Select defaultValue="gemini">
+              <Select value={selectedModel} onValueChange={(value) => {
+                console.log("Sidebar: Cambiando modelo a:", value);
+                setSelectedModel(value);
+              }}>
                 <SelectTrigger className="w-full bg-black/30 border border-gray-700 text-sm text-gray-300 focus:ring-2 focus:ring-brand-red focus:border-brand-red">
                   <SelectValue placeholder="Select a model" />
                 </SelectTrigger>
                 <SelectContent className="bg-brand-dark-secondary border-gray-700 text-gray-300">
-                  <SelectItem value="gpt4">GPT-4o</SelectItem>
-                  <SelectItem value="llama3">Llama 3</SelectItem>
-                  <SelectItem value="gemini">Gemini 1.5</SelectItem>
+                  <SelectItem value="gemini-2.0">Gemini 2.0 Flash</SelectItem>
+                  <SelectItem value="gpt-4.1-nano">GPT-4.1 Nano</SelectItem>
+                  <SelectItem value="velvet" disabled>Velvet (Próximamente)</SelectItem>
                 </SelectContent>
               </Select>
             ) : (
@@ -136,8 +186,10 @@ export function Sidebar() {
 
         {/* Nueva Conversación */}
         <Button 
-          className="w-full bg-brand-red text-white hover:bg-red-700 font-medium"
-          onClick={() => setIsAddModalOpen(true)}
+          className="w-full bg-brand-red text-white hover:bg-red-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={handleNewConversation}
+          disabled={!activeWorkspace}
+          title={!activeWorkspace ? "Selecciona un workspace primero" : "Crear nueva conversación"}
         >
           <Plus className="mr-2 h-4 w-4" />
           New Conversation
@@ -158,9 +210,20 @@ export function Sidebar() {
         <nav className="flex flex-col space-y-6 mt-8">
           {/* Workspaces */}
           <div>
-            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-              Workspace
-            </h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Workspace
+              </h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-gray-500 hover:text-white"
+                onClick={() => setIsAddModalOpen(true)}
+                title="Crear nuevo workspace"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
 
             <div className="space-y-2">
               {isLoading && workspaces.length === 0 ? (
@@ -223,19 +286,47 @@ export function Sidebar() {
             </h2>
             <ScrollArea className="h-64">
               <div className="space-y-2 pr-2">
-                {/* Ejemplo estático */}
-                <a
-                  className="block text-gray-400 hover:text-white transition-colors text-sm truncate"
-                  href="/"
-                >
-                  Análisis de la propuesta Q4...
-                </a>
-                <a
-                  className="block text-gray-400 hover:text-white transition-colors text-sm truncate"
-                  href="/"
-                >
-                  Resumen de métricas de Helpdesk
-                </a>
+                {activeWorkspace && conversations.length === 0 && (
+                  <p className="text-gray-400 text-sm">No hay conversaciones aún.</p>
+                )}
+                {!activeWorkspace && (
+                  <p className="text-gray-400 text-sm">Selecciona un workspace.</p>
+                )}
+                {conversations.map((conv) => (
+                  <div
+                    key={conv.id}
+                    className="flex items-center justify-between group"
+                  >
+                    <button
+                      className={cn(
+                        "flex-1 text-left text-gray-400 hover:text-white transition-colors text-sm truncate p-1 rounded",
+                        activeConversation?.id === conv.id && "bg-brand-red/20 text-white"
+                      )}
+                      onClick={() => setActiveConversation(conv)}
+                    >
+                      {conv.title}
+                    </button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="bg-brand-dark-secondary border-gray-700 text-gray-300">
+                        <DropdownMenuItem
+                          className="text-red-500"
+                          onClick={() => handleDeleteConversation(conv.id)}
+                        >
+                          Eliminar
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                ))}
               </div>
             </ScrollArea>
           </div>

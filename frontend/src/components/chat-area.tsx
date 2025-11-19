@@ -31,6 +31,7 @@ interface ChatMessage {
     chunk_text: string;
     score: number;
   }>;
+  modelUsed?: string;
 }
 
 export function ChatArea() {
@@ -41,6 +42,8 @@ export function ChatArea() {
     exportChatToPdf,
     exportChatToTxt,
     deleteChatHistory,
+    fetchDocuments,
+    selectedModel,
   } = useWorkspaces();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -54,6 +57,12 @@ export function ChatArea() {
   const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const activeStreamRef = useRef<string | null>(null);
+
+  // Debug: Log cuando cambia el modelo seleccionado
+  useEffect(() => {
+    console.log("ChatArea: selectedModel recibido:", selectedModel);
+  }, [selectedModel]);
 
   const {
     transcript,
@@ -66,10 +75,19 @@ export function ChatArea() {
   // const chatMutation = useChat(activeWorkspace?.id || ''); // Deprecated for streaming
 
   // Hook para cargar conversación con mensajes
-  const { data: conversationData, isLoading: isLoadingConversation } = useConversationWithMessages({
+  const { data: conversationData, isLoading: isLoadingConversation, error: conversationError } = useConversationWithMessages({
     workspaceId: activeWorkspace?.id || '',
     conversationId: activeConversation?.id,
   });
+
+  // Si hay error 404, la conversación no existe - limpiar el estado
+  useEffect(() => {
+    if (conversationError && activeConversation) {
+      console.warn('Conversación no encontrada, limpiando estado');
+      setChatHistory([]);
+      setCurrentConversationId(undefined);
+    }
+  }, [conversationError, activeConversation]);
 
   // Actualizar el mensaje con el transcript
   useEffect(() => {
@@ -87,11 +105,17 @@ export function ChatArea() {
   useEffect(() => {
     setChatHistory([]);
     setCurrentConversationId(undefined);
+    activeStreamRef.current = null; // Cancelar stream activo
+    setIsStreaming(false);
   }, [activeWorkspace?.id]);
 
   // Usar activeConversation si está disponible
   useEffect(() => {
     if (activeConversation) {
+      // Cancelar stream activo si hay uno
+      activeStreamRef.current = null;
+      setIsStreaming(false);
+      
       setCurrentConversationId(activeConversation.id);
       // Cargar mensajes de la conversación si están disponibles
       if (conversationData?.messages) {
@@ -135,19 +159,34 @@ export function ChatArea() {
     setChatHistory((prev) => [...prev, assistantMessage]);
 
     setIsStreaming(true);
+    
+    // Generar ID único para este stream
+    const streamId = Date.now().toString();
+    activeStreamRef.current = streamId;
+
+    console.log("ChatArea: Enviando query con modelo:", selectedModel);
 
     // Enviar consulta con streaming
     streamChatQuery({
       workspaceId: activeWorkspace.id,
       query: query,
       conversationId: currentConversationId,
+      model: selectedModel,
       onChunk: (data) => {
+        // Verificar que este stream sigue activo
+        if (activeStreamRef.current !== streamId) {
+          console.log("ChatArea: Stream cancelado, ignorando chunks");
+          return;
+        }
+        
         if (data.type === 'sources') {
           setChatHistory(prev => {
             const newHistory = [...prev];
-            const lastMsg = newHistory[newHistory.length - 1];
+            const lastMsg = { ...newHistory[newHistory.length - 1] };
             if (lastMsg.role === 'assistant') {
               lastMsg.chunks = data.relevant_chunks;
+              lastMsg.modelUsed = data.model_used;
+              newHistory[newHistory.length - 1] = lastMsg;
             }
             return newHistory;
           });
@@ -157,35 +196,46 @@ export function ChatArea() {
         } else if (data.type === 'content') {
           setChatHistory(prev => {
             const newHistory = [...prev];
-            const lastMsg = newHistory[newHistory.length - 1];
+            const lastMsg = { ...newHistory[newHistory.length - 1] };
             if (lastMsg.role === 'assistant') {
-              lastMsg.content += data.text;
+              lastMsg.content = lastMsg.content + data.text;
+              newHistory[newHistory.length - 1] = lastMsg;
             }
             return newHistory;
           });
         } else if (data.type === 'error') {
           setChatHistory(prev => {
             const newHistory = [...prev];
-            const lastMsg = newHistory[newHistory.length - 1];
+            const lastMsg = { ...newHistory[newHistory.length - 1] };
             if (lastMsg.role === 'assistant') {
-              lastMsg.content += `\n\n⚠️ Error: ${data.detail}`;
+              lastMsg.content = lastMsg.content + `\n\n⚠️ Error: ${data.detail}`;
+              newHistory[newHistory.length - 1] = lastMsg;
             }
             return newHistory;
           });
         }
       },
       onError: (err: any) => {
+        // Verificar que este stream sigue activo
+        if (activeStreamRef.current !== streamId) return;
+        
         setChatHistory(prev => {
           const newHistory = [...prev];
-          const lastMsg = newHistory[newHistory.length - 1];
+          const lastMsg = { ...newHistory[newHistory.length - 1] };
           if (lastMsg.role === 'assistant') {
-            lastMsg.content += `\n\n❌ Error de conexión: ${err.message}`;
+            lastMsg.content = lastMsg.content + `\n\n❌ Error de conexión: ${err.message}`;
+            newHistory[newHistory.length - 1] = lastMsg;
           }
           return newHistory;
         });
+        activeStreamRef.current = null;
         setIsStreaming(false);
       },
       onFinish: () => {
+        // Verificar que este stream sigue activo
+        if (activeStreamRef.current !== streamId) return;
+        
+        activeStreamRef.current = null;
         setIsStreaming(false);
         if (activeWorkspace) {
           fetchConversations(activeWorkspace.id);
@@ -267,7 +317,16 @@ export function ChatArea() {
 
   return (
     <main className="flex-1 flex flex-col bg-brand-dark h-screen overflow-hidden">
-      <UploadModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <UploadModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onSuccess={() => {
+          // Refrescar documentos del workspace activo
+          if (activeWorkspace) {
+            fetchDocuments(activeWorkspace.id);
+          }
+        }}
+      />
 
       <header className="p-6 border-b border-gray-800/50 flex justify-between items-center flex-shrink-0">
         <h2 className="text-xl font-semibold text-white">
@@ -279,9 +338,9 @@ export function ChatArea() {
             variant="outline"
             className="text-gray-300 border-gray-700 hover:bg-gray-800 transition-all"
             onClick={() =>
-              activeWorkspace && exportChatToTxt(activeWorkspace.id)
+              activeWorkspace && exportChatToTxt(activeWorkspace.id, activeConversation?.id)
             }
-            disabled={!activeWorkspace}
+            disabled={!activeWorkspace || !activeConversation}
           >
             Export to TXT
           </Button>
@@ -289,9 +348,9 @@ export function ChatArea() {
             variant="outline"
             className="text-gray-300 border-gray-700 hover:bg-gray-800 transition-all"
             onClick={() =>
-              activeWorkspace && exportChatToPdf(activeWorkspace.id)
+              activeWorkspace && exportChatToPdf(activeWorkspace.id, activeConversation?.id)
             }
-            disabled={!activeWorkspace}
+            disabled={!activeWorkspace || !activeConversation}
           >
             Export to PDF
           </Button>
@@ -373,8 +432,7 @@ export function ChatArea() {
                     </div>
                   </div>
                   <QuickPrompts
-                    onPromptClick={handleQuickPrompt}
-                    hasDocuments={false}
+                    onPromptSelect={handleQuickPrompt}
                   />
                 </>
               ) : (
@@ -444,6 +502,15 @@ export function ChatArea() {
                     </div>
                   )}
 
+                  {/* Model used badge for assistant messages */}
+                  {msg.role === "assistant" && msg.modelUsed && (
+                    <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-800/50 border border-gray-700">
+                        🤖 {msg.modelUsed}
+                      </span>
+                    </div>
+                  )}
+
                   {/* Mostrar chunks relevantes si existen */}
                   {msg.chunks && msg.chunks.length > 0 && (
                     <div className="mt-4 pt-4 border-t border-gray-700">
@@ -502,10 +569,19 @@ export function ChatArea() {
           </div>
         )}
 
+        {/* Model indicator */}
+        <div className="mb-3 px-3 py-2 bg-gray-900/30 border border-gray-800 rounded-lg flex items-center justify-center text-xs">
+          <span className="flex items-center gap-2 text-gray-400">
+            <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+            Modelo activo: <span className="font-semibold text-gray-300">
+              {selectedModel === "gpt-4.1-nano" ? "OpenAI GPT-4.1 Nano" : "Gemini 2.0 Flash"}
+            </span>
+          </span>
+        </div>
+
         {/* Archivos adjuntos */}
         {attachedFiles.length > 0 && (
-          <div className="mb-3 flex flex-wrap gap-2">
-            {attachedFiles.map((file, index) => (
+          <div className="mb-3 flex flex-wrap gap-2">{attachedFiles.map((file, index) => (
               <div
                 key={index}
                 className="flex items-center gap-2 bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300 hover:border-gray-600 transition-all"

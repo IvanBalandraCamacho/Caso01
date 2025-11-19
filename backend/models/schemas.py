@@ -51,11 +51,25 @@ class DocumentPublic(DocumentBase):
         """Helper para crear un DocumentPublic desde un UploadFile."""
         file_type = mimetypes.guess_type(file.filename)[0] or "unknown"
         
-        simple_file_type = file_type.split('/')[-1]
-        if "openxmlformats-officedocument.wordprocessingml.document" in simple_file_type:
-            simple_file_type = "docx"
-        elif "openxmlformats-officedocument.spreadsheetml.sheet" in simple_file_type:
-            simple_file_type = "xlsx"
+        # Mapear tipos MIME a extensiones simples
+        mime_to_extension = {
+            "application/pdf": "pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+            "application/msword": "doc",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+            "application/vnd.ms-excel": "xls",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+            "application/vnd.ms-powerpoint": "ppt",
+            "text/csv": "csv",
+            "text/plain": "txt",
+        }
+        
+        simple_file_type = mime_to_extension.get(file_type, file_type.split('/')[-1] if file_type != "unknown" else "unknown")
+        
+        # Si aún no se pudo determinar, extraer del nombre del archivo
+        if simple_file_type == "unknown" and file.filename:
+            extension = file.filename.rsplit('.', 1)[-1].lower()
+            simple_file_type = extension if extension != file.filename else "unknown"
         
         return cls(
             id="temp-id",
@@ -74,6 +88,7 @@ class ChatRequest(BaseModel):
     """Schema para la pregunta del usuario."""
     query: str
     conversation_id: str | None = None  # Opcional: ID de conversación existente
+    model: str | None = None  # Opcional: modelo LLM a usar (gemini-2.0 o gpt-4.1-nano)
     
 class DocumentChunk(BaseModel):
     """Representa un chunk de contexto recuperado."""
@@ -116,7 +131,6 @@ class MessagePublic(BaseModel):
 
 class ConversationCreate(BaseModel):
     """Schema para crear una conversación."""
-    workspace_id: str
     title: str
 
 class ConversationUpdate(BaseModel):
