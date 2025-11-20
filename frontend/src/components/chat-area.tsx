@@ -381,60 +381,76 @@ export function ChatArea() {
       </header>
 
       {/* Área de Mensajes */}
-      <ScrollArea className="flex-1 p-4 pb-48">
-        {!activeWorkspace ? (
-          <div className="flex flex-col items-center justify-center h-full text-center space-y-6">
-            <div className="p-6 bg-card rounded-full shadow-2xl mb-4">
-              <span className="text-6xl">👋</span>
-            </div>
-            <h2 className="text-3xl font-bold text-foreground">
-              Welcome to Tivit AI
-            </h2>
-            <p className="text-muted-foreground max-w-md">
-              Select a workspace from the sidebar to start chatting with your documents.
-            </p>
-          </div>
-        ) : chatHistory.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full max-w-3xl mx-auto px-4">
-            <div className="mb-8 text-center">
-              <h3 className="text-2xl font-bold text-foreground mb-2">
-                {activeWorkspace.name}
-              </h3>
-              <p className="text-muted-foreground">
-                Ready to help you with your documents.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mb-8">
-              <button 
-                onClick={() => setIsModalOpen(true)}
-                className="p-6 bg-card hover:bg-accent border border-border rounded-xl text-left transition-all hover:shadow-lg group flex flex-col gap-3"
-              >
-                <div className="p-2 bg-primary/10 w-fit rounded-lg group-hover:bg-primary/20 transition-colors">
-                  <FileText className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-foreground">Upload Documents</h4>
-                  <p className="text-sm text-muted-foreground mt-1">Add PDF, DOCX, or TXT files to context.</p>
-                </div>
-              </button>
-
-              <button 
-                onClick={() => handleQuickPrompt("Summarize the documents in this workspace")}
-                className="p-6 bg-card hover:bg-accent border border-border rounded-xl text-left transition-all hover:shadow-lg group flex flex-col gap-3"
-              >
-                <div className="p-2 bg-success/10 w-fit rounded-lg group-hover:bg-success/20 transition-colors">
-                  <FileText className="h-6 w-6 text-success" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-foreground">Summarize Workspace</h4>
-                  <p className="text-sm text-muted-foreground mt-1">Get a quick overview of all content.</p>
-                </div>
-              </button>
-            </div>
-
-            <div className="w-full">
-              <QuickPrompts onPromptSelect={handleQuickPrompt} />
+      <ScrollArea className="flex-1 p-6 overflow-y-auto">
+        {chatHistory.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full">
+            <div className="text-center max-w-md">
+              <Avatar className="h-20 w-20 mx-auto mb-6 ring-4 ring-brand-red/20">
+                <AvatarImage src="https://github.com/shadcn.png" alt="Velvet" />
+                <AvatarFallback className="text-2xl">V</AvatarFallback>
+              </Avatar>
+              {activeWorkspace ? (
+                <>
+                  <h3 className="text-2xl font-bold text-white mb-2">
+                    Bienvenido a {activeWorkspace.name}
+                  </h3>
+                  <p className="text-gray-400 mb-6">
+                    Pregunta lo que necesites sobre tus documentos
+                  </p>
+                  <div
+                    className={`flex flex-col space-y-3 transition-all duration-200 ${isDragging ? 'scale-105' : ''
+                      }`}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setIsDragging(true);
+                    }}
+                    onDragLeave={() => setIsDragging(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDragging(false);
+                      const files = Array.from(e.dataTransfer.files);
+                      if (files.length > 0) {
+                        setIsModalOpen(true);
+                      }
+                    }}
+                  >
+                    <div
+                      className={`border-2 border-dashed rounded-lg p-8 transition-all ${isDragging
+                        ? 'border-brand-red bg-brand-red/10 scale-105'
+                        : 'border-gray-700 bg-transparent'
+                        }`}
+                    >
+                      <Button
+                        onClick={() => setIsModalOpen(true)}
+                        className="w-full bg-brand-red hover:bg-red-700 text-white font-medium py-6 text-base transition-all transform hover:scale-105 shadow-lg hover:shadow-red-500/50"
+                      >
+                        📄 {isDragging ? 'Suelta tus archivos aquí' : 'Subir Documento'}
+                      </Button>
+                      <p className="text-sm text-gray-500 mt-3 text-center">
+                        {isDragging ? 'Suelta para subir' : 'o arrastra archivos aquí'}
+                      </p>
+                    </div>
+                  </div>
+                  <QuickPrompts
+                    onPromptSelect={handleQuickPrompt}
+                  />
+                </>
+              ) : (
+                <>
+                  <h3 className="text-2xl font-bold text-white mb-2">
+                    ¡Empieza ahora!
+                  </h3>
+                  <p className="text-gray-400 mb-6">
+                    Crea o selecciona un workspace desde la barra lateral para comenzar a chatear con tus documentos
+                  </p>
+                  <div className="animate-pulse">
+                    <div className="flex items-center justify-center space-x-2 text-brand-red">
+                      <span className="text-3xl">←</span>
+                      <span className="text-sm font-medium">Selecciona un workspace</span>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         ) : (
@@ -446,17 +462,17 @@ export function ChatArea() {
                   }`}
               >
                 <div
-                  className={`max-w-[85%] break-words ${msg.role === "user"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-card text-card-foreground border border-border"
-                    } rounded-2xl p-5 relative group shadow-sm`}
+                  className={`max-w-[80%] break-words ${msg.role === "user"
+                    ? "bg-brand-red text-white"
+                    : "bg-gray-800 text-gray-200"
+                    } rounded-lg p-4 relative group`}
                 >
                   {/* Botón de copiar (solo para mensajes del asistente) */}
                   {msg.role === "assistant" && (
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
+                      className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-700"
                       onClick={() => {
                         navigator.clipboard.writeText(msg.content);
                         setCopiedMessageId(`${index}`);
@@ -488,8 +504,8 @@ export function ChatArea() {
 
                   {/* Model used badge for assistant messages */}
                   {msg.role === "assistant" && msg.modelUsed && (
-                    <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-2">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground font-medium">
+                    <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-800/50 border border-gray-700">
                         🤖 {msg.modelUsed}
                       </span>
                     </div>
@@ -497,23 +513,21 @@ export function ChatArea() {
 
                   {/* Mostrar chunks relevantes si existen */}
                   {msg.chunks && msg.chunks.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-border/50">
-                      <p className="text-xs text-muted-foreground mb-2 font-medium uppercase tracking-wider">
-                        Sources ({msg.chunks.length})
+                    <div className="mt-4 pt-4 border-t border-gray-700">
+                      <p className="text-xs text-gray-400 mb-2">
+                        Fragmentos relevantes ({msg.chunks.length}):
                       </p>
-                      <div className="flex gap-2 overflow-x-auto pb-2">
-                        {msg.chunks.slice(0, 3).map((chunk, idx) => (
-                          <div
-                            key={idx}
-                            className="min-w-[200px] max-w-[250px] text-xs bg-muted/50 p-3 rounded-lg border border-border/50"
-                          >
-                            <p className="font-semibold mb-1 text-foreground truncate">
-                              Score: {chunk.score.toFixed(2)}
-                            </p>
-                            <p className="line-clamp-3 text-muted-foreground">{chunk.chunk_text}</p>
-                          </div>
-                        ))}
-                      </div>
+                      {msg.chunks.slice(0, 2).map((chunk, idx) => (
+                        <div
+                          key={idx}
+                          className="text-xs text-gray-500 bg-gray-900/50 p-2 rounded mb-2"
+                        >
+                          <p className="font-semibold mb-1">
+                            Score: {chunk.score.toFixed(3)}
+                          </p>
+                          <p className="line-clamp-2">{chunk.chunk_text}</p>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -523,9 +537,9 @@ export function ChatArea() {
             {/* Indicador de "Escribiendo..." */}
             {isStreaming && (
               <div className="flex justify-start">
-                <div className="bg-card border border-border text-muted-foreground rounded-2xl p-4 flex items-center gap-3 shadow-sm">
-                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                  <span className="text-sm font-medium">Thinking...</span>
+                <div className="bg-gray-800 text-gray-200 rounded-lg p-4 flex items-center gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span className="text-sm">Escribiendo...</span>
                 </div>
               </div>
             )}
@@ -535,111 +549,137 @@ export function ChatArea() {
         )}
       </ScrollArea>
 
-      {/* Floating Input Area */}
-      <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-background via-background to-transparent pointer-events-none flex justify-center z-20">
-        <div className="w-full max-w-3xl pointer-events-auto relative">
-           {/* Model Badge */}
-           {activeWorkspace && (
-             <div className="absolute -top-10 left-0 right-0 flex justify-center">
-                <span className="bg-popover/90 backdrop-blur-md border border-border px-3 py-1 rounded-full text-xs text-muted-foreground flex items-center gap-2 shadow-sm">
-                   <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
-                   Using: <span className="font-semibold text-foreground">{selectedModel === "gpt-4.1-nano" ? "GPT-4.1 Nano" : "Gemini 2.0 Flash"}</span>
-                </span>
-             </div>
-           )}
+      {/* Footer con el Input */}
+      <footer className="p-6 border-t border-gray-800/50 flex-shrink-0 bg-brand-dark shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.3)]">
+        {/* Estado del reconocimiento de voz */}
+        {listening && (
+          <div className="mb-2 text-sm text-red-400 flex items-center gap-2 animate-pulse">
+            <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+            <span>Escuchando... (di algo y aparecerá en el campo de texto)</span>
+          </div>
+        )}
+        {voiceError && (
+          <div className="mb-2 text-sm text-yellow-400">
+            ⚠️ {voiceError}
+          </div>
+        )}
+        {transcript && (
+          <div className="mb-2 text-xs text-gray-400">
+            🎤 Transcripción actual: "{transcript}"
+          </div>
+        )}
 
-           {/* Input Container */}
-           <div className={`bg-card border border-input rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-200 ${activeWorkspace ? 'opacity-100 translate-y-0' : 'opacity-50 translate-y-4 pointer-events-none'}`}>
-              {/* Attached Files */}
-              {attachedFiles.length > 0 && (
-                 <div className="px-4 pt-3 flex flex-wrap gap-2 bg-muted/30 pb-2">
-                    {attachedFiles.map((file, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center gap-2 bg-background border border-border rounded-md px-2 py-1 text-xs text-foreground shadow-sm"
-                      >
-                        <FileText className="h-3 w-3 text-primary" />
-                        <span className="max-w-[150px] truncate">{file.name}</span>
-                        <button
-                          onClick={() => removeAttachedFile(index)}
-                          className="text-muted-foreground hover:text-destructive transition-colors"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                 </div>
-              )}
-              
-              <div className="flex items-end p-3 gap-2">
-                 <input
-                    type="file"
-                    id="file-attach"
-                    className="hidden"
-                    multiple
-                    accept=".pdf,.docx,.xlsx,.txt,.csv"
-                    onChange={handleFileAttach}
-                    disabled={!activeWorkspace}
-                  />
-                 <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl h-10 w-10" 
-                    onClick={() => document.getElementById('file-attach')?.click()}
-                    title="Attach files"
-                 >
-                    <span className="text-2xl leading-none">+</span>
-                 </Button>
-                 
-                 <textarea
-                    ref={textareaRef}
-                    className="flex-1 bg-transparent border-0 focus:ring-0 resize-none py-2.5 max-h-40 text-foreground placeholder:text-muted-foreground leading-relaxed"
-                    placeholder="Message Tivit AI..."
-                    disabled={!activeWorkspace || isStreaming}
-                    value={message}
-                    onChange={(e) => {
-                      setMessage(e.target.value);
-                      const target = e.target as HTMLTextAreaElement;
-                      target.style.height = 'auto';
-                      target.style.height = Math.min(target.scrollHeight, 160) + 'px';
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSendMessage();
-                      }
-                    }}
-                    rows={1}
-                    style={{ height: 'auto', minHeight: '2.5rem' }}
-                 />
-                 
-                 <div className="flex items-center gap-1">
-                   <Button
-                      variant="ghost"
-                      size="icon"
-                      className={`${listening ? 'text-destructive animate-pulse' : 'text-muted-foreground hover:text-foreground'} rounded-xl h-10 w-10`}
-                      onClick={listening ? stopListening : startListening}
-                      title="Voice input"
-                   >
-                      <Mic className="h-5 w-5" />
-                   </Button>
-
-                   <Button 
-                      size="icon" 
-                      className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl h-10 w-10 shadow-md transition-transform active:scale-95"
-                      onClick={() => handleSendMessage()}
-                      disabled={!activeWorkspace || !message.trim() || isStreaming}
-                   >
-                      {isStreaming ? <Loader2 className="h-5 w-5 animate-spin" /> : <span className="text-lg font-bold">↑</span>}
-                   </Button>
-                 </div>
-              </div>
-           </div>
-           <div className="text-center mt-3 text-xs text-muted-foreground">
-              AI can make mistakes. Please verify important information.
-           </div>
+        {/* Model indicator */}
+        <div className="mb-3 px-3 py-2 bg-gray-900/30 border border-gray-800 rounded-lg flex items-center justify-center text-xs">
+          <span className="flex items-center gap-2 text-gray-400">
+            <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+            Modelo activo: <span className="font-semibold text-gray-300">
+              {selectedModel === "gpt-4.1-nano" ? "OpenAI GPT-4.1 Nano" : "Gemini 2.0 Flash"}
+            </span>
+          </span>
         </div>
-      </div>
+
+        {/* Archivos adjuntos */}
+        {attachedFiles.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-2">{attachedFiles.map((file, index) => (
+              <div
+                key={index}
+                className="flex items-center gap-2 bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300 hover:border-gray-600 transition-all"
+              >
+                <FileText className="h-4 w-4 text-brand-red" />
+                <span className="max-w-[200px] truncate">{file.name}</span>
+                <button
+                  onClick={() => removeAttachedFile(index)}
+                  className="text-gray-500 hover:text-red-400 transition-colors"
+                  title="Eliminar archivo"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="relative bg-brand-dark-secondary rounded-lg border border-gray-700 hover:border-gray-600 focus-within:border-brand-red transition-all">
+          {/* Contador de caracteres */}
+          <div className="absolute top-2 right-2 text-xs text-gray-500 pointer-events-none z-10">
+            {message.length} {message.length > 1000 && <span className="text-yellow-500">(largo)</span>}
+          </div>
+
+          <textarea
+            ref={textareaRef}
+            className="w-full bg-transparent rounded-lg py-3 pl-4 pr-20 focus-visible:ring-0 focus-visible:outline-none text-gray-300 placeholder-gray-500 resize-none min-h-[3rem] max-h-40 leading-relaxed"
+            placeholder="Escribe tu mensaje... (Shift + Enter para nueva línea, @ para mencionar documento)"
+            disabled={!activeWorkspace || isStreaming}
+            value={message}
+            onChange={(e) => {
+              setMessage(e.target.value);
+              const target = e.target as HTMLTextAreaElement;
+              target.style.height = 'auto';
+              target.style.height = Math.min(target.scrollHeight, 160) + 'px';
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+            }}
+            rows={1}
+            style={{
+              height: 'auto',
+              minHeight: '3rem',
+            }}
+          />
+          <div className="absolute bottom-2 right-2 flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="icon"
+              className={`${listening ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse' : 'bg-gray-700/50 hover:bg-gray-600 text-gray-300'} transition-all transform hover:scale-110`}
+              disabled={!activeWorkspace}
+              onClick={listening ? stopListening : startListening}
+              title={listening ? 'Detener grabación (grabando...)' : 'Iniciar reconocimiento de voz'}
+            >
+              <Mic className="h-5 w-5" />
+            </Button>
+
+            {/* Input oculto para archivos */}
+            <input
+              type="file"
+              id="file-attach"
+              className="hidden"
+              multiple
+              accept=".pdf,.docx,.xlsx,.txt,.csv"
+              onChange={handleFileAttach}
+              disabled={!activeWorkspace}
+            />
+            <Button
+              variant="secondary"
+              className="bg-gray-700/50 hover:bg-gray-600 text-gray-300 transition-all relative group"
+              disabled={!activeWorkspace}
+              onClick={() => document.getElementById('file-attach')?.click()}
+              title="Adjuntar archivos"
+            >
+              📎 Attach
+              {attachedFiles.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-brand-red text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {attachedFiles.length}
+                </span>
+              )}
+            </Button>
+            <Button
+              className="bg-brand-red text-white hover:bg-red-600 hover:shadow-lg hover:shadow-red-500/50 transition-all transform hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none"
+              disabled={!activeWorkspace || !message.trim() || isStreaming}
+              onClick={() => handleSendMessage()}
+            >
+              {isStreaming ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Send"
+              )}
+            </Button>
+          </div>
+        </div>
+      </footer>
     </main>
   );
 }

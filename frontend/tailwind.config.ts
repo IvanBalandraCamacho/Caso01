@@ -19,7 +19,7 @@ const config: Config = {
     },
     extend: {
       fontFamily: {
-        sans: ["Inter", "Roboto", "sans-serif"],
+        sans: ["Roboto", "sans-serif"],
       },
       colors: {
         brand: {
@@ -62,8 +62,6 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        success: "hsl(var(--success))",
-        danger: "hsl(var(--danger))",
       },
       borderRadius: {
         lg: "var(--radius)",

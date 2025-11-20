@@ -33,13 +33,13 @@ export function DocumentPanel() {
   }, [documents, searchQuery, statusFilter, typeFilter]);
 
   return (
-    <div className="w-96 bg-popover p-4 border-l border-border h-full flex flex-col">
-      <h2 className="text-lg font-semibold text-foreground mb-4">Documents</h2>
+    <div className="w-96 bg-brand-dark-secondary p-4">
+      <h2 className="text-lg font-semibold text-white mb-4">Documents</h2>
       <div className="mb-4">
         <input
           type="text"
           placeholder="Search documents..."
-          className="w-full bg-card border border-input rounded-lg py-2 px-3 focus-visible:ring-primary text-foreground placeholder-muted-foreground"
+          className="w-full bg-brand-dark border border-gray-700 rounded-lg py-2 px-3 focus-visible:ring-brand-red text-gray-300 placeholder-gray-500"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
@@ -69,8 +69,7 @@ export function DocumentPanel() {
       </div>
       <div className="mb-4">
         <Button
-          variant="outline"
-          className="w-full border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white font-medium"
+          className="w-full bg-brand-red text-white hover:bg-red-700 font-medium"
           onClick={() =>
             activeWorkspace && exportDocumentsToCsv(activeWorkspace.id)
           }
@@ -80,20 +79,13 @@ export function DocumentPanel() {
         </Button>
       </div>
       {isLoadingDocs ? (
-        <div className="space-y-3">
-           {/* Skeleton Loader */}
-           {[1, 2, 3].map((i) => (
-             <div key={i} className="h-20 bg-card animate-pulse rounded-lg" />
-           ))}
-        </div>
+        <p className="text-gray-400">Loading documents...</p>
       ) : (
-        <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-          <DocumentList 
-            documents={filteredDocuments}
-            workspaceId={activeWorkspace?.id}
-            onDeleteSuccess={() => activeWorkspace && fetchDocuments(activeWorkspace.id)}
-          />
-        </div>
+        <DocumentList 
+          documents={filteredDocuments}
+          workspaceId={activeWorkspace?.id}
+          onDeleteSuccess={() => activeWorkspace && fetchDocuments(activeWorkspace.id)}
+        />
       )}
     </div>
   );
