@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Settings, Plus, MoreVertical } from "lucide-react";
+import { Settings, Plus, MoreVertical, PanelLeftClose, PanelLeftOpen, Search, MessageSquare, LayoutGrid } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -51,6 +51,7 @@ export function Sidebar() {
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // React Query delete mutation
   const deleteWorkspaceMutation = useDeleteWorkspace();
@@ -137,200 +138,175 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className="w-72 bg-brand-dark-secondary flex flex-col p-4 border-r border-gray-800/50">
-        {/* Header: Logo */}
-        <div className="mb-8 flex items-center justify-center">
-          <Image 
-            src="/logo.svg" 
-            alt="Logo de la empresa" 
-            width={600} 
-            height={152}
-            className="w-full h-auto max-w-[250px]"
-            priority
-          />
+      <aside className={cn(
+        "bg-popover border-r border-border flex flex-col transition-all duration-300 h-full",
+        isCollapsed ? "w-20" : "w-72"
+      )}>
+        <div className="p-4 flex items-center justify-between">
+          {!isCollapsed && (
+             <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-primary-foreground font-bold">V</div>
+                <h1 className="text-lg font-bold text-foreground tracking-tight">Velvet</h1>
+             </div>
+          )}
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className={cn("text-muted-foreground hover:text-foreground", isCollapsed && "mx-auto")}
+          >
+            {isCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+          </Button>
         </div>
 
-        {/* Header: Velvet y Modelo */}
-        <div className="flex flex-col mb-6">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-brand-light">Velvet</h1>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-gray-400 hover:text-white"
-            >
-              <Settings className="h-5 w-5" />
-            </Button>
-          </div>
-
-          <div className="relative mt-2">
-            {isClient ? (
-              <Select value={selectedModel} onValueChange={(value) => {
-                console.log("Sidebar: Cambiando modelo a:", value);
-                setSelectedModel(value);
-              }}>
-                <SelectTrigger className="w-full bg-black/30 border border-gray-700 text-sm text-gray-300 focus:ring-2 focus:ring-brand-red focus:border-brand-red">
-                  <SelectValue placeholder="Select a model" />
-                </SelectTrigger>
-                <SelectContent className="bg-brand-dark-secondary border-gray-700 text-gray-300">
-                  <SelectItem value="gemini-2.0">Gemini 2.0 Flash</SelectItem>
-                  <SelectItem value="gpt-4.1-nano">GPT-4.1 Nano</SelectItem>
-                  <SelectItem value="velvet" disabled>Velvet (Próximamente)</SelectItem>
-                </SelectContent>
-              </Select>
-            ) : (
-              <div className="h-9 w-full rounded-md border border-gray-700 bg-black/30" />
-            )}
-          </div>
+        <div className="px-3 mb-4">
+           <Button 
+             className={cn(
+               "w-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-sm transition-all",
+               isCollapsed ? "px-0 justify-center" : "justify-start"
+             )}
+             onClick={handleNewConversation}
+             disabled={!activeWorkspace}
+             title="New Conversation"
+           >
+             <Plus className={cn("h-5 w-5", !isCollapsed && "mr-2")} />
+             {!isCollapsed && "New Chat"}
+           </Button>
         </div>
 
-        {/* Nueva Conversación */}
-        <Button 
-          className="w-full bg-brand-red text-white hover:bg-red-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-          onClick={handleNewConversation}
-          disabled={!activeWorkspace}
-          title={!activeWorkspace ? "Selecciona un workspace primero" : "Crear nueva conversación"}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          New Conversation
-        </Button>
-
-        {/* Global Search */}
-        <div className="mt-4">
-          <Input
-            className="w-full bg-transparent border border-gray-700 rounded-lg py-2 pl-4 pr-10 focus-visible:ring-brand-red text-gray-300 placeholder-gray-500"
-            placeholder="Search all documents..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={handleSearch}
-          />
-        </div>
-
-        {/* Navegación */}
-        <nav className="flex flex-col space-y-6 mt-8">
-          {/* Workspaces */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Workspace
-              </h2>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-gray-500 hover:text-white"
-                onClick={() => setIsAddModalOpen(true)}
-                title="Crear nuevo workspace"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
+        {!isCollapsed && (
+          <div className="px-3 mb-6">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="w-full bg-card border-input pl-9 h-9 text-sm focus-visible:ring-primary"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleSearch}
+              />
             </div>
+          </div>
+        )}
 
-            <div className="space-y-2">
-              {isLoading && workspaces.length === 0 ? (
-                <p className="text-gray-400 text-sm">Cargando...</p>
-              ) : (
-                workspaces.map((ws) => (
-                  <div
-                    key={ws.id}
-                    className="flex items-center justify-between group"
+        <ScrollArea className="flex-1 px-3">
+          <div className="space-y-6">
+            {/* Workspaces */}
+            <div>
+              {!isCollapsed && (
+                <div className="flex items-center justify-between mb-2 px-2">
+                  <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Workspaces
+                  </h2>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setIsAddModalOpen(true)}
                   >
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                {workspaces.map((ws) => (
+                  <div key={ws.id} className="group relative">
                     <button
                       className={cn(
-                        "flex-1 text-left text-gray-300 hover:text-white transition-colors p-1 rounded truncate",
-                        activeWorkspace &&
-                          activeWorkspace.id === ws.id &&
-                          "bg-brand-red/20 text-white"
+                        "w-full flex items-center gap-3 p-2 rounded-lg transition-all text-sm",
+                        activeWorkspace?.id === ws.id 
+                          ? "bg-primary/10 text-primary font-medium" 
+                          : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                        isCollapsed && "justify-center"
                       )}
                       onClick={() => setActiveWorkspace(ws)}
+                      title={ws.name}
                     >
-                      {ws.name}
+                      <LayoutGrid className="h-4 w-4 shrink-0" />
+                      {!isCollapsed && <span className="truncate">{ws.name}</span>}
                     </button>
-
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="bg-brand-dark-secondary border-gray-700 text-gray-300">
-                        <DropdownMenuItem onClick={() => openEditModal(ws)}>
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-red-500"
-                          onClick={() => handleDelete(ws.id)}
-                        >
-                          Eliminar
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                ))
-              )}
-              {!isLoading && workspaces.length === 0 && (
-                <p className="text-gray-400 text-sm">No hay workspaces.</p>
-              )}
-            </div>
-          </div>
-
-          <Separator className="bg-gray-800/50" />
-
-          {/* Conversaciones */}
-          <div>
-            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-              Your Conversations
-            </h2>
-            <ScrollArea className="h-64">
-              <div className="space-y-2 pr-2">
-                {activeWorkspace && conversations.length === 0 && (
-                  <p className="text-gray-400 text-sm">No hay conversaciones aún.</p>
-                )}
-                {!activeWorkspace && (
-                  <p className="text-gray-400 text-sm">Selecciona un workspace.</p>
-                )}
-                {conversations.map((conv) => (
-                  <div
-                    key={conv.id}
-                    className="flex items-center justify-between group"
-                  >
-                    <button
-                      className={cn(
-                        "flex-1 text-left text-gray-400 hover:text-white transition-colors text-sm truncate p-1 rounded",
-                        activeConversation?.id === conv.id && "bg-brand-red/20 text-white"
-                      )}
-                      onClick={() => setActiveConversation(conv)}
-                    >
-                      {conv.title}
-                    </button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="bg-brand-dark-secondary border-gray-700 text-gray-300">
-                        <DropdownMenuItem
-                          className="text-red-500"
-                          onClick={() => handleDeleteConversation(conv.id)}
-                        >
-                          Eliminar
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    
+                    {!isCollapsed && (
+                      <div className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-6 w-6">
+                              <MoreVertical className="h-3 w-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openEditModal(ws)}>
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(ws.id)}>
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
-            </ScrollArea>
+            </div>
+
+            {/* Conversations */}
+            <div>
+              {!isCollapsed && (
+                <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">
+                  History
+                </h2>
+              )}
+              <div className="space-y-1">
+                {conversations.map((conv) => (
+                  <div key={conv.id} className="group relative">
+                    <button
+                      className={cn(
+                        "w-full flex items-center gap-3 p-2 rounded-lg transition-all text-sm",
+                        activeConversation?.id === conv.id 
+                          ? "bg-accent text-foreground font-medium" 
+                          : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+                        isCollapsed && "justify-center"
+                      )}
+                      onClick={() => setActiveConversation(conv)}
+                      title={conv.title}
+                    >
+                      <MessageSquare className="h-4 w-4 shrink-0" />
+                      {!isCollapsed && <span className="truncate">{conv.title}</span>}
+                    </button>
+                    
+                    {!isCollapsed && (
+                      <div className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-6 w-6">
+                              <MoreVertical className="h-3 w-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteConversation(conv.id)}>
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-        </nav>
+        </ScrollArea>
+        
+        {!isCollapsed && (
+          <div className="p-4 border-t border-border">
+             <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-foreground gap-2">
+                <Settings className="h-4 w-4" />
+                Settings
+             </Button>
+          </div>
+        )}
       </aside>
 
       {workspaceToEdit && (

@@ -385,7 +385,7 @@ export default function WorkspaceManager() {
                   <button
                     onClick={handleUploadDocument}
                     disabled={!selectedFile || uploadDocumentMutation.isPending}
-                    className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 p-2 rounded text-white font-medium"
+                    className="w-full border border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed p-2 rounded font-medium transition-colors"
                   >
                     {uploadDocumentMutation.isPending ? 'Subiendo...' : 'Subir Documento'}
                   </button>
