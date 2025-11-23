@@ -8,7 +8,10 @@ class Settings(BaseSettings):
     """
     DATABASE_URL: str
     REDIS_URL: str
-    QDRANT_URL: str
+    
+    # DEPRECADO: Qdrant local (mantener para compatibilidad temporal)
+    QDRANT_URL: str = "http://qdrant:6333"  # Opcional durante migración
+    
     GEMINI_API_KEY: str
     CORS_ALLOWED_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", secrets.token_urlsafe(32))
@@ -22,10 +25,23 @@ class Settings(BaseSettings):
     GOOGLE_OAUTH_REDIRECT_URI: str | None = None
 
     # LLM Provider Configuration
-    LLM_PROVIDER: str = "gemini"  # "gemini" or "openai"
-    OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-4.1-nano-2025-04-14"
-    GEMINI_MODEL: str = "gemini-2.0-flash-exp"
+    LLM_PROVIDER: str = "gemini"
+    GEMINI_API_KEY: str
+    GEMINI_MODEL: str = "gemini-1.5-flash"      # Chat rápido / General
+    GEMINI_PRO_MODEL: str = "gemini-1.5-pro"    # Generación de documentos (Mayor calidad)
+    
+    # Multi-LLM Configuration
+    MULTI_LLM_ENABLED: bool = True
+    
+    # DeepSeek Configuration (Para ANÁLISIS)
+    DEEPSEEK_API_KEY: str = ""
+    DEEPSEEK_MODEL: str = "deepseek-chat"
+    
+    # RAG External Service Configuration (NUEVO)
+    RAG_SERVICE_URL: str = "http://localhost:8080"
+    RAG_SERVICE_API_KEY: str | None = None
+    RAG_SERVICE_TIMEOUT: float = 30.0
+    RAG_SERVICE_ENABLED: bool = True  # Activar cuando el servicio esté disponible
 
     class Config:
         env_file = ".env"

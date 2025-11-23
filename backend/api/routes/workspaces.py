@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request
 from fastapi.responses import StreamingResponse, FileResponse
 import shutil
 import os
@@ -7,7 +7,9 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 from models import database, workspace as workspace_model, document as document_model, schemas
 from core.celery_app import celery_app
-from processing import vector_store
+# DEPRECADO: from processing import vector_store (eliminado - usar rag_client)
+from core.rag_client import rag_client
+from core.config import settings
 from core import llm_service
 from models.schemas import WorkspaceUpdate
 from models.conversation import Conversation, Message
@@ -15,6 +17,16 @@ import csv
 import io
 from datetime import datetime
 import json
+
+# Rate Limiting
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+# Autenticación
+from core.auth import get_current_active_user
+from models.user import User
+
+limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter()
 
@@ -26,10 +38,13 @@ router = APIRouter()
 )
 def create_workspace(
     workspace_in: schemas.WorkspaceCreate,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(database.get_db)
 ):
     """
     Crea un nuevo espacio de trabajo.
+    
+    Requiere autenticación. El workspace se asigna al usuario actual.
     
     - **name**: El nombre del workspace (requerido).
     - **description**: Descripción opcional.
@@ -38,7 +53,8 @@ def create_workspace(
     # Crear la nueva instancia del modelo SQLAlchemy
     db_workspace = workspace_model.Workspace(
         name=workspace_in.name,
-        description=workspace_in.description
+        description=workspace_in.description,
+        owner_id=current_user.id  # Asignar al usuario actual
     )
     
     # Añadir a la sesión y confirmar en la BD
@@ -58,22 +74,32 @@ os.makedirs(TEMP_UPLOAD_DIR, exist_ok=True)
     status_code=status.HTTP_202_ACCEPTED, # 202 (Aceptado) porque es asíncrono
     summary="Subir un documento a un Workspace"
 )
+@limiter.limit("10/minute")  # Máximo 10 uploads por minuto
 def upload_document_to_workspace(
+    request: Request,
     workspace_id: str,
     file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(database.get_db)
 ):
     """
     Sube un documento. El procesamiento es asíncrono.
     
+    Requiere autenticación. Solo el owner del workspace puede subir documentos.
+    
     El endpoint:
     1. Verifica que el Workspace exista.
-    2. Guarda el archivo en un directorio temporal.
-    3. Crea un registro 'Document' en la BD con estado 'PENDING'.
-    4. (Próximamente) Envía una tarea a Celery para procesarlo.
+    2. Valida el archivo (tamaño, tipo, extensión).
+    3. Guarda el archivo en un directorio temporal.
+    4. Crea un registro 'Document' en la BD con estado 'PENDING'.
+    5. Envía una tarea a Celery para procesarlo.
     """
     
-    # 1. Verificar que el Workspace existe
+    # 1. Validar archivo ANTES de cualquier procesamiento (SEGURIDAD)
+    from core.security import validate_file
+    validate_file(file)
+    
+    # 2. Verificar que el Workspace existe
     db_workspace = db.query(workspace_model.Workspace).filter(
         workspace_model.Workspace.id == workspace_id
     ).first()
@@ -84,7 +110,14 @@ def upload_document_to_workspace(
             detail=f"Workspace con id {workspace_id} no encontrado."
         )
 
-    # 2. Guardar el archivo temporalmente
+    # Verificar ownership
+    if db_workspace.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para subir documentos a este workspace."
+        )
+
+    # 3. Guardar el archivo temporalmente
     try:
         temp_file_path = TEMP_UPLOAD_DIR / f"{uuid.uuid4()}_{file.filename}"
         with open(temp_file_path, "wb") as buffer:
@@ -97,7 +130,7 @@ def upload_document_to_workspace(
     finally:
         file.file.close()
 
-    # 3. Crear el registro 'Document' en la BD
+    # 4. Crear el registro 'Document' en la BD
     
     # Usamos el helper del schema para obtener el file_type
     doc_data = schemas.DocumentPublic.from_upload(file, workspace_id)
@@ -114,7 +147,7 @@ def upload_document_to_workspace(
     db.commit()
     db.refresh(db_document)
 
-    # 4. TODO: Enviar tarea a Celery
+    # 5. Enviar tarea a Celery
     celery_app.send_task(
          'processing.tasks.process_document',
          args=[db_document.id, str(temp_file_path)]
@@ -131,10 +164,13 @@ def upload_document_to_workspace(
 )
 def get_workspace_documents(
     workspace_id: str,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(database.get_db)
 ):
     """
     Obtiene una lista de todos los documentos para un workspace_id específico.
+    
+    Requiere autenticación. Solo el owner puede ver los documentos del workspace.
     """
     # Primero, verificar que el workspace exista (buena práctica)
     db_workspace = db.query(workspace_model.Workspace).filter(
@@ -147,6 +183,13 @@ def get_workspace_documents(
             detail=f"Workspace con id {workspace_id} no encontrado."
         )
     
+    # Verificar ownership
+    if db_workspace.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para ver los documentos de este workspace."
+        )
+
     # Si existe, obtener sus documentos
     documents = db.query(document_model.Document).filter(
         document_model.Document.workspace_id == workspace_id
@@ -160,13 +203,18 @@ def get_workspace_documents(
     response_model=schemas.ChatResponse,
     summary="Procesar una pregunta de chat (Pipeline RAG Completo)"
 )
+@limiter.limit("5/minute")  # Máximo 5 consultas de chat por minuto
 def chat_with_workspace(
+    request: Request,
     workspace_id: str,
     chat_request: schemas.ChatRequest,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(database.get_db)
 ):
     """
     Maneja una consulta de chat contra un workspace (Pipeline RAG Completo).
+    
+    Requiere autenticación. Solo el owner puede chatear con el workspace.
     
     Paso 1 (Retrieve):
     - Busca en Qdrant los chunks más relevantes de este workspace.
@@ -180,6 +228,20 @@ def chat_with_workspace(
     db_workspace = db.query(workspace_model.Workspace).filter(
         workspace_model.Workspace.id == workspace_id
     ).first()
+    
+    if not db_workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workspace con id {workspace_id} no encontrado."
+        )
+
+    # Verificar ownership
+    if db_workspace.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para chatear con este workspace."
+        )
+
     try:
         # 2. Obtener o crear conversación
         conversation = None
@@ -206,11 +268,33 @@ def chat_with_workspace(
         query_length = len(chat_request.query.split())
         top_k = 15 if query_length > 20 else 10
 
-        relevant_chunks = vector_store.search_similar_chunks(
-            query=chat_request.query,
-            workspace_id=workspace_id,
-            top_k=top_k
-        )
+        # Búsqueda en servicio RAG externo (si está habilitado)
+        if settings.RAG_SERVICE_ENABLED and rag_client:
+            try:
+                import asyncio
+                rag_results = asyncio.run(rag_client.search(
+                    query=chat_request.query,
+                    workspace_id=workspace_id,
+                    top_k=top_k
+                ))
+                
+                # Convertir resultados RAG a formato DocumentChunk
+                relevant_chunks = [
+                    schemas.DocumentChunk(
+                        document_id=result.document_id,
+                        chunk_text=result.content,
+                        chunk_index=0,  # El servicio externo puede no tener índice
+                        score=result.score
+                    ) for result in rag_results
+                ]
+            except Exception as e:
+                print(f"ERROR usando RAG externo: {e}")
+                # Fallback: retornar mensaje de error
+                relevant_chunks = []
+        else:
+            # TODO: Implementar fallback o retornar error
+            print("ADVERTENCIA: RAG_SERVICE_ENABLED=false, servicio RAG no disponible")
+            relevant_chunks = []
 
         # Si no hay chunks, devolver mensaje informativo
         if not relevant_chunks:
@@ -281,7 +365,16 @@ def chat_with_workspace(
     response_model=schemas.WorkspacePublic,
     summary="Obtener un Workspace por ID"
 )
-def get_workspace(workspace_id: str, db: Session = Depends(database.get_db)):
+def get_workspace(
+    workspace_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(database.get_db)
+):
+    """
+    Obtiene un workspace específico por su ID.
+    
+    Requiere autenticación. Solo el owner puede ver el workspace.
+    """
     db_workspace = db.query(workspace_model.Workspace).filter(
         workspace_model.Workspace.id == workspace_id
     ).first()
@@ -291,6 +384,14 @@ def get_workspace(workspace_id: str, db: Session = Depends(database.get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Workspace con id {workspace_id} no encontrado."
         )
+    
+    # Verificar ownership
+    if db_workspace.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para acceder a este workspace."
+        )
+    
     return db_workspace
 
 # --- AÑADIDO: Endpoint para actualizar un Workspace ---
@@ -302,8 +403,14 @@ def get_workspace(workspace_id: str, db: Session = Depends(database.get_db)):
 def update_workspace(
     workspace_id: str,
     workspace_in: schemas.WorkspaceUpdate,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(database.get_db)
 ):
+    """
+    Actualiza un workspace existente.
+    
+    Requiere autenticación. Solo el owner puede actualizar el workspace.
+    """
     db_workspace = db.query(workspace_model.Workspace).filter(
         workspace_model.Workspace.id == workspace_id
     ).first()
@@ -314,6 +421,13 @@ def update_workspace(
             detail=f"Workspace con id {workspace_id} no encontrado."
         )
     
+    # Verificar ownership
+    if db_workspace.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para actualizar este workspace."
+        )
+
     # Actualizar solo los campos proporcionados (que no sean None)
     update_data = workspace_in.model_dump(exclude_unset=True)
     for key, value in update_data.items():
@@ -329,7 +443,18 @@ def update_workspace(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Eliminar un Workspace"
 )
-def delete_workspace(workspace_id: str, db: Session = Depends(database.get_db)):
+@limiter.limit("20/minute")  # Máximo 20 eliminaciones por minuto
+def delete_workspace(
+    request: Request, 
+    workspace_id: str, 
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(database.get_db)
+):
+    """
+    Elimina un workspace y todos sus documentos asociados.
+    
+    Requiere autenticación. Solo el owner puede eliminar el workspace.
+    """
     db_workspace = db.query(workspace_model.Workspace).filter(
         workspace_model.Workspace.id == workspace_id
     ).first()
@@ -339,24 +464,31 @@ def delete_workspace(workspace_id: str, db: Session = Depends(database.get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Workspace con id {workspace_id} no encontrado."
         )
+    
+    # Verificar ownership
+    if db_workspace.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para eliminar este workspace."
+        )
         
     documents = list(db_workspace.documents)
 
     for document in documents:
-        try:
-            vector_store.delete_document_vectors(
-                workspace_id=document.workspace_id,
-                document_id=document.id,
-            )
-        except Exception as exc:  # noqa: BLE001 - logging purpose only
-            print(f"ERROR eliminando vectores del documento {document.id}: {exc}")
-
+        # Eliminar del servicio RAG externo (si está habilitado)
+        if settings.RAG_SERVICE_ENABLED and rag_client:
+            try:
+                import asyncio
+                asyncio.run(rag_client.delete_document(document.id))
+                print(f"Documento {document.id} eliminado del servicio RAG externo")
+            except Exception as exc:
+                print(f"ERROR eliminando del RAG externo {document.id}: {exc}")
+        
         db.delete(document)
 
-    try:
-        vector_store.delete_workspace_vectors(workspace_id)
-    except Exception as exc:  # noqa: BLE001 - logging purpose only
-        print(f"ERROR eliminando colección del workspace {workspace_id}: {exc}")
+    # Nota: El servicio RAG externo elimina documentos individualmente
+    # No hay concepto de "workspace vectors" en el servicio externo
+    print(f"Workspace {workspace_id} eliminado (documentos ya eliminados del RAG)")
 
     db.delete(db_workspace)
     db.commit()
@@ -368,7 +500,18 @@ def delete_workspace(workspace_id: str, db: Session = Depends(database.get_db)):
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Eliminar un Documento"
 )
-def delete_document(document_id: str, db: Session = Depends(database.get_db)):
+@limiter.limit("20/minute")  # Máximo 20 eliminaciones por minuto
+def delete_document(
+    request: Request, 
+    document_id: str, 
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(database.get_db)
+):
+    """
+    Elimina un documento específico.
+    
+    Requiere autenticación. Solo el owner del workspace al que pertenece el documento puede eliminarlo.
+    """
     db_document = db.query(document_model.Document).filter(
         document_model.Document.id == document_id
     ).first()
@@ -379,16 +522,29 @@ def delete_document(document_id: str, db: Session = Depends(database.get_db)):
             detail=f"Documento con id {document_id} no encontrado."
         )
     
-    # 1. Eliminar vectores de Qdrant
-    # (Necesitaremos una nueva función en vector_store.py)
-    try:
-        vector_store.delete_document_vectors(
-            workspace_id=db_document.workspace_id,
-            document_id=db_document.id
+    # Verificar ownership del workspace al que pertenece el documento
+    db_workspace = db.query(workspace_model.Workspace).filter(
+        workspace_model.Workspace.id == db_document.workspace_id
+    ).first()
+
+    if not db_workspace or db_workspace.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para eliminar este documento."
         )
-    except Exception as e:
-        print(f"Error al eliminar vectores de Qdrant: {e}")
-        # Continuar de todos modos para eliminar de la BD
+
+    # 1. Eliminar del servicio RAG externo (si está habilitado)
+    if settings.RAG_SERVICE_ENABLED and rag_client:
+        try:
+            import asyncio
+            success = asyncio.run(rag_client.delete_document(db_document.id))
+            if success:
+                print(f"Documento {db_document.id} eliminado del servicio RAG externo")
+            else:
+                print(f"Documento {db_document.id} no encontrado en servicio RAG")
+        except Exception as e:
+            print(f"Error al eliminar del servicio RAG: {e}")
+            # Continuar de todos modos para eliminar de la BD
         
     # 2. Eliminar de PostgreSQL
     db.delete(db_document)
@@ -398,13 +554,17 @@ def delete_document(document_id: str, db: Session = Depends(database.get_db)):
 @router.get(
     "/workspaces",
     response_model=list[schemas.WorkspacePublic],
-    summary="Obtener todos los Workspaces"
+    summary="Obtener todos los Workspaces del usuario"
 )
-def get_workspaces(db: Session = Depends(database.get_db)):
+def get_workspaces(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(database.get_db)
+):
     """
-    Obtiene una lista de todos los workspaces activos.
+    Obtiene una lista de todos los workspaces del usuario autenticado.
     """
     workspaces = db.query(workspace_model.Workspace).filter(
+        workspace_model.Workspace.owner_id == current_user.id,
         workspace_model.Workspace.is_active == True
     ).all()
     
@@ -418,10 +578,13 @@ def get_workspaces(db: Session = Depends(database.get_db)):
 )
 def export_documents_csv(
     workspace_id: str,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(database.get_db)
 ):
     """
     Exporta la lista de documentos de un workspace a CSV.
+    
+    Requiere autenticación. Solo el owner puede exportar los documentos.
     """
     # Verificar que el workspace existe
     db_workspace = db.query(workspace_model.Workspace).filter(

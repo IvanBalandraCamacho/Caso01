@@ -1,0 +1,103 @@
+GUÍA DE INTEGRACIÓN FRONTEND - CASO01 BACKEND
+================================================
+
+Esta guía detalla los endpoints disponibles y las consideraciones técnicas para el desarrollo del cliente Frontend.
+
+BASE URL: http://localhost:8000/api/v1
+
+1. AUTENTICACIÓN (JWT)
+----------------------
+El backend utiliza JWT (JSON Web Tokens) para proteger los recursos.
+Header requerido en peticiones protegidas: `Authorization: Bearer <access_token>`
+
+ENDPOINTS:
+[POST] /auth/register
+  - Body: { "email": "...", "password": "...", "full_name": "..." }
+  - Response: { "id": 1, "email": "...", ... }
+
+[POST] /auth/login
+  - Body: (OAuth2PasswordRequestForm) username=email, password=password
+  - Response: { "access_token": "...", "token_type": "bearer" }
+
+[GET]  /auth/me
+  - Header: Authorization
+  - Response: Datos del usuario actual.
+
+2. WORKSPACES (Espacios de Trabajo)
+-----------------------------------
+Los usuarios organizan su trabajo en Workspaces. Cada workspace tiene sus propios documentos y chats.
+
+ENDPOINTS:
+[GET]    /workspaces
+  - Lista todos los workspaces del usuario.
+
+[POST]   /workspaces
+  - Body: { "name": "Proyecto Alpha", "description": "..." }
+  - Crea un nuevo workspace.
+
+[GET]    /workspaces/{id}
+  - Obtiene detalles de un workspace específico.
+
+[PUT]    /workspaces/{id}
+  - Actualiza nombre/descripción.
+
+[DELETE] /workspaces/{id}
+  - Elimina workspace y todo su contenido (Cascade delete).
+
+3. GESTIÓN DE DOCUMENTOS (RAG)
+------------------------------
+Subida y gestión de archivos para el contexto de la IA.
+
+ENDPOINTS:
+[POST]   /workspaces/{workspace_id}/upload
+  - Body: Multipart Form Data (file=@documento.pdf)
+  - Nota: Soporta PDF, DOCX, TXT. Máx 50MB.
+  - Trigger: Inicia proceso asíncrono de indexación en RAG externo.
+
+[GET]    /workspaces/{workspace_id}/documents
+  - Lista documentos en el workspace con su estado (processing, completed, error).
+
+[DELETE] /documents/{document_id}
+  - Elimina un documento y sus vectores asociados.
+
+4. CHAT & IA (Multi-LLM)
+------------------------
+Interacción con los modelos de IA. El backend selecciona automáticamente el modelo (Gemini/DeepSeek).
+
+ENDPOINTS:
+[POST]   /workspaces/{workspace_id}/chat
+  - Body: { "message": "¿Cuál es el presupuesto?", "stream": true }
+  - Response (Stream=true): Server-Sent Events (SSE) con chunks de texto.
+  - Response (Stream=false): JSON con respuesta completa.
+  - Nota: El backend decide si usa Gemini Flash (Chat), Gemini Pro (Generar) o DeepSeek (Analizar).
+
+[GET]    /workspaces/{workspace_id}/conversations
+  - Historial de conversaciones del workspace.
+
+[GET]    /conversations/{conversation_id}
+  - Detalle de mensajes de una conversación específica.
+
+5. CONSIDERACIONES PARA EL DESARROLLADOR FRONTEND
+-------------------------------------------------
+
+A. MANEJO DE STREAMING
+   El endpoint de chat soporta streaming. Se recomienda usar `fetch` con `ReadableStream` o librerías como `ai` (Vercel SDK) para mostrar la respuesta token por token, mejorando la UX.
+
+B. ESTADOS DE DOCUMENTOS
+   Al subir un documento, su estado inicial es `processing`. El frontend debe hacer polling o permitir recarga para mostrar cuando pase a `completed`. Solo los documentos `completed` son usados por la IA.
+
+C. SISTEMA MULTI-LLM (Transparente)
+   El frontend NO necesita seleccionar el modelo. El backend tiene un "Router Inteligente" que decide:
+   - Si el usuario pide "Analizar" -> Usa DeepSeek.
+   - Si pide "Generar Propuesta" -> Usa Gemini Pro.
+   - Chat normal -> Usa Gemini Flash.
+   
+   *Tip de UX*: Podrías mostrar un indicador visual (badge) en el chat diciendo "Analizando con DeepSeek..." si la respuesta tarda un poco más.
+
+D. ERRORES COMUNES
+   - 401 Unauthorized: Token expirado o inválido. Redirigir a Login.
+   - 429 Too Many Requests: El usuario excedió el rate limit. Mostrar mensaje de espera.
+   - 413 Payload Too Large: Archivo muy pesado (>50MB).
+
+E. RAG EXTERNO
+   El backend se comunica con un servicio RAG en `localhost:8080`. Si el chat responde "No tengo contexto", verificar que los documentos estén en estado `completed`.

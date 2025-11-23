@@ -6,7 +6,9 @@ import uuid
 import os
 
 from models import database, document as document_model, schemas
-from processing import parser, vector_store
+# DEPRECADO: from processing import parser, vector_store
+from processing import parser
+# from core.rag_client import rag_client  # TODO: Implementar cuando RAG externo esté listo
 from core import llm_service
 
 router = APIRouter()
@@ -37,6 +39,10 @@ def generate_document_summary(
 
     # 1) Si se subió un archivo, procesarlo y extraer su texto
     if file is not None:
+        # Validar archivo ANTES de procesarlo (SEGURIDAD)
+        from core.security import validate_file
+        validate_file(file)
+        
         try:
             temp_file_path = TEMP_UPLOAD_DIR / f"{uuid.uuid4()}_{file.filename}"
             with open(temp_file_path, "wb") as buffer:
@@ -79,53 +85,37 @@ def generate_document_summary(
         return resp
 
     # 2) Si se pide por document_id, intentar reconstruir texto a partir de chunks
+    # TODO: Implementar cuando el servicio RAG externo esté disponible
     if document_id:
-        db_document = db.query(document_model.Document).filter(
-            document_model.Document.id == document_id
-        ).first()
-
-        if not db_document:
-            raise HTTPException(status_code=404, detail=f"Documento {document_id} no encontrado.")
-
-        # Obtener workspace_id desde el documento si no fue provisto
-        use_workspace_id = workspace_id or db_document.workspace_id
-
-        # Recuperar chunks desde Qdrant
-        chunks = vector_store.get_document_chunks(document_id=document_id, workspace_id=use_workspace_id)
-
-        if not chunks:
-            raise HTTPException(status_code=404, detail="No se encontraron chunks para este documento. Asegúrese de que el documento fue procesado.")
-
-        # Reconstruir texto ordenando por chunk_index
-        full_text = "\n\n".join([c.chunk_text for c in chunks])
-
-        # Try to load project-level instructions file if present
-        instructions_text = None
-        try:
-            candidate = Path.cwd() / "summary_instructions.md"
-            if not candidate.exists():
-                candidate = Path(__file__).resolve().parents[4] / "summary_instructions.md"
-            if candidate.exists():
-                instructions_text = candidate.read_text(encoding="utf-8")
-        except Exception as e:
-            print(f"WARNING: No se pudo leer summary_instructions.md: {e}")
-
-        summary_sections = llm_service.generate_summary_from_text(full_text, instructions_text=instructions_text)
-        if isinstance(summary_sections, dict) and summary_sections.get("error"):
-            raise HTTPException(status_code=500, detail=summary_sections.get("error"))
-
-        # Nota: No se persiste el resumen en la BD por decisión del usuario.
-
-        resp = schemas.SummaryResponse(
-            document_id=document_id,
-            summary=schemas.SummarySections(
-                administrativo=summary_sections.get("administrativo", ""),
-                posibles_competidores=summary_sections.get("posibles_competidores", ""),
-                tecnico=summary_sections.get("tecnico", ""),
-                viabilidad_del_alcance=summary_sections.get("viabilidad_del_alcance", "")
-            )
+        raise HTTPException(
+            status_code=503,
+            detail="La funcionalidad de resumen por document_id está temporalmente deshabilitada. "
+                   "Use la opción de subir archivo directamente. "
+                   "Esta funcionalidad estará disponible cuando el servicio RAG externo esté configurado."
         )
-        return resp
+        
+        # CÓDIGO ORIGINAL (comentado hasta que RAG externo esté listo):
+        # db_document = db.query(document_model.Document).filter(
+        #     document_model.Document.id == document_id
+        # ).first()
+        #
+        # if not db_document:
+        #     raise HTTPException(status_code=404, detail=f"Documento {document_id} no encontrado.")
+        #
+        # # Obtener workspace_id desde el documento si no fue provisto
+        # use_workspace_id = workspace_id or db_document.workspace_id
+        #
+        # # TODO: Recuperar chunks desde servicio RAG externo
+        # # chunks = await rag_client.search(
+        # #     query="",  # Búsqueda vacía para obtener todos los chunks
+        # #     workspace_id=use_workspace_id,
+        # #     filters={"document_id": document_id}
+        # # )
+        #
+        # # Reconstruir texto ordenando por chunk_index
+        # # full_text = "\n\n".join([c.chunk_text for c in chunks])
+        #
+        # # ... resto del código ...
 
     # Si no hay datos
     raise HTTPException(status_code=400, detail="Proporcione `file` o `document_id`.")

@@ -11,7 +11,8 @@ pydantic-settings
 # --- Seguridad ---
 pyjwt
 passlib[bcrypt]
-slowapi
+slowapi  # Rate limiting
+python-jose[cryptography]  # JWT tokens
 
 # --- Base de datos y Cache ---
 pymysql
@@ -20,13 +21,12 @@ sqlalchemy
 redis
 celery
 
-# --- IA y RAG ---
-langchain-text-splitters>=0.2.0  # <-- Paquete separado en LangChain 0.1+
-langchain-core>=0.2.0
-qdrant-client>=1.7.0,<2.0.0  # Fijada para evitar breaking changes en la API
+# --- IA y LLM ---
 google-generativeai>=0.5.2
-openai>=1.54.0
-sentence-transformers>=2.2.0
+openai>=1.54.0  # Cliente requerido para DeepSeek V3
+
+# --- HTTP Client (para servicio RAG externo) ---
+httpx
 
 # --- Procesamiento de Documentos ---
 pandas

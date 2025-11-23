@@ -1,160 +1,177 @@
 """
-LLM Service - Factory for LLM providers.
-Provides a unified interface to different LLM backends (Gemini, OpenAI, etc.)
+LLM Service - Factory for Multi-LLM providers (Simplificado).
+Provides a unified interface to different LLM backends with intelligent routing.
+
+Sistema Multi-LLM:
+- Gemini 1.5 Flash: Principal para TODO (análisis, chat, generación)
+- DeepSeek V3: Secundario para Q&A específico (opcional)
 """
 from typing import List, Generator
 from core.config import settings
-from core.providers import GeminiProvider, OpenAIProvider, LLMProvider
+from core.providers import GeminiProvider, LLMProvider
+from core.providers.deepseek_provider import DeepSeekProvider
+from core.llm_router import LLMRouter, TaskType
 from models.schemas import DocumentChunk
+import logging
 
-# Global provider instance
-_provider: LLMProvider = None
+logger = logging.getLogger(__name__)
+
+# Global provider instances
+_providers = {}
+_router = None
 
 
-def get_llm_provider() -> LLMProvider:
+def initialize_providers():
     """
-    Get or create the LLM provider based on configuration.
-    Returns the configured provider (Gemini or OpenAI).
+    Inicializa todos los providers disponibles.
     """
-    global _provider
+    global _providers, _router
     
-    if _provider is not None:
-        return _provider
+    logger.info("Inicializando sistema Multi-LLM (Refinado)...")
     
-    provider_name = settings.LLM_PROVIDER.lower()
-    print(f"LLM_SERVICE: Inicializando provider '{provider_name}'...")
-    
-    if provider_name == "openai":
-        _provider = OpenAIProvider(
-            api_key=settings.OPENAI_API_KEY,
-            model_name=getattr(settings, "OPENAI_MODEL", "gpt-4.1-nano-2025-04-14")
-        )
-    elif provider_name == "gemini":
-        _provider = GeminiProvider(
-            api_key=settings.GEMINI_API_KEY,
-            model_name=getattr(settings, "GEMINI_MODEL", "gemini-2.0-flash-exp")
-        )
-    else:
-        raise ValueError(f"Provider desconocido: {provider_name}. Use 'gemini' o 'openai'.")
-    
-    return _provider
-
-
-# Diccionario para cachear proveedores inicializados
-_provider_cache = {}
-
-# Initialize provider on module load
-try:
-    provider = get_llm_provider()
-    print(f"LLM_SERVICE: Provider '{settings.LLM_PROVIDER}' inicializado correctamente.")
-    
-    # Precargar ambos proveedores para evitar delays en el primer uso
-    print("LLM_SERVICE: Precargando proveedores...")
+    # 1. Gemini 1.5 Flash (Chat/General)
     try:
-        _provider_cache["gemini-2.0"] = GeminiProvider(
+        _providers["gemini_flash"] = GeminiProvider(
             api_key=settings.GEMINI_API_KEY,
-            model_name="gemini-2.0-flash-exp"
+            model_name=settings.GEMINI_MODEL
         )
-        print("LLM_SERVICE: Gemini 2.0 precargado.")
+        logger.info("✅ Gemini 1.5 Flash inicializado (CHAT/GENERAL)")
     except Exception as e:
-        print(f"LLM_SERVICE: No se pudo precargar Gemini: {e}")
+        logger.error(f"❌ Error Gemini Flash: {e}")
+
+    # 2. Gemini 1.5 Pro (Generación)
+    try:
+        _providers["gemini_pro"] = GeminiProvider(
+            api_key=settings.GEMINI_API_KEY,
+            model_name=getattr(settings, "GEMINI_PRO_MODEL", "gemini-1.5-pro")
+        )
+        logger.info("✅ Gemini 1.5 Pro inicializado (GENERACIÓN)")
+    except Exception as e:
+        logger.error(f"❌ Error Gemini Pro: {e}")
     
-    if settings.OPENAI_API_KEY:
+    # 3. DeepSeek V3 (Análisis)
+    if settings.DEEPSEEK_API_KEY:
         try:
-            _provider_cache["gpt-4.1-nano"] = OpenAIProvider(
-                api_key=settings.OPENAI_API_KEY,
-                model_name="gpt-4.1-nano-2025-04-14"
-            )
-            print("LLM_SERVICE: OpenAI GPT-4.1 Nano precargado.")
+            _providers["deepseek"] = DeepSeekProvider()
+            logger.info("✅ DeepSeek V3 inicializado (ANÁLISIS)")
         except Exception as e:
-            print(f"LLM_SERVICE: No se pudo precargar OpenAI: {e}")
-    else:
-        print("LLM_SERVICE: OpenAI API Key no configurada, omitiendo precarga.")
-        
-except Exception as e:
-    print(f"LLM_SERVICE ERROR: No se pudo inicializar el provider: {e}")
-    provider = None
+            logger.error(f"❌ Error DeepSeek: {e}")
+    
+    # Inicializar router
+    _router = LLMRouter()
+    logger.info("✅ LLM Router inicializado")
+    
+    logger.info(f"Sistema Multi-LLM listo con {len(_providers)} providers")
 
 
-def generate_response(query: str, context_chunks: List[DocumentChunk]) -> str:
+def get_provider(model_name: str = None, task_type: str = None) -> LLMProvider:
     """
-    Generate a complete response for the given query.
+    Obtiene un provider específico o usa el router para seleccionar el mejor.
     
     Args:
-        query: User's question
-        context_chunks: Relevant document chunks
-        
-    Returns:
-        Complete response as string
-    """
-    if provider is None:
-        raise RuntimeError("El proveedor LLM no está inicializado.")
-    return provider.generate_response(query, context_chunks)
-
-
-def generate_response_stream(query: str, context_chunks: List[DocumentChunk], model: str | None = None) -> Generator[str, None, None]:
-    """
-    Generate a streaming response for the given query.
-    
-    Args:
-        query: User's question
-        context_chunks: Relevant document chunks
-        model: Optional model override (gemini-2.0 or gpt-4.1-nano)
-        
-    Yields:
-        Response chunks as they are generated
-    """
-    if provider is None:
-        raise RuntimeError("El proveedor LLM no está inicializado.")
-    
-    # Si se especifica un modelo, crear proveedor temporal
-    if model:
-        temp_provider = _get_provider_for_model(model)
-        return temp_provider.generate_response_stream(query, context_chunks)
-    
-    return provider.generate_response_stream(query, context_chunks)
-
-
-def _get_provider_for_model(model: str) -> LLMProvider:
-    """
-    Get LLM provider instance for specific model.
-    Uses cached providers when available.
-    
-    Args:
-        model: Model identifier (gemini-2.0 or gpt-4.1-nano)
+        model_name: Nombre específico del modelo (opcional)
+        task_type: Tipo de tarea para routing automático (opcional)
         
     Returns:
         LLMProvider instance
     """
-    from core.config import settings
+    if not _providers:
+        initialize_providers()
     
-    print(f"LLM_SERVICE: Seleccionando proveedor para modelo '{model}'...")
+    # Si se especifica modelo, retornar ese
+    if model_name and model_name in _providers:
+        return _providers[model_name]
     
-    # Intentar usar cache primero
-    if model in _provider_cache:
-        print(f"LLM_SERVICE: Usando {model} desde cache (precargado)")
-        return _provider_cache[model]
-    
-    # Si no está en cache, crear nueva instancia
-    if model == "gpt-4.1-nano":
-        print("LLM_SERVICE: Inicializando OpenAI GPT-4.1 Nano (no estaba en cache)")
-        provider_instance = OpenAIProvider(
-            api_key=settings.OPENAI_API_KEY,
-            model_name="gpt-4.1-nano-2025-04-14"
+    # Si se especifica tipo de tarea, usar router
+    if task_type and _router:
+        model_name, _, _ = _router.route(
+            query="",  # No necesitamos query para task_type directo
+            num_documents=0
         )
-        _provider_cache[model] = provider_instance
-        return provider_instance
-    elif model == "gemini-2.0":
-        print("LLM_SERVICE: Inicializando Gemini 2.0 Flash (no estaba en cache)")
-        provider_instance = GeminiProvider(
-            api_key=settings.GEMINI_API_KEY,
-            model_name="gemini-2.0-flash-exp"
+        if task_type == "analyze":
+            return _providers.get("gemini_flash")
+        elif task_type == "respond":
+            return _providers.get("deepseek")
+        elif task_type == "create":
+            return _providers.get("claude_haiku")
+    
+    # Default: Gemini Flash
+    return _providers.get("gemini_flash") or list(_providers.values())[0]
+
+
+def generate_response(
+    query: str, 
+    context_chunks: List[DocumentChunk],
+    task_type: str = None
+) -> str:
+    """
+    Genera respuesta usando el mejor modelo para la tarea.
+    
+    Args:
+        query: Pregunta del usuario
+        context_chunks: Chunks de contexto del RAG
+        task_type: Tipo de tarea ("analyze", "respond", "create")
+        
+    Returns:
+        Respuesta generada
+    """
+    if settings.MULTI_LLM_ENABLED and _router:
+        # Usar router para seleccionar modelo
+        model_name, detected_task, reason = _router.route(
+            query=query,
+            num_documents=len(context_chunks)
         )
-        _provider_cache[model] = provider_instance
-        return provider_instance
+        logger.info(f"Router seleccionó: {model_name} - {reason}")
+        provider = _providers.get(model_name)
     else:
-        print(f"LLM_SERVICE: Modelo '{model}' no reconocido, usando proveedor por defecto")
-        return get_llm_provider()
+        # Usar provider por defecto
+        provider = get_provider()
+    
+    if not provider:
+        raise RuntimeError("No hay provider disponible")
+    
+    return provider.generate_response(query, context_chunks)
+
+
+def generate_response_stream(
+    query: str, 
+    context_chunks: List[DocumentChunk],
+    task_type: str = None
+) -> Generator[str, None, None]:
+    """
+    Genera respuesta en streaming usando el mejor modelo.
+    
+    Args:
+        query: Pregunta del usuario
+        context_chunks: Chunks de contexto del RAG
+        task_type: Tipo de tarea ("analyze", "respond", "create")
+        
+    Yields:
+        Chunks de texto de la respuesta
+    """
+    if settings.MULTI_LLM_ENABLED and _router:
+        # Usar router para seleccionar modelo
+        model_name, detected_task, reason = _router.route(
+            query=query,
+            num_documents=len(context_chunks)
+        )
+        logger.info(f"Router seleccionó: {model_name} - {reason}")
+        provider = _providers.get(model_name)
+    else:
+        # Usar provider por defecto
+        provider = get_provider()
+    
+    if not provider:
+        raise RuntimeError("No hay provider disponible")
+    
+    return provider.generate_response_stream(query, context_chunks)
+
+
+# Inicializar providers al cargar el módulo
+try:
+    initialize_providers()
+except Exception as e:
+    logger.error(f"Error inicializando providers: {e}")
 
 
 # Legacy functions for backward compatibility
@@ -183,13 +200,14 @@ def generate_summary_from_text(text: str, instructions_text: str | None = None) 
     Returns:
         Dictionary with summary or error
     """
-    if provider is None:
+    provider = get_provider()
+    
+    if not provider:
         return {"error": "LLM no inicializado"}
     
     prompt = _build_summary_prompt(text, instructions_text=instructions_text)
     
     try:
-        # Use generate_response with empty context for summarization
         summary = provider.generate_response(prompt, [])
         return {"summary_raw": summary}
     except Exception as e:
