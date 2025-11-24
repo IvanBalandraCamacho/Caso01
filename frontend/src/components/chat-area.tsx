@@ -252,9 +252,10 @@ export function ChatArea() {
         // Si es el primer mensaje y tenemos conversation_id, generar título automáticamente
         if (isFirstMessage && currentConversationId && activeWorkspace) {
           try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1';
             const token = localStorage.getItem("access_token");
             const response = await fetch(
-              `http://localhost:8000/workspaces/${activeWorkspace.id}/conversations/${currentConversationId}/generate-title`,
+              `${apiUrl}/workspaces/${activeWorkspace.id}/conversations/${currentConversationId}/generate-title`,
               { 
                 method: 'POST',
                 headers: {

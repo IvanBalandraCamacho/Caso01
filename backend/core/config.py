@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-1.5-flash"      # Chat rápido / General
     GEMINI_PRO_MODEL: str = "gemini-1.5-pro"    # Generación de documentos (Mayor calidad)
     
+    # OpenAI Configuration (Para ANÁLISIS)
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-4o-mini"
+    
     # Multi-LLM Configuration
     MULTI_LLM_ENABLED: bool = True
     

@@ -562,9 +562,35 @@ export function WorkspaceProvider({
     [apiUrl, activeWorkspace, fetchDocuments]
   );
 
-  // Cargar workspaces al inicio
+  // Cargar workspaces al inicio solo si el usuario está autenticado
   useEffect(() => {
-    fetchWorkspaces();
+    // Solo cargar si hay token (usuario autenticado)
+    if (typeof window !== 'undefined' && localStorage.getItem('access_token')) {
+      fetchWorkspaces();
+    }
+  }, [fetchWorkspaces]);
+
+  // Escuchar cuando el usuario hace login (custom event)
+  useEffect(() => {
+    const handleLoginSuccess = () => {
+      fetchWorkspaces();
+    };
+
+    const handleLogout = () => {
+      setWorkspaces([]);
+      setActiveWorkspace(null);
+      setConversations([]);
+      setActiveConversation(null);
+      setDocuments([]);
+    };
+
+    window.addEventListener('loginSuccess', handleLoginSuccess);
+    window.addEventListener('logout', handleLogout);
+    
+    return () => {
+      window.removeEventListener('loginSuccess', handleLoginSuccess);
+      window.removeEventListener('logout', handleLogout);
+    };
   }, [fetchWorkspaces]);
 
   // Nota: NO auto-seleccionar workspace al inicio - el usuario debe elegir manualmente

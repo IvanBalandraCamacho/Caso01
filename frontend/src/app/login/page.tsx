@@ -32,12 +32,14 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1';
+      
       // Crear FormData para OAuth2PasswordRequestForm
       const formData = new URLSearchParams();
       formData.append('username', email); // OAuth2 usa 'username' pero enviamos el email
       formData.append('password', password);
 
-      const response = await fetch('http://localhost:8000/api/v1/auth/login', {
+      const response = await fetch(`${apiUrl}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -55,8 +57,11 @@ export default function LoginPage() {
       // Guardar token en localStorage
       localStorage.setItem('access_token', data.access_token);
       
+      // Disparar evento para que el WorkspaceContext cargue los datos
+      window.dispatchEvent(new Event('loginSuccess'));
+      
       // Obtener información del usuario
-      const userResponse = await fetch('http://localhost:8000/api/v1/auth/me', {
+      const userResponse = await fetch(`${apiUrl}/auth/me`, {
         headers: {
           'Authorization': `Bearer ${data.access_token}`,
         },

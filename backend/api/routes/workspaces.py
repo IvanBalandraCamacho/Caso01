@@ -298,10 +298,21 @@ def chat_with_workspace(
 
         # Si no hay chunks, devolver mensaje informativo
         if not relevant_chunks:
+            # Guardar respuesta del asistente incluso cuando no hay documentos
+            no_docs_response = "No encontré documentos relevantes para esta consulta. Intente subir un archivo primero."
+            assistant_message = Message(
+                conversation_id=conversation.id, 
+                role="assistant", 
+                content=no_docs_response
+            )
+            db.add(assistant_message)
+            db.commit()
+            
             return schemas.ChatResponse(
                 query=chat_request.query,
-                llm_response="No encontré documentos relevantes para esta consulta. Intente subir un archivo primero.",
-                relevant_chunks=[]
+                llm_response=no_docs_response,
+                relevant_chunks=[],
+                conversation_id=conversation.id
             )
 
         # Generador para streaming NDJSON

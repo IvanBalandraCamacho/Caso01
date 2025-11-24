@@ -93,7 +93,7 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
         try {
           const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
           const token = localStorage.getItem("access_token");
-          const response = await fetch(`${apiUrl}/api/v1/workspaces/${workspace.id}`, {
+          const response = await fetch(`${apiUrl}/workspaces/${workspace.id}`, {
             headers: {
               Authorization: `Bearer ${token}`,
             },

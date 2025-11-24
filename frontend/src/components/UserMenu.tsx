@@ -56,6 +56,8 @@ export function UserMenu({
   const handleLogout = () => {
     // Limpiar token
     localStorage.removeItem("access_token");
+    // Disparar evento para limpiar el contexto
+    window.dispatchEvent(new Event('logout'));
     // Redirigir a login
     router.push("/login");
   };

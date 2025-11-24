@@ -12,10 +12,12 @@ from typing import Dict, Any
 from models import database
 from models.user import User
 from core.auth import get_current_active_user
+from core.llm_service import get_provider
 import logging
 import json
 import tempfile
 import os
+import pdfplumber
 
 # Configurar logger
 logger = logging.getLogger(__name__)
@@ -70,63 +72,100 @@ async def analyze_proposal(
             tmp_file.write(content)
             tmp_path = tmp_file.name
         
-        # TODO: Implementar extracción de texto del PDF
-        # Por ahora, retornamos datos de ejemplo
+        # Extraer texto del PDF
+        pdf_text = ""
+        try:
+            with pdfplumber.open(tmp_path) as pdf:
+                for page in pdf.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        pdf_text += page_text + "\n"
+        except Exception as e:
+            logger.error(f"Error al extraer texto del PDF: {str(e)}")
+            os.unlink(tmp_path)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Error al leer el PDF: {str(e)}"
+            )
+        
+        # Validar que el PDF tenga contenido
+        if not pdf_text.strip():
+            os.unlink(tmp_path)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El PDF no contiene texto extraíble"
+            )
         
         # Limpiar archivo temporal
         os.unlink(tmp_path)
         
-        # Análisis simulado
-        analysis = {
-            "cliente": "Empresa XYZ S.A.",
-            "fecha_entrega": "2025-12-31",
-            "alcance_economico": {
-                "presupuesto": "500000",
-                "moneda": "USD"
-            },
-            "tecnologias_requeridas": [
-                "Python",
-                "FastAPI",
-                "React",
-                "PostgreSQL",
-                "Docker"
-            ],
-            "riesgos_detectados": [
-                "Plazo ajustado para la complejidad del proyecto",
-                "Integración con sistemas legacy sin documentación",
-                "Requiere certificaciones de seguridad"
-            ],
-            "preguntas_sugeridas": [
-                "¿Existe documentación de los sistemas legacy?",
-                "¿Cuál es la disponibilidad del equipo del cliente para reuniones?",
-                "¿Hay un entorno de desarrollo disponible?"
-            ],
-            "equipo_sugerido": [
-                {
-                    "nombre": "Tech Lead Senior",
-                    "rol": "Líder Técnico",
-                    "skills": ["Python", "Arquitectura", "DevOps"],
-                    "experiencia": "8+ años"
-                },
-                {
-                    "nombre": "Backend Developer",
-                    "rol": "Desarrollador Backend",
-                    "skills": ["FastAPI", "PostgreSQL", "REST APIs"],
-                    "experiencia": "5+ años"
-                },
-                {
-                    "nombre": "Frontend Developer",
-                    "rol": "Desarrollador Frontend",
-                    "skills": ["React", "TypeScript", "UI/UX"],
-                    "experiencia": "4+ años"
-                }
-            ]
-        }
+        # Preparar prompt para el LLM
+        prompt = f"""Analiza el siguiente documento RFP y extrae la siguiente información en formato JSON estricto:
+
+DOCUMENTO RFP:
+{pdf_text[:8000]}
+
+Debes retornar un JSON con esta estructura EXACTA (sin markdown, sin explicaciones adicionales):
+{{
+  "cliente": "nombre de la empresa cliente",
+  "fecha_entrega": "fecha límite en formato YYYY-MM-DD o 'No especificada'",
+  "alcance_economico": {{
+    "presupuesto": "monto numérico o 'No especificado'",
+    "moneda": "USD/EUR/MXN/etc o 'No especificada'"
+  }},
+  "tecnologias_requeridas": ["tecnología1", "tecnología2", ...],
+  "riesgos_detectados": ["riesgo1", "riesgo2", ...],
+  "preguntas_sugeridas": ["pregunta1", "pregunta2", ...],
+  "equipo_sugerido": [
+    {{
+      "nombre": "Rol del profesional",
+      "rol": "Descripción del rol",
+      "skills": ["skill1", "skill2"],
+      "experiencia": "X+ años"
+    }}
+  ]
+}}
+
+INSTRUCCIONES:
+1. Extrae ÚNICAMENTE la información presente en el documento
+2. Si algo no está especificado, usa "No especificado" o arrays vacíos
+3. Para riesgos, identifica problemas potenciales del proyecto
+4. Para preguntas, sugiere clarificaciones necesarias para el cliente
+5. Para el equipo, sugiere perfiles basados en las tecnologías y alcance
+6. Retorna SOLO el JSON, sin texto adicional"""
+
+        # Usar el LLM para analizar
+        try:
+            llm_provider = get_provider(task_type="analyze")
+            # GeminiProvider usa generate_response sin chunks de contexto
+            response = llm_provider.generate_response(query=prompt, context_chunks=[])
+            
+            # Limpiar respuesta (remover markdown si existe)
+            response_text = response.strip()
+            if response_text.startswith("```json"):
+                response_text = response_text[7:]
+            if response_text.startswith("```"):
+                response_text = response_text[3:]
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+            response_text = response_text.strip()
+            
+            # Parsear JSON
+            analysis = json.loads(response_text)
+            
+            logger.info(f"RFP analizado exitosamente por usuario: {current_user.email}")
+            return analysis
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Error al parsear respuesta del LLM: {str(e)}")
+            logger.error(f"Respuesta recibida: {response[:500]}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error al procesar la respuesta del análisis. Por favor intenta de nuevo."
+            )
         
-        logger.info(f"RFP analizado exitosamente por usuario: {current_user.email}")
-        return analysis
-        
-    except Exception as e:
+    except HTTPException:
+        raise
         logger.error(f"Error al analizar RFP: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

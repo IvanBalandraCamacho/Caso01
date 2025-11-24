@@ -74,7 +74,7 @@ export function UploadModal({ isOpen, onClose, onSuccess }: UploadModalProps) {
           const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
           const token = localStorage.getItem("access_token");
           const response = await fetch(
-            `${apiUrl}/api/v1/workspaces/${activeWorkspace.id}/upload`,
+            `${apiUrl}/workspaces/${activeWorkspace.id}/upload`,
             {
               method: "POST",
               headers: {

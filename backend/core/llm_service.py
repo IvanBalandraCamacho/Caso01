@@ -3,12 +3,13 @@ LLM Service - Factory for Multi-LLM providers (Simplificado).
 Provides a unified interface to different LLM backends with intelligent routing.
 
 Sistema Multi-LLM:
-- Gemini 1.5 Flash: Principal para TODO (análisis, chat, generación)
+- OpenAI GPT-4o-mini: Principal para análisis de documentos
+- Gemini 1.5 Flash: Chat y respuestas generales
 - DeepSeek V3: Secundario para Q&A específico (opcional)
 """
 from typing import List, Generator
 from core.config import settings
-from core.providers import GeminiProvider, LLMProvider
+from core.providers import GeminiProvider, LLMProvider, OpenAIProvider
 from core.providers.deepseek_provider import DeepSeekProvider
 from core.llm_router import LLMRouter, TaskType
 from models.schemas import DocumentChunk
@@ -29,7 +30,18 @@ def initialize_providers():
     
     logger.info("Inicializando sistema Multi-LLM (Refinado)...")
     
-    # 1. Gemini 1.5 Flash (Chat/General)
+    # 1. OpenAI GPT-4o-mini (Análisis de documentos)
+    if hasattr(settings, 'OPENAI_API_KEY') and settings.OPENAI_API_KEY:
+        try:
+            _providers["gpt4o_mini"] = OpenAIProvider(
+                api_key=settings.OPENAI_API_KEY,
+                model_name="gpt-4o-mini"
+            )
+            logger.info("✅ OpenAI GPT-4o-mini inicializado (ANÁLISIS)")
+        except Exception as e:
+            logger.error(f"❌ Error OpenAI GPT-4o-mini: {e}")
+    
+    # 2. Gemini 1.5 Flash (Chat/General)
     try:
         _providers["gemini_flash"] = GeminiProvider(
             api_key=settings.GEMINI_API_KEY,
@@ -39,7 +51,7 @@ def initialize_providers():
     except Exception as e:
         logger.error(f"❌ Error Gemini Flash: {e}")
 
-    # 2. Gemini 1.5 Pro (Generación)
+    # 3. Gemini 1.5 Pro (Generación)
     try:
         _providers["gemini_pro"] = GeminiProvider(
             api_key=settings.GEMINI_API_KEY,
@@ -49,7 +61,7 @@ def initialize_providers():
     except Exception as e:
         logger.error(f"❌ Error Gemini Pro: {e}")
     
-    # 3. DeepSeek V3 (Análisis)
+    # 4. DeepSeek V3 (Análisis alternativo)
     if settings.DEEPSEEK_API_KEY:
         try:
             _providers["deepseek"] = DeepSeekProvider()
@@ -82,20 +94,20 @@ def get_provider(model_name: str = None, task_type: str = None) -> LLMProvider:
     if model_name and model_name in _providers:
         return _providers[model_name]
     
-    # Si se especifica tipo de tarea, usar router
-    if task_type and _router:
-        model_name, _, _ = _router.route(
-            query="",  # No necesitamos query para task_type directo
-            num_documents=0
-        )
+    # Si se especifica tipo de tarea, usar routing basado en task_type
+    if task_type:
         if task_type == "analyze":
-            return _providers.get("gemini_flash")
+            # Prioridad: GPT-4o-mini > DeepSeek > Gemini
+            return (_providers.get("gpt4o_mini") or 
+                    _providers.get("deepseek") or 
+                    _providers.get("gemini_flash"))
         elif task_type == "respond":
-            return _providers.get("deepseek")
+            return _providers.get("deepseek") or _providers.get("gemini_flash")
         elif task_type == "create":
-            return _providers.get("claude_haiku")
+            return _providers.get("gemini_pro") or _providers.get("gemini_flash")
     
-    # Default: Gemini Flash
+    # Default: GPT-4o-mini si está disponible, sino Gemini Flash
+    return _providers.get("gpt4o_mini") or _providers.get("gemini_flash") or list(_providers.values())[0]
     return _providers.get("gemini_flash") or list(_providers.values())[0]
 
 

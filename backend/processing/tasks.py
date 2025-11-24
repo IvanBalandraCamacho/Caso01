@@ -2,7 +2,7 @@ import time
 import os
 from pathlib import Path
 from core.celery_app import celery_app
-from models import database, document as document_model, workspace as workspace_model
+from models import database, document as document_model, workspace as workspace_model, user as user_model
 from sqlalchemy.orm import Session
 from . import parser
 # DEPRECADO: from . import vector_store (eliminado - usar rag_client)

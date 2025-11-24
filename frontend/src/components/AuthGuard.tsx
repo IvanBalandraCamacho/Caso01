@@ -33,7 +33,8 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
       // Verificar si el token es válido con el backend
       try {
-        const response = await fetch('http://localhost:8000/api/v1/auth/me', {
+        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1';
+        const response = await fetch(`${apiUrl}/auth/me`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
