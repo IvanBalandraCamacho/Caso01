@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from datetime import datetime, timezone # <-- AÑADIR timezone
 import uuid
 import mimetypes
@@ -89,6 +89,14 @@ class ChatRequest(BaseModel):
     query: str
     conversation_id: str | None = None  # Opcional: ID de conversación existente
     model: str | None = None  # Opcional: modelo LLM a usar (gemini-2.0 o gpt-4.1-nano)
+    
+    @validator('query')
+    def query_must_not_be_empty(cls, v):
+        if not v or not v.strip():
+            raise ValueError('La consulta no puede estar vacía')
+        if len(v.strip()) < 3:
+            raise ValueError('La consulta debe tener al menos 3 caracteres')
+        return v.strip()
     
 class DocumentChunk(BaseModel):
     """Representa un chunk de contexto recuperado."""

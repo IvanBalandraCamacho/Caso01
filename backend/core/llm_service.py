@@ -1,5 +1,5 @@
 """
-LLM Service - Factory for Multi-LLM providers (Simplificado).
+LLM Service - Factory for Multi-LLM providers.
 Provides a unified interface to different LLM backends with intelligent routing.
 
 Sistema Multi-LLM:
@@ -28,7 +28,7 @@ def initialize_providers():
     """
     global _providers, _router
     
-    logger.info("Inicializando sistema Multi-LLM (Refinado)...")
+    logger.info("Inicializando sistema Multi-LLM...")
     
     # 1. OpenAI GPT-4o-mini (Análisis de documentos)
     if hasattr(settings, 'OPENAI_API_KEY') and settings.OPENAI_API_KEY:
@@ -108,119 +108,35 @@ def get_provider(model_name: str = None, task_type: str = None) -> LLMProvider:
     
     # Default: GPT-4o-mini si está disponible, sino Gemini Flash
     return _providers.get("gpt4o_mini") or _providers.get("gemini_flash") or list(_providers.values())[0]
-    return _providers.get("gemini_flash") or list(_providers.values())[0]
 
 
-def generate_response(
-    query: str, 
-    context_chunks: List[DocumentChunk],
-    task_type: str = None
-) -> str:
+def generate_response(query: str, context_chunks: List[DocumentChunk], model_override: str = None) -> str:
     """
-    Genera respuesta usando el mejor modelo para la tarea.
+    Genera una respuesta usando el LLM apropiado.
     
     Args:
         query: Pregunta del usuario
-        context_chunks: Chunks de contexto del RAG
-        task_type: Tipo de tarea ("analyze", "respond", "create")
+        context_chunks: Documentos relevantes del RAG
+        model_override: Modelo específico a usar (opcional)
         
     Returns:
         Respuesta generada
     """
-    if settings.MULTI_LLM_ENABLED and _router:
-        # Usar router para seleccionar modelo
-        model_name, detected_task, reason = _router.route(
-            query=query,
-            num_documents=len(context_chunks)
-        )
-        logger.info(f"Router seleccionó: {model_name} - {reason}")
-        provider = _providers.get(model_name)
-    else:
-        # Usar provider por defecto
-        provider = get_provider()
-    
-    if not provider:
-        raise RuntimeError("No hay provider disponible")
-    
+    provider = get_provider(model_name=model_override)
     return provider.generate_response(query, context_chunks)
 
 
-def generate_response_stream(
-    query: str, 
-    context_chunks: List[DocumentChunk],
-    task_type: str = None
-) -> Generator[str, None, None]:
+def generate_response_stream(query: str, context_chunks: List[DocumentChunk], model_override: str = None) -> Generator[str, None, None]:
     """
-    Genera respuesta en streaming usando el mejor modelo.
+    Genera una respuesta en streaming usando el LLM apropiado.
     
     Args:
         query: Pregunta del usuario
-        context_chunks: Chunks de contexto del RAG
-        task_type: Tipo de tarea ("analyze", "respond", "create")
+        context_chunks: Documentos relevantes del RAG
+        model_override: Modelo específico a usar (opcional)
         
     Yields:
-        Chunks de texto de la respuesta
+        Fragmentos de la respuesta
     """
-    if settings.MULTI_LLM_ENABLED and _router:
-        # Usar router para seleccionar modelo
-        model_name, detected_task, reason = _router.route(
-            query=query,
-            num_documents=len(context_chunks)
-        )
-        logger.info(f"Router seleccionó: {model_name} - {reason}")
-        provider = _providers.get(model_name)
-    else:
-        # Usar provider por defecto
-        provider = get_provider()
-    
-    if not provider:
-        raise RuntimeError("No hay provider disponible")
-    
+    provider = get_provider(model_name=model_override)
     return provider.generate_response_stream(query, context_chunks)
-
-
-# Inicializar providers al cargar el módulo
-try:
-    initialize_providers()
-except Exception as e:
-    logger.error(f"Error inicializando providers: {e}")
-
-
-# Legacy functions for backward compatibility
-def _build_summary_prompt(text: str, instructions_text: str | None = None) -> str:
-    """Build prompt for document summarization."""
-    if instructions_text:
-        instr = instructions_text.strip()
-    else:
-        instr = (
-            "Eres un asistente experto en análisis de propuestas comerciales. "
-            "Genera un resumen estructurado en las secciones: Administrativo, Posibles competidores, Técnico, Viabilidad del alcance."
-        )
-    
-    prompt = f"""{instr}\n\nDOCUMENTO:\n{text}\n\nSALIDA:"""
-    return prompt
-
-
-def generate_summary_from_text(text: str, instructions_text: str | None = None) -> dict:
-    """
-    Generate summary from text using the configured LLM provider.
-    
-    Args:
-        text: Document text to summarize
-        instructions_text: Optional custom instructions
-        
-    Returns:
-        Dictionary with summary or error
-    """
-    provider = get_provider()
-    
-    if not provider:
-        return {"error": "LLM no inicializado"}
-    
-    prompt = _build_summary_prompt(text, instructions_text=instructions_text)
-    
-    try:
-        summary = provider.generate_response(prompt, [])
-        return {"summary_raw": summary}
-    except Exception as e:
-        return {"error": str(e)}

@@ -37,15 +37,26 @@ class Settings(BaseSettings):
     # Multi-LLM Configuration
     MULTI_LLM_ENABLED: bool = True
     
-    # DeepSeek Configuration (Para ANÁLISIS)
-    DEEPSEEK_API_KEY: str = ""
-    DEEPSEEK_MODEL: str = "deepseek-chat"
+    # OpenAI Configuration
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-4o-mini"
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # If OPENAI_API_KEY is not set, try to read from token.txt
+        if not self.OPENAI_API_KEY:
+            try:
+                token_file = os.path.join(os.path.dirname(__file__), "..", "..", "token.txt")
+                with open(token_file, "r") as f:
+                    self.OPENAI_API_KEY = f.read().strip()
+            except FileNotFoundError:
+                pass
     
     # RAG External Service Configuration (NUEVO)
     RAG_SERVICE_URL: str = "http://localhost:8080"
     RAG_SERVICE_API_KEY: str | None = None
     RAG_SERVICE_TIMEOUT: float = 30.0
-    RAG_SERVICE_ENABLED: bool = True  # Activar cuando el servicio esté disponible
+    RAG_SERVICE_ENABLED: bool = True  # Ahora habilitado por defecto
 
     class Config:
         env_file = ".env"
