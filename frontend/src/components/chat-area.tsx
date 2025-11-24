@@ -22,7 +22,6 @@ import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import { QuickPrompts } from "./QuickPrompts";
 import { showToast } from "./Toast";
-import { UserMenu } from "./UserMenu";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -392,13 +391,6 @@ export function ChatArea() {
           >
             Export to PDF
           </Button>
-          <UserMenu 
-            size="sm" 
-            showName={true} 
-            showClearHistory={true}
-            onClearHistory={handleClearHistory}
-            disableClearHistory={!activeWorkspace || chatHistory.length === 0}
-          />
         </div>
       </header>
 

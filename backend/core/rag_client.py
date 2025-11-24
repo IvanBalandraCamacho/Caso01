@@ -25,6 +25,13 @@ class DocumentMetadata(BaseModel):
     workspace_id: Optional[str] = None
     user_id: Optional[str] = None
 
+class SearchResult(BaseModel):
+    """Resultado de una búsqueda en el servicio RAG"""
+    document_id: str
+    content: str
+    score: float
+    metadata: Optional[Dict[str, Any]] = None
+
 class SearchRequest(BaseModel):
     query: str
     workspace_id: Optional[str] = None
@@ -36,6 +43,22 @@ class RAGIngestRequest(BaseModel):
     workspace_id: str
     content: str
     metadata: Dict[str, Any]
+
+
+class SearchResult(BaseModel):
+    """Resultado de búsqueda del servicio RAG."""
+    document_id: str
+    content: str
+    score: float
+    metadata: Dict[str, Any]
+
+
+class IngestResponse(BaseModel):
+    """Respuesta del servicio RAG al indexar contenido."""
+    document_id: str
+    chunks_count: int
+    status: str
+    message: Optional[str] = None
 
 
 # ============================================================================

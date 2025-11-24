@@ -396,7 +396,7 @@ export function Sidebar() {
                       <>
                         <button
                           className={cn(
-                            "w-full flex items-center gap-3 p-2 rounded-xl transition-all text-sm",
+                            "w-full flex items-center gap-3 p-2 rounded-xl transition-all text-sm pr-8",
                             activeConversation?.id === conv.id 
                               ? "bg-accent font-medium" 
                               : "hover:bg-accent/50",
@@ -407,7 +407,7 @@ export function Sidebar() {
                           title={conv.title}
                         >
                           <MessageSquare className="h-4 w-4 shrink-0" />
-                          {!isCollapsed && <span className="truncate">{conv.title}</span>}
+                          {!isCollapsed && <span className="truncate max-w-[150px]">{conv.title}</span>}
                         </button>
                         
                         {!isCollapsed && (
