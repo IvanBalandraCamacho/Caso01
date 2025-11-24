@@ -13,13 +13,16 @@ services:
       # Database & Services
       - DATABASE_URL=mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
       - REDIS_URL=redis://redis:6379
-      # RAG External Service (cuando esté disponible)
-      - RAG_SERVICE_URL=${RAG_SERVICE_URL:-http://recommendation-service:8080}
+      # RAG External Service (ahora disponible)
+      - RAG_SERVICE_URL=http://rag-service:8080
       - RAG_SERVICE_API_KEY=${RAG_SERVICE_API_KEY:-}
-      - RAG_SERVICE_ENABLED=${RAG_SERVICE_ENABLED:-false}
+      - RAG_SERVICE_ENABLED=true
+      # OpenAI API Key (necesaria para embeddings)
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
       - mysql
       - redis
+      - rag-service
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
   # 2. Frontend (Next.js)
@@ -72,7 +75,21 @@ services:
     ports:
       - "6379:6379"
 
-  # 5. Worker Asíncrono (Celery)
+  # 5. Servicio RAG (NUEVO)
+  rag-service:
+    build: ./rag-service
+    container_name: ia_rag_service
+    ports:
+      - "8080:8080"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      - redis
+    volumes:
+      - rag_data:/app/data
+
+  # 6. Worker Asíncrono (Celery)
   celery_worker:
     build: ./backend
     container_name: ia_celery_worker
@@ -86,13 +103,17 @@ services:
       - DATABASE_URL=mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
       - REDIS_URL=redis://redis:6379
       # RAG External Service
-      - RAG_SERVICE_URL=${RAG_SERVICE_URL:-http://recommendation-service:8080}
+      - RAG_SERVICE_URL=http://rag-service:8080
       - RAG_SERVICE_API_KEY=${RAG_SERVICE_API_KEY:-}
-      - RAG_SERVICE_ENABLED=${RAG_SERVICE_ENABLED:-false}
+      - RAG_SERVICE_ENABLED=true
+      # OpenAI API Key
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
       - backend
       - redis
       - mysql
+      - rag-service
 
 volumes:
   mysql_data:
+  rag_data:

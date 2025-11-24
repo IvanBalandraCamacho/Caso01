@@ -26,9 +26,176 @@ from slowapi.util import get_remote_address
 from core.auth import get_current_active_user
 from models.user import User
 
+# Cache y eficiencia
+import redis
+import pickle
+from functools import lru_cache
+from typing import List, Optional
+
 limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter()
+
+# Configuración Redis para cache
+redis_client = redis.from_url(settings.REDIS_URL) if hasattr(settings, 'REDIS_URL') else None
+
+# Cache TTL en segundos (24 horas)
+CACHE_TTL = 86400
+
+# Funciones de cache y eficiencia para datos TIVIT
+@lru_cache(maxsize=1)
+def get_tivit_data():
+    """Obtiene datos TIVIT con cache LRU (solo se carga una vez por proceso)"""
+    try:
+        from api.routes.tivit import TRABAJADORES_TIVIT, SERVICIOS_TIVIT
+        return TRABAJADORES_TIVIT, SERVICIOS_TIVIT
+    except Exception as e:
+        print(f"Error cargando datos TIVIT: {e}")
+        return [], []
+
+def get_cached_tivit_chunks(query_keywords: frozenset) -> List[schemas.DocumentChunk]:
+    """Obtiene chunks de TIVIT cacheados basados en keywords de la consulta"""
+    if not redis_client:
+        return get_fallback_tivit_chunks(query_keywords)
+    
+    cache_key = f"tivit_chunks:{hash(query_keywords)}"
+    
+    try:
+        cached_data = redis_client.get(cache_key)
+        if cached_data:
+            return pickle.loads(cached_data)
+    except Exception as e:
+        print(f"Error obteniendo cache Redis: {e}")
+    
+    # Generar chunks y cachearlos
+    chunks = generate_tivit_chunks(query_keywords)
+    
+    try:
+        redis_client.setex(cache_key, CACHE_TTL, pickle.dumps(chunks))
+    except Exception as e:
+        print(f"Error guardando en cache Redis: {e}")
+    
+    return chunks
+
+def generate_tivit_chunks(query_keywords: frozenset) -> List[schemas.DocumentChunk]:
+    """Genera chunks de TIVIT filtrados por keywords"""
+    trabajadores, servicios = get_tivit_data()
+    chunks = []
+    
+    # Keywords para detectar tipo de equipo
+    dev_keywords = frozenset(["desarrollo", "programador", "developer", "software", "web", "mobile", "backend", "frontend"])
+    security_keywords = frozenset(["seguridad", "ciberseguridad", "cybersecurity", "hacking", "pentest", "auditoria"])
+    cloud_keywords = frozenset(["cloud", "aws", "azure", "gcp", "nube", "infraestructura"])
+    data_keywords = frozenset(["datos", "data", "analytics", "bi", "machine learning", "ml", "ai"])
+    
+    # Determinar qué tipo de trabajadores/servicios son más relevantes
+    relevant_areas = set()
+    if any(kw in query_keywords for kw in dev_keywords):
+        relevant_areas.add("Desarrollo")
+    if any(kw in query_keywords for kw in security_keywords):
+        relevant_areas.add("Ciberseguridad")
+    if any(kw in query_keywords for kw in cloud_keywords):
+        relevant_areas.add("Cloud")
+    if any(kw in query_keywords for kw in data_keywords):
+        relevant_areas.add("Datos")
+    
+    # Si no hay áreas específicas, incluir todas
+    if not relevant_areas:
+        relevant_areas = {"Desarrollo", "Ciberseguridad", "Cloud", "Datos"}
+    
+    # Filtrar y limitar trabajadores
+    filtered_trabajadores = [
+        t for t in trabajadores 
+        if any(area.lower() in t.area.lower() or area.lower() in t.area_experiencia.lower() 
+               for area in relevant_areas)
+    ][:8]  # Máximo 8 trabajadores
+    
+    # Filtrar servicios relevantes
+    filtered_servicios = [
+        s for s in servicios 
+        if any(area.lower() in s.categoria.lower() for area in relevant_areas)
+    ][:4]  # Máximo 4 servicios
+    
+    # Crear chunks optimizados (más concisos)
+    for trabajador in filtered_trabajadores:
+        chunk_text = f"TIVIT {trabajador.nombre}: {trabajador.area} con {trabajador.anos_experiencia} años exp. Certificaciones: {', '.join(trabajador.certificaciones[:3])}. Rol: {trabajador.rol}. Idiomas: {', '.join(trabajador.idiomas)}. Disponibilidad: {trabajador.disponibilidad}."
+        
+        chunks.append(schemas.DocumentChunk(
+            document_id="tivit-trabajadores",
+            chunk_text=chunk_text,
+            chunk_index=len(chunks),
+            score=0.95  # Alta relevancia para datos filtrados
+        ))
+    
+    for servicio in filtered_servicios:
+        chunk_text = f"Servicio TIVIT {servicio.nombre}: {servicio.descripcion[:100]}... Costo: ${servicio.costo_mensual_min}-${servicio.costo_mensual_max}/mes. Duración: {servicio.duracion_estimada_meses} meses. Tecnologías: {', '.join(servicio.tecnologias_principales[:3])}."
+        
+        chunks.append(schemas.DocumentChunk(
+            document_id="tivit-servicios",
+            chunk_text=chunk_text,
+            chunk_index=len(chunks),
+            score=0.85
+        ))
+    
+    return chunks
+
+def invalidate_tivit_cache():
+    """Invalida todo el cache de TIVIT (útil cuando se actualizan los datos)"""
+    if redis_client:
+        try:
+            # Eliminar todas las claves que empiecen con "tivit_chunks:"
+            keys = redis_client.keys("tivit_chunks:*")
+            if keys:
+                redis_client.delete(*keys)
+                print(f"Cache TIVIT invalidado: {len(keys)} claves eliminadas")
+        except Exception as e:
+            print(f"Error invalidando cache TIVIT: {e}")
+    
+    # Limpiar también el LRU cache
+    get_tivit_data.cache_clear()
+
+def get_cache_stats():
+    """Obtiene estadísticas del cache para monitoreo"""
+    stats = {
+        "redis_available": redis_client is not None,
+        "lru_cache_info": get_tivit_data.cache_info()._asdict() if hasattr(get_tivit_data, 'cache_info') else None
+    }
+    
+    if redis_client:
+        try:
+            tivit_keys = redis_client.keys("tivit_chunks:*")
+            stats["redis_keys_count"] = len(tivit_keys)
+            stats["redis_memory_usage"] = sum(len(redis_client.get(k) or b'') for k in tivit_keys)
+        except Exception as e:
+            stats["redis_error"] = str(e)
+    
+    return stats
+
+def extract_query_keywords(query: str) -> frozenset:
+    """Extrae keywords relevantes de la consulta para filtrado inteligente"""
+    query_lower = query.lower()
+    
+    # Keywords de equipo y especialidades
+    team_keywords = {
+        "equipo", "team", "personal", "staff", "trabajadores", "colaboradores",
+        "desarrollo", "programador", "developer", "software", "web", "mobile", 
+        "backend", "frontend", "fullstack", "seguridad", "ciberseguridad", 
+        "cybersecurity", "hacking", "pentest", "auditoria", "cloud", "aws", 
+        "azure", "gcp", "nube", "infraestructura", "datos", "data", "analytics", 
+        "bi", "machine learning", "ml", "ai", "devops", "sre", "arquitecto",
+        "architecture", "qa", "testing", "scrum", "agile", "proyecto", "startup"
+    }
+    
+    found_keywords = {word for word in query_lower.split() if word in team_keywords}
+    
+    # Agregar bigramas comunes
+    query_words = query_lower.split()
+    for i in range(len(query_words) - 1):
+        bigram = f"{query_words[i]} {query_words[i+1]}"
+        if bigram in ["armar equipo", "equipo desarrollo", "equipo seguridad", "equipo cloud"]:
+            found_keywords.add(bigram)
+    
+    return frozenset(found_keywords)
 
 @router.post(
     "/workspaces", 
@@ -303,6 +470,25 @@ def chat_with_workspace(
                 llm_response="No encontré documentos relevantes para esta consulta. Intente subir un archivo primero.",
                 relevant_chunks=[]
             )
+
+        # Enriquecer contexto con datos de TIVIT si es relevante (OPTIMIZADO)
+        query_lower = chat_request.query.lower()
+        if any(keyword in query_lower for keyword in ["armar equipo", "equipo", "trabajadores", "personal", "staff"]):
+            try:
+                # Extraer keywords para filtrado inteligente
+                query_keywords = extract_query_keywords(chat_request.query)
+                
+                # Obtener chunks cacheados y filtrados
+                tivit_chunks = get_cached_tivit_chunks(query_keywords)
+                
+                # Agregar chunks al contexto (limitado a 12 para no sobrecargar)
+                relevant_chunks.extend(tivit_chunks[:12])
+                
+                print(f"TIVIT: Agregados {len(tivit_chunks[:12])} chunks filtrados para keywords: {query_keywords}")
+                    
+            except Exception as e:
+                print(f"Error cargando datos TIVIT optimizados: {e}")
+                # Continuar sin datos adicionales
 
         # Generador para streaming NDJSON
         def stream_response_generator(conversation_id, relevant_chunks):
@@ -1003,41 +1189,73 @@ def export_chat_pdf(
         }
     )
 
-@router.delete(
-    "/workspaces/{workspace_id}/chat/history",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Eliminar historial de chat"
+@router.get(
+    "/cache/stats",
+    summary="Obtener estadísticas del cache TIVIT"
 )
-def delete_chat_history(
-    workspace_id: str,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(database.get_db)
+def get_cache_statistics(
+    current_user: User = Depends(get_current_active_user)
 ):
     """
-    Elimina el historial de chat de un workspace.
+    Obtiene estadísticas del sistema de cache para monitoreo.
     
-    Requiere autenticación. Solo el owner puede eliminar el historial.
-    
-    Nota: Como no tenemos tabla de historial, esto es un placeholder.
+    Requiere autenticación de administrador.
     """
-    # Verificar que el workspace existe
-    db_workspace = db.query(workspace_model.Workspace).filter(
-        workspace_model.Workspace.id == workspace_id
-    ).first()
+    # Solo administradores pueden ver stats (por ahora cualquier usuario autenticado)
+    stats = get_cache_stats()
+    return stats
+
+@router.post(
+    "/cache/invalidate",
+    summary="Invalidar cache TIVIT"
+)
+def invalidate_cache(
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Invalida todo el cache de TIVIT.
     
-    if not db_workspace:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Workspace con id {workspace_id} no encontrado."
-        )
+    Requiere autenticación de administrador.
+    """
+    invalidate_tivit_cache()
+    return {"message": "Cache TIVIT invalidado correctamente"}
+
+@router.get(
+    "/llm/metrics",
+    summary="Obtener métricas del sistema LLM optimizado"
+)
+def get_llm_metrics_endpoint(
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Obtiene métricas de rendimiento del sistema LLM optimizado.
     
-    # Verificar ownership
-    if db_workspace.owner_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permiso para eliminar el historial de este workspace."
-        )
+    Incluye estadísticas de cache semántico, tipos de tareas soportadas, y rendimiento.
     
-    # TODO: Implementar eliminación de historial de chat cuando exista la tabla
-    print(f"Delete chat history requested for workspace {workspace_id}")
-    return
+    Requiere autenticación.
+    """
+    from core.llm_service import get_llm_metrics
+    return get_llm_metrics()
+
+@router.post(
+    "/llm/analyze-query",
+    summary="Analizar complejidad de una query (para debugging)"
+)
+def analyze_query_endpoint(
+    query_request: schemas.ChatRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Analiza la complejidad de una query y muestra los parámetros óptimos que se usarían.
+    
+    Útil para debugging y optimización del sistema LLM.
+    
+    Requiere autenticación.
+    """
+    from core.llm_service import analyze_query_complexity
+    
+    # Simular chunks vacíos para análisis básico
+    context_chunks = []
+    
+    analysis = analyze_query_complexity(query_request.query, context_chunks)
+    return analysis

@@ -55,7 +55,7 @@ def process_document(self, document_id: str, temp_file_path_str: str):
             print("WORKER: Enviando documento al servicio RAG externo...")
             try:
                 result = asyncio.run(
-                    rag_client.ingest_document(
+                    rag_client.ingest_text_content(
                         document_id=db_document.id,
                         workspace_id=db_document.workspace_id,
                         content=text_content,
@@ -66,7 +66,7 @@ def process_document(self, document_id: str, temp_file_path_str: str):
                         }
                     )
                 )
-                chunk_count = result.chunks_created
+                chunk_count = result.chunks_count if result else 0
                 print(f"WORKER: Documento procesado por RAG externo - {chunk_count} chunks creados")
             except Exception as e:
                 print(f"WORKER: ERROR en servicio RAG externo: {e}")

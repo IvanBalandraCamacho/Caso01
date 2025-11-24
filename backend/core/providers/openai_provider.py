@@ -11,6 +11,8 @@ from .llm_provider import LLMProvider
 from models.schemas import DocumentChunk
 from core.config import settings
 import logging
+import time
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 logger = logging.getLogger(__name__)
 
@@ -35,23 +37,35 @@ class OpenAIProvider(LLMProvider):
         """
         logger.info(f"Inicializando OpenAI provider con modelo {model_name}")
         
-        self.client = OpenAI(api_key=api_key)
+        self.client = OpenAI(
+            api_key=api_key,
+            timeout=30.0  # Timeout de 30 segundos
+        )
         self.model_name = model_name
         
         logger.info("OpenAI provider inicializado correctamente")
     
-    def generate_response(self, query: str, context_chunks: List[DocumentChunk]) -> str:
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10),
+        retry=retry_if_exception_type(Exception),
+        reraise=True
+    )
+    def generate_response(self, query: str, context_chunks: List[DocumentChunk], custom_prompt: str = None) -> str:
         """
         Genera una respuesta completa usando GPT-4o-mini.
         
         Args:
             query: Pregunta del usuario
             context_chunks: Chunks de contexto del RAG
+            custom_prompt: Prompt personalizado (opcional)
             
         Returns:
             Respuesta generada
         """
-        prompt = self._build_prompt(query, context_chunks)
+        prompt = custom_prompt if custom_prompt else self._build_prompt(query, context_chunks)
+        
+        start_time = time.time()
         
         try:
             response = self.client.chat.completions.create(
@@ -68,16 +82,32 @@ class OpenAIProvider(LLMProvider):
                 ],
                 temperature=0.7,
                 max_tokens=8000,
+                timeout=30.0
             )
+            
+            elapsed_time = time.time() - start_time
+            tokens_used = response.usage.total_tokens if response.usage else 0
+            
+            logger.info(f"OpenAI response generated in {elapsed_time:.2f}s, tokens: {tokens_used}")
+            
             return response.choices[0].message.content
+            
         except Exception as e:
-            logger.error(f"Error en OpenAI API: {e}")
+            elapsed_time = time.time() - start_time
+            logger.error(f"Error en OpenAI API después de {elapsed_time:.2f}s: {e}")
             raise RuntimeError(f"Error al generar respuesta con OpenAI: {e}") from e
     
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10),
+        retry=retry_if_exception_type(Exception),
+        reraise=True
+    )
     def generate_response_stream(
         self, 
         query: str, 
-        context_chunks: List[DocumentChunk]
+        context_chunks: List[DocumentChunk],
+        custom_prompt: str = None
     ) -> Generator[str, None, None]:
         """
         Genera una respuesta en streaming usando GPT-4o-mini.
@@ -85,11 +115,14 @@ class OpenAIProvider(LLMProvider):
         Args:
             query: Pregunta del usuario
             context_chunks: Chunks de contexto del RAG
+            custom_prompt: Prompt personalizado (opcional)
             
         Yields:
             Chunks de texto de la respuesta
         """
-        prompt = self._build_prompt(query, context_chunks)
+        prompt = custom_prompt if custom_prompt else self._build_prompt(query, context_chunks)
+        
+        start_time = time.time()
         
         try:
             stream = self.client.chat.completions.create(
@@ -107,11 +140,23 @@ class OpenAIProvider(LLMProvider):
                 temperature=0.7,
                 max_tokens=8000,
                 stream=True,
+                timeout=30.0
             )
+            
+            total_tokens = 0
             
             for chunk in stream:
                 if chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
+                
+                # Track tokens if available
+                if hasattr(chunk, 'usage') and chunk.usage:
+                    total_tokens = chunk.usage.total_tokens
+            
+            elapsed_time = time.time() - start_time
+            logger.info(f"OpenAI streaming completed in {elapsed_time:.2f}s, tokens: {total_tokens}")
+            
         except Exception as e:
-            logger.error(f"Error en OpenAI streaming: {e}")
+            elapsed_time = time.time() - start_time
+            logger.error(f"Error en OpenAI streaming después de {elapsed_time:.2f}s: {e}")
             raise RuntimeError(f"Error en streaming con OpenAI: {e}") from e

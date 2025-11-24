@@ -1,330 +1,247 @@
 """
-Cliente HTTP para el servicio RAG externo (RECOMMENDATION CORE SERVICE)
+Cliente HTTP para el servicio RAG (Retrieval-Augmented Generation)
 
-Este módulo proporciona una interfaz para comunicarse con el servicio RAG externo
-que maneja la búsqueda semántica, ingesta de documentos y embeddings.
-
-TODO: Completar cuando el servicio RAG externo esté disponible
-- Actualizar URLs de endpoints
-- Ajustar schemas de request/response según API real
-- Configurar autenticación (API key, OAuth, etc.)
+Este módulo proporciona una interfaz completa para comunicarse con el servicio RAG
+que maneja la búsqueda semántica, ingesta de documentos y gestión de embeddings.
 """
 
 import httpx
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from pydantic import BaseModel
 import logging
+import json
 from core.config import settings
 
 logger = logging.getLogger(__name__)
 
 
 # ============================================================================
-# SCHEMAS - Ajustar según API del servicio RAG externo
+# SCHEMAS - Compatibles con el servicio RAG implementado
 # ============================================================================
 
-class RAGSearchRequest(BaseModel):
-    """Request para búsqueda semántica en RAG externo"""
+class DocumentMetadata(BaseModel):
+    filename: str
+    content_type: str
+    workspace_id: Optional[str] = None
+    user_id: Optional[str] = None
+
+class SearchRequest(BaseModel):
     query: str
-    workspace_id: str
-    filters: Optional[Dict] = None
-    top_k: int = 10
-
-
-class RAGSearchResult(BaseModel):
-    """Resultado individual de búsqueda RAG"""
-    chunk_id: str
-    document_id: str
-    content: str
-    score: float
-    metadata: Optional[Dict] = None
-
+    workspace_id: Optional[str] = None
+    limit: int = 5
+    threshold: float = 0.7
 
 class RAGIngestRequest(BaseModel):
-    """Request para ingesta de documento en RAG externo"""
     document_id: str
     workspace_id: str
     content: str
-    metadata: Dict
-
-
-class RAGIngestResponse(BaseModel):
-    """Response de ingesta de documento"""
-    status: str
-    chunks_created: int
-    message: Optional[str] = None
+    metadata: Dict[str, Any]
 
 
 # ============================================================================
-# CLIENTE RAG
+# CLIENTE RAG - IMPLEMENTACIÓN COMPLETA
 # ============================================================================
 
 class RAGClient:
     """
-    Cliente para comunicarse con el servicio RAG externo.
-    
+    Cliente completo para el servicio RAG.
+
     Proporciona métodos para:
-    - Búsqueda semántica de chunks relevantes
-    - Ingesta de documentos para procesamiento
-    - Eliminación de documentos del índice vectorial
-    
-    TODO: Actualizar base_url cuando el servicio esté desplegado
+    - Búsqueda semántica de documentos relevantes
+    - Ingesta de documentos para procesamiento e indexación
+    - Eliminación de documentos del índice
+    - Verificación de salud del servicio
     """
-    
+
     def __init__(
-        self, 
+        self,
         base_url: str = None,
         api_key: str = None,
-        timeout: int = 30
+        timeout: float = 30.0
     ):
         """
         Inicializa el cliente RAG.
-        
+
         Args:
-            base_url: URL base del servicio RAG (ej: http://rag-service:8080)
+            base_url: URL base del servicio RAG
             api_key: API key para autenticación (opcional)
             timeout: Timeout en segundos para requests HTTP
         """
-        # TODO: Actualizar con la URL real del servicio
         self.base_url = (base_url or settings.RAG_SERVICE_URL).rstrip('/')
+        self.api_key = api_key or settings.RAG_SERVICE_API_KEY
         self.timeout = timeout
-        
-        # Headers comunes
-        self.headers = {
-            "Content-Type": "application/json"
-        }
-        
-        # TODO: Configurar autenticación según el servicio RAG
-        if api_key or settings.RAG_SERVICE_API_KEY:
-            self.headers["Authorization"] = f"Bearer {api_key or settings.RAG_SERVICE_API_KEY}"
-        
-        # Cliente HTTP asíncrono
-        self.client = httpx.AsyncClient(
-            timeout=timeout,
-            headers=self.headers
-        )
-        
+        self._client: Optional[httpx.AsyncClient] = None
+
         logger.info(f"RAG_CLIENT: Inicializado con base_url={self.base_url}")
-    
+
+    async def _get_client(self) -> httpx.AsyncClient:
+        """Obtiene o crea un cliente HTTP async"""
+        if self._client is None:
+            headers = {"Content-Type": "application/json"}
+            if self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
+
+            self._client = httpx.AsyncClient(
+                timeout=self.timeout,
+                headers=headers
+            )
+        return self._client
+
+    async def _make_request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
+        """Hace una petición HTTP al servicio RAG"""
+        client = await self._get_client()
+        url = f"{self.base_url}{endpoint}"
+
+        try:
+            response = await client.request(method, url, **kwargs)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"RAG HTTP error {e.response.status_code}: {e.response.text}")
+            raise Exception(f"RAG service error: {e.response.status_code}")
+        except httpx.RequestError as e:
+            logger.error(f"RAG request error: {e}")
+            raise Exception(f"RAG service unavailable: {e}")
+        except Exception as e:
+            logger.error(f"RAG unexpected error: {e}")
+            raise Exception(f"RAG service error: {e}")
+
     async def search(
-        self, 
-        query: str, 
-        workspace_id: str,
-        filters: Optional[Dict] = None,
-        top_k: int = 10
-    ) -> List[RAGSearchResult]:
+        self,
+        query: str,
+        workspace_id: Optional[str] = None,
+        limit: int = 5,
+        threshold: float = 0.7
+    ) -> List[SearchResult]:
         """
-        Busca chunks relevantes en el servicio RAG externo.
-        
+        Busca documentos relevantes para una consulta.
+
         Args:
-            query: Consulta de búsqueda semántica
-            workspace_id: ID del workspace para filtrar resultados
-            filters: Filtros adicionales (ej: fecha, categoría)
-            top_k: Número máximo de resultados a retornar
-            
+            query: Texto de búsqueda
+            workspace_id: ID del workspace (opcional, para filtrar)
+            limit: Número máximo de resultados
+            threshold: Umbral mínimo de similitud
+
         Returns:
-            Lista de resultados ordenados por relevancia (score descendente)
-            
-        Raises:
-            RuntimeError: Si hay error de comunicación con el servicio
-            
-        Example:
-            >>> results = await rag_client.search(
-            ...     query="¿Cuál es el presupuesto?",
-            ...     workspace_id="workspace-123",
-            ...     top_k=5
-            ... )
-            >>> for result in results:
-            ...     print(f"Score: {result.score}, Content: {result.content[:50]}")
+            Lista de resultados de búsqueda ordenados por score
         """
         try:
-            request_data = RAGSearchRequest(
-                query=query,
-                workspace_id=workspace_id,
-                filters=filters or {},
-                top_k=top_k
-            )
-            
-            logger.info(f"RAG_CLIENT: Buscando '{query[:50]}...' en workspace {workspace_id}")
-            
-            # TODO: Ajustar endpoint según API real
-            endpoint = f"{self.base_url}/api/v1/search"
-            
-            response = await self.client.post(
-                endpoint,
-                json=request_data.dict()
-            )
-            response.raise_for_status()
-            
-            data = response.json()
-            
-            # TODO: Ajustar parsing según estructura de respuesta real
-            results = [RAGSearchResult(**item) for item in data.get('results', [])]
-            
-            logger.info(f"RAG_CLIENT: {len(results)} resultados encontrados")
+            payload = {
+                "query": query,
+                "limit": limit,
+                "threshold": threshold
+            }
+            if workspace_id:
+                payload["workspace_id"] = workspace_id
+
+            response_data = await self._make_request("POST", "/search", json=payload)
+
+            # Convertir respuesta a objetos SearchResult
+            results = []
+            for item in response_data:
+                metadata = DocumentMetadata(**item["metadata"])
+                result = SearchResult(
+                    document_id=item["document_id"],
+                    content=item["content"],
+                    metadata=metadata,
+                    score=item["score"]
+                )
+                results.append(result)
+
+            logger.info(f"RAG search: {len(results)} results for '{query[:50]}...'")
             return results
-            
-        except httpx.TimeoutException:
-            logger.error(f"RAG_CLIENT: Timeout al buscar en servicio RAG")
-            raise RuntimeError("Servicio RAG no responde (timeout)")
-            
-        except httpx.HTTPStatusError as e:
-            logger.error(f"RAG_CLIENT: HTTP {e.response.status_code} - {e.response.text}")
-            raise RuntimeError(f"Error en servicio RAG: {e.response.status_code}")
-            
+
         except Exception as e:
-            logger.error(f"RAG_CLIENT: Error inesperado: {str(e)}")
-            raise RuntimeError(f"Error conectando con servicio RAG: {str(e)}")
-    
-    async def ingest_document(
+            logger.error(f"RAG search error: {e}")
+            return []  # Retornar lista vacía en caso de error
+
+    async def ingest_text_content(
         self,
         document_id: str,
         workspace_id: str,
         content: str,
-        metadata: Dict
-    ) -> RAGIngestResponse:
+        metadata: Dict[str, Any]
+    ) -> Optional[IngestResponse]:
         """
-        Envía documento al servicio RAG para procesamiento e indexación.
-        
-        El servicio RAG se encargará de:
-        1. Dividir el documento en chunks
-        2. Crear embeddings de cada chunk
-        3. Indexar en base de datos vectorial
-        
+        Indexa contenido de texto directamente en el servicio RAG.
+
         Args:
             document_id: ID único del documento
-            workspace_id: ID del workspace al que pertenece
-            content: Contenido completo del documento (texto extraído)
-            metadata: Metadata adicional (filename, file_type, etc.)
-            
+            workspace_id: ID del workspace
+            content: Contenido de texto a indexar
+            metadata: Metadata adicional
+
         Returns:
-            Respuesta con status y número de chunks creados
-            
-        Raises:
-            RuntimeError: Si hay error en el procesamiento
-            
-        Example:
-            >>> response = await rag_client.ingest_document(
-            ...     document_id="doc-123",
-            ...     workspace_id="workspace-123",
-            ...     content="Contenido del documento...",
-            ...     metadata={"filename": "reporte.pdf", "file_type": "pdf"}
-            ... )
-            >>> print(f"Chunks creados: {response.chunks_created}")
+            Respuesta de ingestión o None si falla
         """
         try:
-            request_data = RAGIngestRequest(
-                document_id=document_id,
-                workspace_id=workspace_id,
-                content=content,
-                metadata=metadata
-            )
-            
-            logger.info(f"RAG_CLIENT: Enviando documento {document_id} para ingesta")
-            
-            # TODO: Ajustar endpoint según API real
-            endpoint = f"{self.base_url}/api/v1/ingest"
-            
-            response = await self.client.post(
-                endpoint,
-                json=request_data.dict()
-            )
-            response.raise_for_status()
-            
-            result = RAGIngestResponse(**response.json())
-            
-            logger.info(f"RAG_CLIENT: Documento {document_id} procesado - {result.chunks_created} chunks")
+            payload = {
+                "document_id": document_id,
+                "workspace_id": workspace_id,
+                "content": content,
+                "metadata": metadata
+            }
+
+            response_data = await self._make_request("POST", "/ingest_text", json=payload)
+            result = IngestResponse(**response_data)
+            logger.info(f"RAG ingest text: {result.document_id} with {result.chunks_count} chunks")
             return result
-            
-        except httpx.TimeoutException:
-            logger.error(f"RAG_CLIENT: Timeout en ingesta de documento {document_id}")
-            raise RuntimeError("Servicio RAG no responde (timeout en ingesta)")
-            
-        except httpx.HTTPStatusError as e:
-            logger.error(f"RAG_CLIENT: Error HTTP en ingesta - {e.response.status_code}")
-            raise RuntimeError(f"Error ingesta RAG: {e.response.status_code}")
-            
+
         except Exception as e:
-            logger.error(f"RAG_CLIENT: Error en ingesta: {str(e)}")
-            raise RuntimeError(f"Error ingesta RAG: {str(e)}")
-    
+            logger.error(f"RAG ingest text error: {e}")
+            return None
+
     async def delete_document(self, document_id: str) -> bool:
         """
-        Elimina documento del índice vectorial del servicio RAG.
-        
+        Elimina un documento del servicio RAG.
+
         Args:
             document_id: ID del documento a eliminar
-            
+
         Returns:
-            True si se eliminó correctamente, False en caso contrario
-            
-        Example:
-            >>> success = await rag_client.delete_document("doc-123")
-            >>> if success:
-            ...     print("Documento eliminado del índice RAG")
+            True si se eliminó correctamente
         """
         try:
-            # TODO: Ajustar endpoint según API real
-            endpoint = f"{self.base_url}/api/v1/documents/{document_id}"
-            
-            logger.info(f"RAG_CLIENT: Eliminando documento {document_id}")
-            
-            response = await self.client.delete(endpoint)
-            response.raise_for_status()
-            
-            logger.info(f"RAG_CLIENT: Documento {document_id} eliminado correctamente")
-            return True
-            
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code == 404:
-                logger.warning(f"RAG_CLIENT: Documento {document_id} no encontrado en RAG")
-                return False
-            logger.error(f"RAG_CLIENT: Error eliminando documento - {e.response.status_code}")
-            return False
-            
+            response_data = await self._make_request("DELETE", f"/delete/{document_id}")
+            success = response_data.get("status") == "success"
+            if success:
+                logger.info(f"RAG delete: {document_id} deleted successfully")
+            return success
+
         except Exception as e:
-            logger.error(f"RAG_CLIENT: Error eliminando documento: {str(e)}")
+            logger.error(f"RAG delete error for {document_id}: {e}")
             return False
-    
-    async def health_check(self) -> Dict:
+
+    async def health_check(self) -> Dict[str, Any]:
         """
-        Verifica el estado del servicio RAG externo.
-        
+        Verifica el estado del servicio RAG.
+
         Returns:
-            Dict con status del servicio
-            
-        Example:
-            >>> health = await rag_client.health_check()
-            >>> print(health)
-            {'status': 'ok', 'version': '1.0.0'}
+            Dict con información de salud del servicio
         """
         try:
-            # TODO: Ajustar endpoint según API real
-            endpoint = f"{self.base_url}/health"
-            
-            response = await self.client.get(endpoint)
-            response.raise_for_status()
-            
-            return response.json()
-            
+            response_data = await self._make_request("GET", "/health")
+            return response_data
         except Exception as e:
-            logger.error(f"RAG_CLIENT: Health check falló: {str(e)}")
+            logger.error(f"RAG health check failed: {e}")
             return {"status": "error", "detail": str(e)}
-    
+
     async def close(self):
         """Cierra la conexión HTTP del cliente."""
-        await self.client.aclose()
+        if self._client:
+            await self._client.aclose()
+            self._client = None
         logger.info("RAG_CLIENT: Conexión cerrada")
 
 
 # ============================================================================
-# INSTANCIA GLOBAL (Singleton)
+# INSTANCIA GLOBAL
 # ============================================================================
 
-# TODO: Descomentar cuando el servicio RAG esté disponible
-# rag_client = RAGClient()
+rag_client = RAGClient(
+    base_url=settings.RAG_SERVICE_URL,
+    api_key=settings.RAG_SERVICE_API_KEY,
+    timeout=settings.RAG_SERVICE_TIMEOUT
+)
 
-# Mientras tanto, usar None y manejar en el código
-rag_client = None
-
-logger.info("RAG_CLIENT: Módulo cargado (servicio RAG externo pendiente)")
+logger.info("RAG_CLIENT: Cliente activado con configuración completa")

@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     RAG_SERVICE_URL: str = "http://localhost:8080"
     RAG_SERVICE_API_KEY: str | None = None
     RAG_SERVICE_TIMEOUT: float = 30.0
-    RAG_SERVICE_ENABLED: bool = True  # Activar cuando el servicio esté disponible
+    RAG_SERVICE_ENABLED: bool = True  # Ahora habilitado por defecto
 
     class Config:
         env_file = ".env"

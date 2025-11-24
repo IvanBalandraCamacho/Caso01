@@ -4,6 +4,9 @@ from sqlalchemy.exc import OperationalError
 from redis import Redis
 from redis.exceptions import ConnectionError as RedisConnectionError
 from core.config import settings
+from core import llm_service
+from core.rag_client import rag_client
+import asyncio
 import time
 import logging
 
@@ -80,17 +83,65 @@ def get_rag_status() -> dict:
             "message": "RAG service not enabled (RAG_SERVICE_ENABLED=false)"
         }
     
-    # TODO: Implementar health check del servicio RAG cuando esté disponible
-    # try:
-    #     response = await rag_client.health_check()
-    #     return {"status": "ok", "version": response.version}
-    # except Exception as e:
-    #     return {"status": "error", "error": str(e)}
+    try:
+        # Ejecutar health check async en un event loop
+        health_response = asyncio.run(rag_client.health_check())
+        
+        if health_response.get("status") == "healthy":
+            return {
+                "status": "ok",
+                "service": health_response.get("service", "RAG Service"),
+                "message": "RAG service is operational"
+            }
+        else:
+            return {
+                "status": "error",
+                "error": f"RAG service returned status: {health_response.get('status')}",
+                "details": health_response
+            }
     
-    return {
-        "status": "not_implemented",
-        "message": "RAG service health check not implemented yet"
-    }
+    except Exception as e:
+        logger.error(f"Error checking RAG service health: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "message": "RAG service is not accessible"
+        }
+
+
+def get_llm_status() -> dict:
+    """
+    Verifica el estado del servicio LLM (OpenAI GPT-4o-mini).
+    
+    Returns:
+        dict con status del LLM
+    """
+    try:
+        # Test simple con un prompt corto
+        test_response = llm_service.generate_response(
+            query="Responde solo 'OK' si puedes procesar esta solicitud.",
+            context_chunks=[]
+        )
+        
+        if test_response and "OK" in test_response.upper():
+            return {
+                "status": "ok",
+                "model": "gpt-4o-mini",
+                "provider": "OpenAI"
+            }
+        else:
+            return {
+                "status": "warning",
+                "message": "LLM respondió pero no como esperado",
+                "model": "gpt-4o-mini"
+            }
+    except Exception as e:
+        logger.error(f"Error en LLM health check: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "model": "gpt-4o-mini"
+        }
 
 
 # --- Endpoints de Health Check ---
@@ -131,6 +182,7 @@ def detailed_health_check():
     db_status = get_db_status()
     redis_status = get_redis_status()
     rag_status = get_rag_status()
+    llm_status = get_llm_status()
     
     # Calcular uptime
     uptime_seconds = int(time.time() - START_TIME)
@@ -148,12 +200,13 @@ def detailed_health_check():
         "services": {
             "mysql": db_status,
             "redis": redis_status,
-            "rag": rag_status
+            "rag": rag_status,
+            "llm": llm_status
         }
     }
     
     # Determinar status general
-    critical_services = [db_status, redis_status]
+    critical_services = [db_status, redis_status, llm_status]
     if any(s["status"] == "error" for s in critical_services):
         health_data["status"] = "degraded"
         logger.warning("Health check degraded - some services are down")
@@ -204,3 +257,22 @@ def liveness_probe():
     - 200 si está vivo
     """
     return {"alive": True}
+
+
+@router.get(
+    "/health/llm",
+    summary="Health check específico del LLM"
+)
+def llm_health_check():
+    """
+    Endpoint para verificar específicamente el estado del servicio LLM.
+    
+    Realiza una llamada de test al modelo para asegurar que está funcionando.
+    Útil para debugging y monitoreo del LLM.
+    """
+    llm_status = get_llm_status()
+    
+    if llm_status["status"] == "ok":
+        return llm_status
+    else:
+        return llm_status, status.HTTP_503_SERVICE_UNAVAILABLE

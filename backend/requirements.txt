@@ -24,7 +24,8 @@ celery
 
 # --- IA y LLM ---
 google-generativeai>=0.5.2
-openai>=1.54.0  # Cliente requerido para DeepSeek V3
+openai>=1.54.0  # Cliente requerido para DeepSeek y OpenAI
+tenacity>=8.0.0  # Para retry logic en llamadas a LLM
 
 # --- HTTP Client (para servicio RAG externo) ---
 httpx
