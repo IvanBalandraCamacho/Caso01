@@ -26,12 +26,14 @@ export function DocumentGenerator({ workspaceId, conversationId }: DocumentGener
     setSuccess(null);
 
     try {
+      const token = localStorage.getItem("access_token");
       const response = await fetch(
         `http://localhost:8000/api/v1/workspaces/${workspaceId}/conversations/${conversationId}/generate-downloadable`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             format: format,

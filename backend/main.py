@@ -2,7 +2,7 @@ import os
 import time
 from fastapi import FastAPI, Request
 # from starlette.middleware.gzip import GZIPMiddleware
-from api.routes import health, workspaces, conversations, document_generation, auth
+from api.routes import health, workspaces, conversations, document_generation, auth, proposals
 # from api.routes import users  # Comentado: módulo no existe aún
 from core.config import settings
 from models import database
@@ -86,6 +86,7 @@ app.include_router(auth.router, prefix="/api/v1", tags=["Authentication"])
 app.include_router(workspaces.router, prefix="/api/v1", tags=["Workspaces"])
 app.include_router(conversations.router, prefix="/api/v1", tags=["Conversations"])
 app.include_router(document_generation.router, prefix="/api/v1", tags=["Document Generation"])
+app.include_router(proposals.router, prefix="/api/v1", tags=["Proposals"])
 
 @app.get("/")
 @limiter.limit("30/minute")  # Rate limit en root endpoint

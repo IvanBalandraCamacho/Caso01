@@ -10,6 +10,8 @@ from models import database, document as document_model, schemas
 from processing import parser
 # from core.rag_client import rag_client  # TODO: Implementar cuando RAG externo esté listo
 from core import llm_service
+from core.auth import get_current_active_user
+from models.user import User
 
 router = APIRouter()
 
@@ -27,10 +29,14 @@ def generate_document_summary(
     document_id: str | None = Form(None),
     workspace_id: str | None = Form(None),
     file: UploadFile | None = File(None),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(database.get_db)
 ):
     """
     Genera un resumen siguiendo las instrucciones estrictas del archivo `summary_instructions.md`.
+    
+    Requiere autenticación.
+    
     - Proveer `document_id` para usar un documento previamente procesado (usa los chunks en Qdrant).
     - O subir `file` en multipart/form-data para resumir al vuelo.
 

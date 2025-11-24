@@ -9,6 +9,22 @@ import {
   useEffect,
 } from "react";
 
+// Helper function para obtener headers con autenticación
+const getAuthHeaders = () => {
+  // Check if we're in the browser (not SSR)
+  if (typeof window === 'undefined') {
+    return {
+      'Content-Type': 'application/json',
+    };
+  }
+  
+  const token = localStorage.getItem('access_token');
+  return {
+    'Content-Type': 'application/json',
+    ...(token && { 'Authorization': `Bearer ${token}` }),
+  };
+};
+
 // 1. Exportamos las interfaces para que otros archivos las usen
 export interface Workspace {
   id: string;
@@ -136,7 +152,9 @@ export function WorkspaceProvider({
   const fetchWorkspaces = useCallback(async () => {
     if (!apiUrl) return;
     try {
-      const response = await fetch(`${apiUrl}/workspaces`);
+      const response = await fetch(`${apiUrl}/workspaces`, {
+        headers: getAuthHeaders(),
+      });
       if (!response.ok)
         throw new Error("No se pudieron cargar los workspaces");
       const data = await response.json();
@@ -154,7 +172,10 @@ export function WorkspaceProvider({
       setErrorDocs(null);
       try {
         const response = await fetch(
-          `${apiUrl}/workspaces/${workspaceId}/documents`
+          `${apiUrl}/workspaces/${workspaceId}/documents`,
+          {
+            headers: getAuthHeaders(),
+          }
         );
         if (!response.ok)
           throw new Error("No se pudieron cargar los documentos");
@@ -200,7 +221,7 @@ export function WorkspaceProvider({
           `${apiUrl}/workspaces/${workspaceId}`,
           {
             method: "PUT",
-            headers: { "Content-Type": "application/json" },
+            headers: getAuthHeaders(),
             body: JSON.stringify(data),
           }
         );
@@ -232,6 +253,7 @@ export function WorkspaceProvider({
           `${apiUrl}/workspaces/${workspaceId}`,
           {
             method: "DELETE",
+            headers: getAuthHeaders(),
           }
         );
         if (!response.ok)
@@ -255,7 +277,10 @@ export function WorkspaceProvider({
       if (!apiUrl) return;
       try {
         const response = await fetch(
-          `${apiUrl}/workspaces/${workspaceId}/conversations`
+          `${apiUrl}/workspaces/${workspaceId}/conversations`,
+          {
+            headers: getAuthHeaders(),
+          }
         );
         if (!response.ok)
           throw new Error("No se pudieron cargar las conversaciones");
@@ -278,7 +303,7 @@ export function WorkspaceProvider({
           `${apiUrl}/workspaces/${workspaceId}/conversations`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: getAuthHeaders(),
             body: JSON.stringify({ title }),
           }
         );
@@ -306,6 +331,7 @@ export function WorkspaceProvider({
           `${apiUrl}/workspaces/${activeWorkspace.id}/conversations/${conversationId}`,
           {
             method: "DELETE",
+            headers: getAuthHeaders(),
           }
         );
         if (!response.ok) throw new Error("Error al eliminar la conversación");
@@ -328,7 +354,10 @@ export function WorkspaceProvider({
       if (!apiUrl || !activeWorkspace) return [];
       try {
         const response = await fetch(
-          `${apiUrl}/workspaces/${activeWorkspace.id}/conversations/${conversationId}`
+          `${apiUrl}/workspaces/${activeWorkspace.id}/conversations/${conversationId}`,
+          {
+            headers: getAuthHeaders(),
+          }
         );
         if (!response.ok)
           throw new Error("No se pudieron cargar los mensajes");
@@ -348,7 +377,10 @@ export function WorkspaceProvider({
       if (!apiUrl) return;
       try {
         const response = await fetch(
-          `${apiUrl}/workspaces/${workspaceId}/documents/export-csv`
+          `${apiUrl}/workspaces/${workspaceId}/documents/export-csv`,
+          {
+            headers: getAuthHeaders(),
+          }
         );
         if (!response.ok) {
           const errorText = await response.text();
@@ -387,7 +419,9 @@ export function WorkspaceProvider({
           ? `${apiUrl}/workspaces/${workspaceId}/chat/export/txt?conversation_id=${conversationId}`
           : `${apiUrl}/workspaces/${workspaceId}/chat/export/txt`;
         
-        const response = await fetch(url);
+        const response = await fetch(url, {
+          headers: getAuthHeaders(),
+        });
         if (!response.ok) {
           const errorText = await response.text();
           console.error('Error response:', errorText);
@@ -425,7 +459,9 @@ export function WorkspaceProvider({
           ? `${apiUrl}/workspaces/${workspaceId}/chat/export/pdf?conversation_id=${conversationId}`
           : `${apiUrl}/workspaces/${workspaceId}/chat/export/pdf`;
         
-        const response = await fetch(url);
+        const response = await fetch(url, {
+          headers: getAuthHeaders(),
+        });
         if (!response.ok) {
           const errorText = await response.text();
           console.error('Error response:', errorText);
@@ -463,6 +499,7 @@ export function WorkspaceProvider({
           `${apiUrl}/workspaces/${workspaceId}/chat/history`,
           {
             method: "DELETE",
+            headers: getAuthHeaders(),
           }
         );
         if (!response.ok)
@@ -481,7 +518,10 @@ export function WorkspaceProvider({
       if (!apiUrl) return;
       try {
         const response = await fetch(
-          `${apiUrl}/workspaces/fulltext-search?query=${query}`
+          `${apiUrl}/workspaces/fulltext-search?query=${query}`,
+          {
+            headers: getAuthHeaders(),
+          }
         );
         if (!response.ok)
           throw new Error("No se pudo realizar la búsqueda");
@@ -505,6 +545,7 @@ export function WorkspaceProvider({
           `${apiUrl}/documents/${documentId}`,
           {
             method: "DELETE",
+            headers: getAuthHeaders(),
           }
         );
         if (!response.ok)

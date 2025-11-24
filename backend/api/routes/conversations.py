@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session, joinedload
 from models import database, schemas
 from models.conversation import Conversation, Message
 from models import workspace as workspace_model
+from core.auth import get_current_active_user
+from models.user import User
 import json
 from datetime import datetime
 
@@ -15,10 +17,12 @@ router = APIRouter()
 )
 def get_conversations(
     workspace_id: str,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(database.get_db)
 ):
     """
     Obtiene todas las conversaciones de un workspace específico.
+    Requiere autenticación. Solo el owner puede ver las conversaciones.
     """
     # Verificar que el workspace existe
     db_workspace = db.query(workspace_model.Workspace).filter(
@@ -29,6 +33,13 @@ def get_conversations(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Workspace con id {workspace_id} no encontrado."
+        )
+    
+    # Verificar ownership
+    if db_workspace.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para ver las conversaciones de este workspace."
         )
     
     # Obtener conversaciones con PREFETCH de mensajes (elimina N+1 queries)
@@ -64,11 +75,30 @@ def get_conversations(
 def get_conversation(
     workspace_id: str,
     conversation_id: str,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(database.get_db)
 ):
     """
     Obtiene una conversación específica con todos sus mensajes.
+    Requiere autenticación. Solo el owner puede ver la conversación.
     """
+    # Verificar que el workspace existe y pertenece al usuario
+    db_workspace = db.query(workspace_model.Workspace).filter(
+        workspace_model.Workspace.id == workspace_id
+    ).first()
+    
+    if not db_workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workspace no encontrado."
+        )
+    
+    if db_workspace.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para acceder a este workspace."
+        )
+    
     # Verificar que la conversación existe y pertenece al workspace
     conversation = db.query(Conversation).filter(
         Conversation.id == conversation_id,
@@ -108,10 +138,12 @@ def get_conversation(
 def create_conversation(
     workspace_id: str,
     conversation_data: schemas.ConversationCreate,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(database.get_db)
 ):
     """
     Crea una nueva conversación en un workspace.
+    Requiere autenticación. Solo el owner puede crear conversaciones.
     """
     # Verificar que el workspace existe
     db_workspace = db.query(workspace_model.Workspace).filter(
@@ -122,6 +154,13 @@ def create_conversation(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Workspace con id {workspace_id} no encontrado."
+        )
+    
+    # Verificar ownership
+    if db_workspace.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para crear conversaciones en este workspace."
         )
     
     # Crear conversación
@@ -153,11 +192,30 @@ def update_conversation(
     workspace_id: str,
     conversation_id: str,
     conversation_data: schemas.ConversationUpdate,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(database.get_db)
 ):
     """
     Actualiza el título de una conversación.
+    Requiere autenticación. Solo el owner puede actualizar conversaciones.
     """
+    # Verificar que el workspace existe y pertenece al usuario
+    db_workspace = db.query(workspace_model.Workspace).filter(
+        workspace_model.Workspace.id == workspace_id
+    ).first()
+    
+    if not db_workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workspace no encontrado."
+        )
+    
+    if db_workspace.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para actualizar conversaciones en este workspace."
+        )
+    
     # Verificar que la conversación existe y pertenece al workspace
     conversation = db.query(Conversation).filter(
         Conversation.id == conversation_id,
@@ -201,11 +259,30 @@ def update_conversation(
 def delete_conversation(
     workspace_id: str,
     conversation_id: str,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(database.get_db)
 ):
     """
     Elimina una conversación y todos sus mensajes.
+    Requiere autenticación. Solo el owner puede eliminar conversaciones.
     """
+    # Verificar que el workspace existe y pertenece al usuario
+    db_workspace = db.query(workspace_model.Workspace).filter(
+        workspace_model.Workspace.id == workspace_id
+    ).first()
+    
+    if not db_workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workspace no encontrado."
+        )
+    
+    if db_workspace.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para eliminar conversaciones en este workspace."
+        )
+    
     # Verificar que la conversación existe y pertenece al workspace
     conversation = db.query(Conversation).filter(
         Conversation.id == conversation_id,

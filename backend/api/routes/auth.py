@@ -70,6 +70,9 @@ def register(
             detail="El email ya está registrado"
         )
     
+    # Log para debug
+    logger.info(f"Intentando registrar: {user_in.email}, password length: {len(user_in.password)} bytes, password length (UTF-8): {len(user_in.password.encode('utf-8'))} bytes")
+    
     # Validar longitud de contraseña
     if len(user_in.password) < 8:
         raise HTTPException(
@@ -77,8 +80,16 @@ def register(
             detail="La contraseña debe tener al menos 8 caracteres"
         )
     
+    # Bcrypt tiene un límite de 72 bytes, truncar si es necesario
+    password_to_hash = user_in.password
+    if len(password_to_hash.encode('utf-8')) > 72:
+        logger.warning(f"Contraseña muy larga ({len(password_to_hash.encode('utf-8'))} bytes), truncando a 72 bytes")
+        # Truncar a 72 bytes de forma segura (evitando cortar en medio de caracteres UTF-8)
+        password_bytes = password_to_hash.encode('utf-8')[:72]
+        password_to_hash = password_bytes.decode('utf-8', errors='ignore')
+    
     # Hash de la contraseña
-    hashed_password = get_password_hash(user_in.password)
+    hashed_password = get_password_hash(password_to_hash)
     
     # Crear usuario
     db_user = User(
@@ -153,7 +164,11 @@ def login(
     # Crear token de acceso
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.email, "user_id": user.id},
+        data={
+            "sub": user.email, 
+            "user_id": user.id,
+            "first_name": user.full_name.split()[0] if user.full_name else "Usuario"
+        },
         expires_delta=access_token_expires
     )
     

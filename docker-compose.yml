@@ -45,7 +45,7 @@ services:
       # Mantenemos un volumen para el caché de build de Next.js
       - /app/.next
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
     depends_on:
       - backend
     command: npm run dev

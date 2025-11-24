@@ -83,14 +83,14 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     Crea un JWT access token.
     
     Args:
-        data: Datos a incluir en el token (ej: {"sub": email, "user_id": id})
+        data: Datos a incluir en el token (ej: {"sub": email, "user_id": id, "first_name": name})
         expires_delta: Tiempo de expiración personalizado (opcional)
         
     Returns:
         JWT token codificado
         
     Example:
-        >>> token = create_access_token({"sub": "user@example.com", "user_id": "123"})
+        >>> token = create_access_token({"sub": "user@example.com", "user_id": "123", "first_name": "John"})
         >>> len(token) > 100  # Token es largo
         True
     """

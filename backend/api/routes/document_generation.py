@@ -10,6 +10,8 @@ from models.document import Document
 from models import workspace as workspace_model
 from core import llm_service
 from core.pdf_service import pdf_export_service
+from core.auth import get_current_active_user
+from models.user import User
 from datetime import datetime
 import io
 
@@ -176,12 +178,13 @@ def generate_downloadable_document(
     workspace_id: str,
     conversation_id: str,
     request: schemas.GenerateDownloadableDocRequest,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(database.get_db)
 ):
     """
     Genera un documento descargable en formato TXT, Markdown o PDF.
     
-    - **NO requiere OAuth** - Funciona sin autenticación de Google
+    - **Requiere autenticación** - Solo el owner puede generar documentos
     - **Descarga directa** - El usuario recibe el archivo inmediatamente
     - **Totalmente editable** - El usuario puede modificar el contenido
     
@@ -213,6 +216,13 @@ def generate_downloadable_document(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Workspace no encontrado"
+        )
+    
+    # Verificar ownership
+    if workspace.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para generar documentos en este workspace."
         )
     
     # Verificar conversación
@@ -304,12 +314,32 @@ def download_document_direct(
     format: str,
     document_type: str = "complete",
     include_metadata: bool = True,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(database.get_db)
 ):
     """
     Endpoint alternativo que devuelve el archivo directamente para descarga.
     Útil para usar con <a href="..."> o window.open() en el frontend.
+    
+    Requiere autenticación. Solo el owner puede descargar documentos.
     """
+    
+    # Verificar workspace y ownership
+    workspace = db.query(workspace_model.Workspace).filter(
+        workspace_model.Workspace.id == workspace_id
+    ).first()
+    
+    if not workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workspace no encontrado"
+        )
+    
+    if workspace.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para descargar documentos de este workspace."
+        )
     
     # Reutilizar la lógica del endpoint anterior
     request = schemas.GenerateDownloadableDocRequest(

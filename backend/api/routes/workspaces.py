@@ -637,12 +637,15 @@ def export_documents_csv(
 def export_chat_txt(
     workspace_id: str,
     conversation_id: str = None,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(database.get_db)
 ):
     """
     Exporta el historial de chat de un workspace a TXT.
     Si se proporciona conversation_id, exporta solo esa conversación.
     Si no, exporta todas las conversaciones del workspace.
+    
+    Requiere autenticación. Solo el owner puede exportar.
     """
     from models.conversation import Conversation, Message
     import re
@@ -678,6 +681,13 @@ def export_chat_txt(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Workspace con id {workspace_id} no encontrado."
+        )
+    
+    # Verificar ownership
+    if db_workspace.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para exportar desde este workspace."
         )
     
     # Crear contenido TXT
@@ -746,12 +756,15 @@ def export_chat_txt(
 def export_chat_pdf(
     workspace_id: str,
     conversation_id: str = None,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(database.get_db)
 ):
     """
     Exporta el historial de chat de un workspace a PDF.
     Si se proporciona conversation_id, exporta solo esa conversación.
     Si no, exporta todas las conversaciones del workspace.
+    
+    Requiere autenticación. Solo el owner puede exportar.
     """
     from models.conversation import Conversation, Message
     from reportlab.lib.pagesizes import letter
@@ -838,6 +851,13 @@ def export_chat_pdf(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Workspace con id {workspace_id} no encontrado."
+        )
+    
+    # Verificar ownership
+    if db_workspace.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para exportar desde este workspace."
         )
     
     # Crear buffer para el PDF
@@ -990,10 +1010,14 @@ def export_chat_pdf(
 )
 def delete_chat_history(
     workspace_id: str,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(database.get_db)
 ):
     """
     Elimina el historial de chat de un workspace.
+    
+    Requiere autenticación. Solo el owner puede eliminar el historial.
+    
     Nota: Como no tenemos tabla de historial, esto es un placeholder.
     """
     # Verificar que el workspace existe
@@ -1005,6 +1029,13 @@ def delete_chat_history(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Workspace con id {workspace_id} no encontrado."
+        )
+    
+    # Verificar ownership
+    if db_workspace.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para eliminar el historial de este workspace."
         )
     
     # TODO: Implementar eliminación de historial de chat cuando exista la tabla

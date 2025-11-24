@@ -3,7 +3,6 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +22,7 @@ import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import { QuickPrompts } from "./QuickPrompts";
 import { showToast } from "./Toast";
+import { UserMenu } from "./UserMenu";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -252,9 +252,15 @@ export function ChatArea() {
         // Si es el primer mensaje y tenemos conversation_id, generar título automáticamente
         if (isFirstMessage && currentConversationId && activeWorkspace) {
           try {
+            const token = localStorage.getItem("access_token");
             const response = await fetch(
               `http://localhost:8000/workspaces/${activeWorkspace.id}/conversations/${currentConversationId}/generate-title`,
-              { method: 'POST' }
+              { 
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                }
+              }
             );
             if (response.ok) {
               // Actualizar lista de conversaciones
@@ -385,29 +391,13 @@ export function ChatArea() {
           >
             Export to PDF
           </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="flex items-center space-x-2 hover:bg-gray-800 transition-all">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src="https://github.com/shadcn.png" alt="User" />
-                  <AvatarFallback>PC</AvatarFallback>
-                </Avatar>
-                <span className="text-sm font-medium text-gray-300">PacoPruebas</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="bg-brand-dark-secondary border-gray-700 text-gray-300">
-              <DropdownMenuItem
-                onClick={handleClearHistory}
-                disabled={!activeWorkspace || chatHistory.length === 0}
-                className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-              >
-                Limpiar Historial de Conversación
-              </DropdownMenuItem>
-              <DropdownMenuItem className="hover:bg-gray-700">
-                Configuración Avanzada
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <UserMenu 
+            size="sm" 
+            showName={true} 
+            showClearHistory={true}
+            onClearHistory={handleClearHistory}
+            disableClearHistory={!activeWorkspace || chatHistory.length === 0}
+          />
         </div>
       </header>
 

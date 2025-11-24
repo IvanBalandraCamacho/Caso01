@@ -26,6 +26,7 @@ import { AddWorkspaceModal } from "./AddWorkspaceModal";
 import { useDeleteWorkspace } from "@/hooks/useApi";
 import Image from "next/image";
 import ProposalModal from "./ProposalModal";
+import { UserMenu } from "./UserMenu";
 
 export function Sidebar() {
   const router = useRouter();
@@ -159,11 +160,15 @@ export function Sidebar() {
     }
     
     try {
+      const token = localStorage.getItem("access_token");
       const response = await fetch(
         `http://localhost:8000/workspaces/${activeWorkspace.id}/conversations/${convId}`,
         {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
           body: JSON.stringify({ title: editingConversationTitle.trim() })
         }
       );
@@ -280,7 +285,7 @@ export function Sidebar() {
         )}
 
         <ScrollArea className="flex-1 px-3">
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* Workspaces */}
             <div>
               {!isCollapsed && (
@@ -300,7 +305,7 @@ export function Sidebar() {
                 </div>
               )}
 
-              <ScrollArea className="h-[250px]">
+              <ScrollArea className="h-[180px]">
                 <div className="space-y-1 pr-2">
                   {filteredWorkspaces.map((ws) => (
                   <div key={ws.id} className="group relative">
@@ -352,7 +357,7 @@ export function Sidebar() {
                   History
                 </h2>
               )}
-              <ScrollArea className="h-[300px]">
+              <ScrollArea className="h-[200px]">
                 <div className="space-y-1 pr-2">
                   {conversations.map((conv) => (
                   <div key={conv.id} className="group relative">
@@ -433,6 +438,10 @@ export function Sidebar() {
           </div>
         </ScrollArea>
         
+        {/* User Menu at the bottom */}
+        <div className="p-3 border-t border-gray-700 shrink-0">
+          <UserMenu size="md" showName={!isCollapsed} />
+        </div>
 
       </aside>
 
