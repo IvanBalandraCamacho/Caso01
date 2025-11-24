@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 class DocumentMetadata(BaseModel):
     filename: str
-    content_type: str
+    content_type: Optional[str] = None  # Hacerlo opcional para compatibilidad
     workspace_id: Optional[str] = None
     user_id: Optional[str] = None
 
@@ -162,11 +162,10 @@ class RAGClient:
             # Convertir respuesta a objetos SearchResult
             results = []
             for item in response_data:
-                metadata = DocumentMetadata(**item["metadata"])
                 result = SearchResult(
                     document_id=item["document_id"],
                     content=item["content"],
-                    metadata=metadata,
+                    metadata=item["metadata"],  # Mantener como dict
                     score=item["score"]
                 )
                 results.append(result)
@@ -183,7 +182,8 @@ class RAGClient:
         document_id: str,
         workspace_id: str,
         content: str,
-        metadata: Dict[str, Any]
+        metadata: Dict[str, Any],
+        user_id: Optional[str] = None
     ) -> Optional[IngestResponse]:
         """
         Indexa contenido de texto directamente en el servicio RAG.
@@ -193,6 +193,7 @@ class RAGClient:
             workspace_id: ID del workspace
             content: Contenido de texto a indexar
             metadata: Metadata adicional
+            user_id: ID del usuario (opcional)
 
         Returns:
             Respuesta de ingestión o None si falla
@@ -202,7 +203,8 @@ class RAGClient:
                 "document_id": document_id,
                 "workspace_id": workspace_id,
                 "content": content,
-                "metadata": metadata
+                "metadata": metadata,
+                "user_id": user_id
             }
 
             response_data = await self._make_request("POST", "/ingest_text", json=payload)

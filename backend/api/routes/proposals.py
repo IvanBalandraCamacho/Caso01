@@ -136,8 +136,13 @@ INSTRUCCIONES:
 
         # Usar el LLM para analizar
         try:
-            llm_provider = get_provider(task_type="analyze")
-            # GeminiProvider usa generate_response sin chunks de contexto
+            # Usar explícitamente GPT-4o-mini para análisis
+            llm_provider = get_provider(model_name="gpt4o_mini")
+            if not llm_provider:
+                # Fallback: intentar con task_type
+                llm_provider = get_provider(task_type="analyze")
+            
+            # Generar respuesta
             response = llm_provider.generate_response(query=prompt, context_chunks=[])
             
             # Limpiar respuesta (remover markdown si existe)
@@ -166,6 +171,7 @@ INSTRUCCIONES:
         
     except HTTPException:
         raise
+    except Exception as e:
         logger.error(f"Error al analizar RFP: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

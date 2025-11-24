@@ -371,7 +371,7 @@ def get_workspace_documents(
     summary="Procesar una pregunta de chat (Pipeline RAG Completo)"
 )
 @limiter.limit("5/minute")  # Máximo 5 consultas de chat por minuto
-def chat_with_workspace(
+async def chat_with_workspace(
     request: Request,
     workspace_id: str,
     chat_request: schemas.ChatRequest,
@@ -438,12 +438,12 @@ def chat_with_workspace(
         # Búsqueda en servicio RAG externo (si está habilitado)
         if settings.RAG_SERVICE_ENABLED and rag_client:
             try:
-                import asyncio
-                rag_results = asyncio.run(rag_client.search(
+                rag_results = await rag_client.search(
                     query=chat_request.query,
                     workspace_id=workspace_id,
-                    top_k=top_k
-                ))
+                    limit=top_k,
+                    threshold=0.25  # Threshold más bajo para consultas genéricas
+                )
                 
                 # Convertir resultados RAG a formato DocumentChunk
                 relevant_chunks = [
@@ -465,22 +465,10 @@ def chat_with_workspace(
 
         # Si no hay chunks, devolver mensaje informativo
         if not relevant_chunks:
-            # Guardar respuesta del asistente incluso cuando no hay documentos
-            no_docs_response = "No encontré documentos relevantes para esta consulta. Intente subir un archivo primero."
-            assistant_message = Message(
-                conversation_id=conversation.id, 
-                role="assistant", 
-                content=no_docs_response
-            )
-            db.add(assistant_message)
-            db.commit()
-            
-            return schemas.ChatResponse(
-                query=chat_request.query,
-                llm_response=no_docs_response,
-                relevant_chunks=[],
-                conversation_id=conversation.id
-            )
+            print(f"CHAT: No hay documentos RAG disponibles, continuando con chat directo (sin contexto)")
+            # Permitir chat directo sin contexto de documentos
+            # El LLM responderá basándose solo en su conocimiento general
+            relevant_chunks = []  # Lista vacía, el LLM responderá sin contexto
 
         # Enriquecer contexto con datos de TIVIT si es relevante (OPTIMIZADO)
         query_lower = chat_request.query.lower()
@@ -641,7 +629,7 @@ def update_workspace(
     summary="Eliminar un Workspace"
 )
 @limiter.limit("20/minute")  # Máximo 20 eliminaciones por minuto
-def delete_workspace(
+async def delete_workspace(
     request: Request, 
     workspace_id: str, 
     current_user: User = Depends(get_current_active_user),
@@ -675,8 +663,7 @@ def delete_workspace(
         # Eliminar del servicio RAG externo (si está habilitado)
         if settings.RAG_SERVICE_ENABLED and rag_client:
             try:
-                import asyncio
-                asyncio.run(rag_client.delete_document(document.id))
+                await rag_client.delete_document(document.id)
                 print(f"Documento {document.id} eliminado del servicio RAG externo")
             except Exception as exc:
                 print(f"ERROR eliminando del RAG externo {document.id}: {exc}")
@@ -698,7 +685,7 @@ def delete_workspace(
     summary="Eliminar un Documento"
 )
 @limiter.limit("20/minute")  # Máximo 20 eliminaciones por minuto
-def delete_document(
+async def delete_document(
     request: Request, 
     document_id: str, 
     current_user: User = Depends(get_current_active_user),
@@ -733,8 +720,7 @@ def delete_document(
     # 1. Eliminar del servicio RAG externo (si está habilitado)
     if settings.RAG_SERVICE_ENABLED and rag_client:
         try:
-            import asyncio
-            success = asyncio.run(rag_client.delete_document(db_document.id))
+            success = await rag_client.delete_document(db_document.id)
             if success:
                 print(f"Documento {db_document.id} eliminado del servicio RAG externo")
             else:

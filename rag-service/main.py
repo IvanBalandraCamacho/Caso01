@@ -65,6 +65,21 @@ class RAGIngestRequest(BaseModel):
     workspace_id: str
     content: str
     metadata: Dict[str, Any]
+    user_id: Optional[str] = None
+
+class IngestResponse(BaseModel):
+    """Respuesta de indexación de contenido"""
+    document_id: str
+    chunks_count: int
+    status: str
+    message: Optional[str] = None
+
+class SearchResult(BaseModel):
+    """Resultado de búsqueda semántica"""
+    document_id: str
+    content: str
+    score: float
+    metadata: Dict[str, Any]
 
 # Utilidades
 def get_embedding(text: str) -> List[float]:
@@ -153,31 +168,44 @@ async def ingest_text_content(
             embedding = get_embedding(chunk)
 
             # Guardar chunk en Redis
+            # Filtrar valores None del metadata
+            filtered_request_metadata = {k: v for k, v in request.metadata.items() if v is not None}
+            
+            metadata_dict = {
+                **filtered_request_metadata,
+                "workspace_id": request.workspace_id,
+                "chunk_index": i
+            }
+            # Solo agregar user_id si no es None
+            if request.user_id is not None:
+                metadata_dict["user_id"] = request.user_id
+            
             chunk_data = {
                 "document_id": document_id,
                 "chunk_id": chunk_id,
                 "content": chunk,
                 "embedding": json.dumps(embedding),
-                "metadata": json.dumps({
-                    **request.metadata,
-                    "workspace_id": request.workspace_id,
-                    "user_id": request.user_id,
-                    "chunk_index": i
-                })
+                "metadata": json.dumps(metadata_dict)
             }
 
             redis_client.hset(f"chunk:{chunk_id}", mapping=chunk_data)
             chunk_ids.append(chunk_id)
 
         # Guardar metadata del documento
+        # Filtrar valores None del metadata
+        filtered_metadata = {k: v for k, v in request.metadata.items() if v is not None}
+        
         doc_metadata = {
             "document_id": document_id,
             "workspace_id": request.workspace_id,
-            "user_id": request.user_id,
             "total_chunks": len(chunks),
             "chunk_ids": json.dumps(chunk_ids),
-            **request.metadata
+            **filtered_metadata
         }
+        # Solo agregar user_id si no es None
+        if request.user_id is not None:
+            doc_metadata["user_id"] = request.user_id
+        
         redis_client.hset(f"document:{document_id}", mapping=doc_metadata)
 
         logger.info(f"Contenido indexado: documento {document_id} con {len(chunks)} chunks")
@@ -196,6 +224,8 @@ async def ingest_text_content(
 async def search_documents(request: SearchRequest):
     """Busca documentos relevantes para una consulta"""
     try:
+        logger.info(f"Búsqueda iniciada - Query: '{request.query}' | Workspace: {request.workspace_id} | Threshold: {request.threshold}")
+        
         # Generar embedding de la consulta
         query_embedding = get_embedding(request.query)
 
@@ -208,32 +238,60 @@ async def search_documents(request: SearchRequest):
 
             for doc_key in redis_client.scan_iter(doc_pattern):
                 doc_data = redis_client.hgetall(doc_key)
-                if doc_data.get("workspace_id") == request.workspace_id:
-                    chunk_ids = json.loads(doc_data.get("chunk_ids", "[]"))
+                # Decodificar bytes a string para comparación
+                workspace_id_bytes = doc_data.get(b"workspace_id") or doc_data.get("workspace_id")
+                workspace_id = workspace_id_bytes.decode() if isinstance(workspace_id_bytes, bytes) else workspace_id_bytes
+                
+                logger.info(f"Comparando workspace: '{workspace_id}' == '{request.workspace_id}' ? {workspace_id == request.workspace_id}")
+                
+                if workspace_id == request.workspace_id:
+                    chunk_ids_bytes = doc_data.get(b"chunk_ids") or doc_data.get("chunk_ids")
+                    chunk_ids_str = chunk_ids_bytes.decode() if isinstance(chunk_ids_bytes, bytes) else chunk_ids_bytes
+                    chunk_ids = json.loads(chunk_ids_str)
                     relevant_chunks.extend(chunk_ids)
+                    logger.info(f"✓ Match! Agregados {len(chunk_ids)} chunks del documento")
+            
+            logger.info(f"Total chunks relevantes para workspace {request.workspace_id}: {len(relevant_chunks)}")
         else:
             # Buscar todos los chunks
             relevant_chunks = [key.decode().split(":", 1)[1] for key in redis_client.scan_iter(search_pattern)]
+            logger.info(f"Búsqueda sin filtro workspace: {len(relevant_chunks)} chunks totales")
 
         # Calcular similitudes
         results = []
+        logger.info(f"Calculando similitudes para {len(relevant_chunks)} chunks...")
+        
         for chunk_id in relevant_chunks:
             chunk_data = redis_client.hgetall(f"chunk:{chunk_id}")
 
             if not chunk_data:
+                logger.warning(f"Chunk {chunk_id} no encontrado en Redis")
                 continue
 
-            embedding = json.loads(chunk_data["embedding"])
+            # Decodificar bytes a string
+            def get_value(data, key):
+                val = data.get(key.encode() if isinstance(key, str) else key) or data.get(key)
+                return val.decode() if isinstance(val, bytes) else val
+
+            embedding_str = get_value(chunk_data, "embedding")
+            content_str = get_value(chunk_data, "content")
+            document_id_str = get_value(chunk_data, "document_id")
+            metadata_str = get_value(chunk_data, "metadata")
+
+            embedding = json.loads(embedding_str)
             similarity = cosine_similarity(query_embedding, embedding)
 
+            logger.info(f"Chunk {chunk_id[:20]}... - Similitud: {similarity:.4f} (threshold: {request.threshold})")
+
             if similarity >= request.threshold:
-                metadata = json.loads(chunk_data["metadata"])
+                metadata = json.loads(metadata_str)
                 results.append(SearchResult(
-                    document_id=chunk_data["document_id"],
-                    content=chunk_data["content"],
-                    metadata=DocumentMetadata(**metadata),
-                    score=similarity
+                    document_id=document_id_str,
+                    content=content_str,
+                    score=similarity,
+                    metadata=metadata
                 ))
+                logger.info(f"✓ Chunk añadido a resultados")
 
         # Ordenar por score descendente y limitar resultados
         results.sort(key=lambda x: x.score, reverse=True)

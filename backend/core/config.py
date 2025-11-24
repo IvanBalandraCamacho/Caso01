@@ -1,6 +1,7 @@
 import os
 import secrets
 from pydantic_settings import BaseSettings
+from pydantic import Field
 
 class Settings(BaseSettings):
     """
@@ -27,19 +28,15 @@ class Settings(BaseSettings):
     # LLM Provider Configuration
     LLM_PROVIDER: str = "gemini"
     GEMINI_API_KEY: str
-    GEMINI_MODEL: str = "gemini-1.5-flash"      # Chat rápido / General
-    GEMINI_PRO_MODEL: str = "gemini-1.5-pro"    # Generación de documentos (Mayor calidad)
+    GEMINI_MODEL: str = "gemini-2.0-flash-exp"      # Chat rápido / General
+    GEMINI_PRO_MODEL: str = "gemini-1.5-pro"        # Generación de documentos (Mayor calidad)
     
     # OpenAI Configuration (Para ANÁLISIS)
-    OPENAI_API_KEY: str = ""
+    OPENAI_API_KEY: str = Field(default="", description="OpenAI API Key")
     OPENAI_MODEL: str = "gpt-4o-mini"
     
     # Multi-LLM Configuration
     MULTI_LLM_ENABLED: bool = True
-    
-    # OpenAI Configuration
-    OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-4o-mini"
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -55,7 +52,7 @@ class Settings(BaseSettings):
     # RAG External Service Configuration (NUEVO)
     RAG_SERVICE_URL: str = "http://localhost:8080"
     RAG_SERVICE_API_KEY: str | None = None
-    RAG_SERVICE_TIMEOUT: float = 30.0
+    RAG_SERVICE_TIMEOUT: float = 120.0  # 120 segundos para documentos grandes
     RAG_SERVICE_ENABLED: bool = True  # Ahora habilitado por defecto
 
     class Config:

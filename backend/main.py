@@ -8,6 +8,7 @@ from core.config import settings
 from models import database
 from sqlalchemy.exc import OperationalError
 from starlette.middleware.cors import CORSMiddleware
+from core import llm_service
 
 # Rate Limiting
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -54,6 +55,10 @@ def create_tables_with_retry(max_retries=5, delay=3):
 
 # Ejecutar la creación de tablas con reintentos
 create_tables_with_retry()
+
+# Inicializar providers de LLM
+logger.info("Inicializando providers de LLM...")
+llm_service.initialize_providers()
 
 app = FastAPI(
     title="Sistema de IA Empresarial (Multi-LLM)",

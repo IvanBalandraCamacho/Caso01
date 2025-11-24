@@ -62,7 +62,7 @@ def initialize_providers():
         logger.error(f"❌ Error Gemini Pro: {e}")
     
     # 4. DeepSeek V3 (Análisis alternativo)
-    if settings.DEEPSEEK_API_KEY:
+    if hasattr(settings, 'DEEPSEEK_API_KEY') and settings.DEEPSEEK_API_KEY:
         try:
             _providers["deepseek"] = DeepSeekProvider()
             logger.info("✅ DeepSeek V3 inicializado (ANÁLISIS)")

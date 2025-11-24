@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/services/apiClient';
+import ragClient from '@/services/ragClient';
 import {
   WorkspacePublic,
   WorkspaceCreate,
@@ -10,6 +11,10 @@ import {
   UploadDocumentParams,
   ConversationWithMessages,
   ConversationUpdate,
+  RAGIngestRequest,
+  IngestResponse,
+  SearchRequest,
+  SearchResult,
 } from '@/types/api';
 
 // ============================================
@@ -223,24 +228,44 @@ export const streamChatQuery = async ({
 
     if (!reader) throw new Error('No readable stream');
 
+    let buffer = ''; // Buffer para acumular datos incompletos
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split('\n');
+      // Decodificar y agregar al buffer
+      buffer += decoder.decode(value, { stream: true });
 
+      // Procesar líneas completas
+      const lines = buffer.split('\n');
+      
+      // Guardar la última línea incompleta en el buffer
+      buffer = lines.pop() || '';
+
+      // Procesar líneas completas
       for (const line of lines) {
         if (line.trim()) {
           try {
             const data = JSON.parse(line);
             onChunk(data);
           } catch (e) {
-            console.warn('Error parsing JSON chunk:', line);
+            console.warn('Error parsing JSON chunk:', line, e);
           }
         }
       }
     }
+
+    // Procesar cualquier dato restante en el buffer
+    if (buffer.trim()) {
+      try {
+        const data = JSON.parse(buffer);
+        onChunk(data);
+      } catch (e) {
+        console.warn('Error parsing final buffer:', buffer, e);
+      }
+    }
+
     onFinish();
   } catch (error) {
     onError(error);
@@ -520,3 +545,47 @@ export const useGenerateProposal = () => {
     mutationFn: generateProposalDocx,
   });
 };
+
+// ============================================
+// HOOKS - RAG SERVICE
+// ============================================
+
+/**
+ * Hook para indexar contenido de texto en el RAG
+ */
+export const useIngestText = () => {
+  return useMutation({
+    mutationFn: (request: RAGIngestRequest) => ragClient.ingestText(request),
+  });
+};
+
+/**
+ * Hook para buscar documentos con el RAG
+ */
+export const useSearchRAG = () => {
+  return useMutation({
+    mutationFn: (request: SearchRequest) => ragClient.search(request),
+  });
+};
+
+/**
+ * Hook para eliminar documento del RAG
+ */
+export const useDeleteRAGDocument = () => {
+  return useMutation({
+    mutationFn: (documentId: string) => ragClient.deleteDocument(documentId),
+  });
+};
+
+/**
+ * Hook para verificar salud del RAG service
+ */
+export const useRAGHealthCheck = () => {
+  return useQuery({
+    queryKey: ['rag-health'],
+    queryFn: () => ragClient.healthCheck(),
+    refetchInterval: 30000, // Revalidar cada 30 segundos
+    retry: 3,
+  });
+};
+

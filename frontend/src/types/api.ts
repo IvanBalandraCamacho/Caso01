@@ -71,3 +71,34 @@ export interface UploadDocumentParams {
   workspaceId: string;
   file: File;
 }
+
+// --- RAG Service Types ---
+export interface RAGIngestRequest {
+  document_id: string;
+  workspace_id: string;
+  content: string;
+  metadata: Record<string, any>;
+  user_id?: string | null;
+}
+
+export interface IngestResponse {
+  document_id: string;
+  chunks_count: number;
+  status: string;
+  message?: string | null;
+}
+
+export interface SearchRequest {
+  query: string;
+  workspace_id?: string | null;
+  limit?: number;
+  threshold?: number;
+}
+
+export interface SearchResult {
+  document_id: string;
+  content: string;
+  score: number;
+  metadata: Record<string, any>;
+}
+

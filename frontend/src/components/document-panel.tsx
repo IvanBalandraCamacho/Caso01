@@ -4,6 +4,8 @@ import { useWorkspaces } from "@/context/WorkspaceContext";
 import { FilterDropdown } from "./ui/filter-dropdown";
 import { Button } from "@/components/ui/button";
 import { DocumentList } from "./document-list";
+import { SemanticSearchModal } from "./SemanticSearchModal";
+import { Search } from "lucide-react";
 
 export function DocumentPanel() {
   const {
@@ -17,6 +19,7 @@ export function DocumentPanel() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [isMounted, setIsMounted] = useState(false);
+  const [isSemanticSearchOpen, setIsSemanticSearchOpen] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -76,7 +79,16 @@ export function DocumentPanel() {
           onChange={setTypeFilter}
         />
       </div>
-      <div className="mb-4">
+      <div className="mb-4 space-y-2">
+        <Button
+          variant="outline"
+          className="w-full border-primary/50 text-primary hover:bg-primary/10 hover:text-primary font-medium"
+          onClick={() => setIsSemanticSearchOpen(true)}
+          disabled={!activeWorkspace}
+        >
+          <Search className="h-4 w-4 mr-2" />
+          Búsqueda Semántica
+        </Button>
         <Button
           variant="outline"
           className="w-full border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white font-medium"
@@ -104,6 +116,13 @@ export function DocumentPanel() {
           />
         </div>
       )}
+
+      {/* Modal de búsqueda semántica */}
+      <SemanticSearchModal
+        isOpen={isSemanticSearchOpen}
+        onClose={() => setIsSemanticSearchOpen(false)}
+        workspaceId={activeWorkspace?.id}
+      />
     </div>
   );
 }

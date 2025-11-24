@@ -54,10 +54,16 @@ def process_document(self, document_id: str, temp_file_path_str: str):
         if settings.RAG_SERVICE_ENABLED and rag_client:
             print("WORKER: Enviando documento al servicio RAG externo...")
             try:
+                # Obtener el user_id desde el workspace
+                user_id = None
+                if db_document.workspace:
+                    user_id = str(db_document.workspace.owner_id) if db_document.workspace.owner_id else None
+                
                 result = asyncio.run(
                     rag_client.ingest_text_content(
                         document_id=db_document.id,
                         workspace_id=db_document.workspace_id,
+                        user_id=user_id,
                         content=text_content,
                         metadata={
                             "filename": db_document.file_name,

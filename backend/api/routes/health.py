@@ -70,7 +70,7 @@ def get_redis_status() -> dict:
         }
 
 
-def get_rag_status() -> dict:
+async def get_rag_status() -> dict:
     """
     Verifica el estado del servicio RAG externo.
     
@@ -84,8 +84,8 @@ def get_rag_status() -> dict:
         }
     
     try:
-        # Ejecutar health check async en un event loop
-        health_response = asyncio.run(rag_client.health_check())
+        # Ejecutar health check async
+        health_response = await rag_client.health_check()
         
         if health_response.get("status") == "healthy":
             return {
@@ -165,7 +165,7 @@ def health_check():
     "/health/detailed",
     summary="Health check detallado con estado de servicios"
 )
-def detailed_health_check():
+async def detailed_health_check():
     """
     Endpoint de health check detallado.
     
@@ -181,7 +181,7 @@ def detailed_health_check():
     # Verificar servicios
     db_status = get_db_status()
     redis_status = get_redis_status()
-    rag_status = get_rag_status()
+    rag_status = await get_rag_status()
     llm_status = get_llm_status()
     
     # Calcular uptime
