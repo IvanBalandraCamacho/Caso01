@@ -117,6 +117,37 @@ const deleteDocument = async ({ documentId, workspaceId }: { documentId: string;
 };
 
 // ============================================
+// API FUNCTIONS - PROPOSALS
+// ============================================
+
+/**
+ * Analizar un archivo RFP (PDF) con IA
+ * POST /proposals/analyze
+ */
+const analyzeProposalFile = async (file: File): Promise<any> => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const { data } = await apiClient.post('/proposals/analyze', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return data;
+};
+
+/**
+ * Generar documento Word de propuesta
+ * POST /proposals/generate
+ */
+const generateProposalDocx = async (proposalData: any): Promise<Blob> => {
+  const { data } = await apiClient.post('/proposals/generate', proposalData, {
+    responseType: 'blob',
+  });
+  return data;
+};
+
+// ============================================
 // API FUNCTIONS - CHAT
 // ============================================
 
@@ -463,5 +494,27 @@ export const useDeleteConversation = () => {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: [CONVERSATIONS_QUERY_KEY, variables.workspaceId] });
     },
+  });
+};
+
+// ============================================
+// HOOKS - PROPOSALS
+// ============================================
+
+/**
+ * Hook para analizar un archivo RFP
+ */
+export const useAnalyzeProposal = () => {
+  return useMutation({
+    mutationFn: analyzeProposalFile,
+  });
+};
+
+/**
+ * Hook para generar documento Word de propuesta
+ */
+export const useGenerateProposal = () => {
+  return useMutation({
+    mutationFn: generateProposalDocx,
   });
 };

@@ -7,10 +7,12 @@ interface QuickPromptsProps {
 
 export function QuickPrompts({ onPromptSelect }: QuickPromptsProps) {
   const prompts = [
-    "Resume este documento",
-    "¿Cuáles son los puntos clave?",
-    "Explica esto en términos simples",
-    "Dame un análisis detallado",
+    "Genera un resumen ejecutivo de la documentación disponible",
+    "Identifica y extrae los puntos críticos y conclusiones principales",
+    "Proporciona una explicación simplificada para audiencia no técnica",
+    "Realiza un análisis profundo con insights estratégicos y recomendaciones",
+    "Compara y contrasta los documentos para identificar patrones o discrepancias",
+    "Extrae métricas, KPIs y datos cuantitativos relevantes del contenido",
   ];
 
   return (

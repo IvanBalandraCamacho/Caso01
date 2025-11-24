@@ -93,7 +93,7 @@ def read_root(request: Request):
     logger.info("Root endpoint accessed")
     return {
         "message": "Bienvenido al API del Sistema de IA",
-        "active_llm": settings.ACTIVE_LLM_SERVICE,
+        "active_llm": settings.LLM_PROVIDER,
         "version": "1.0.0"
     }
 
@@ -101,7 +101,7 @@ def read_root(request: Request):
 logger.info("=" * 80)
 logger.info("🚀 Aplicación iniciada correctamente")
 logger.info(f"📊 Versión: 1.0.0")
-logger.info(f"🔧 LLM Activo: {settings.ACTIVE_LLM_SERVICE}")
+logger.info(f"🔧 LLM Activo: {settings.LLM_PROVIDER}")
 logger.info(f"🔒 RAG Externo: {'Habilitado' if settings.RAG_SERVICE_ENABLED else 'Deshabilitado'}")
 logger.info(f"🌐 CORS Orígenes: {', '.join(origins)}")
 logger.info("=" * 80)

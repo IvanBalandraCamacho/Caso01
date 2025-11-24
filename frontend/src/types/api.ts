@@ -44,6 +44,8 @@ export interface DocumentPublic extends DocumentBase {
 // --- Chat Types ---
 export interface ChatRequest {
   query: string;
+  model?: string;
+  conversation_id?: string;
 }
 
 export interface DocumentChunk {

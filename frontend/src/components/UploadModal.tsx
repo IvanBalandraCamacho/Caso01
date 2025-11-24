@@ -71,7 +71,7 @@ export function UploadModal({ isOpen, onClose, onSuccess }: UploadModalProps) {
         formData.append("file", uploadableFile.file);
 
         try {
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+          const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
           const response = await fetch(
             `${apiUrl}/api/v1/workspaces/${activeWorkspace.id}/upload`,
             {

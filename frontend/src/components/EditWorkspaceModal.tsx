@@ -91,7 +91,7 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
       // 1. Cargar detalles del workspace (para 'instructions')
       const fetchWorkspaceDetails = async () => {
         try {
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+          const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
           const response = await fetch(`${apiUrl}/api/v1/workspaces/${workspace.id}`);
           if (response.ok) {
             const data: Workspace & { instructions?: string } = await response.json();

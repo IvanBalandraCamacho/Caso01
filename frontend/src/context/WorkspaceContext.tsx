@@ -124,9 +124,9 @@ export function WorkspaceProvider({
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   
   // Estado para el modelo LLM seleccionado
-  const [selectedModel, setSelectedModel] = useState<string>("gemini-2.0");
+  const [selectedModel, setSelectedModel] = useState<string>("gpt-4o-mini");
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 
   const addNotification = (notification: Notification) => {
     setNotifications((prev) => [...prev, notification]);
@@ -136,7 +136,7 @@ export function WorkspaceProvider({
   const fetchWorkspaces = useCallback(async () => {
     if (!apiUrl) return;
     try {
-      const response = await fetch(`${apiUrl}/api/v1/workspaces`);
+      const response = await fetch(`${apiUrl}/workspaces`);
       if (!response.ok)
         throw new Error("No se pudieron cargar los workspaces");
       const data = await response.json();
@@ -154,7 +154,7 @@ export function WorkspaceProvider({
       setErrorDocs(null);
       try {
         const response = await fetch(
-          `${apiUrl}/api/v1/workspaces/${workspaceId}/documents`
+          `${apiUrl}/workspaces/${workspaceId}/documents`
         );
         if (!response.ok)
           throw new Error("No se pudieron cargar los documentos");
@@ -197,7 +197,7 @@ export function WorkspaceProvider({
       if (!apiUrl) return;
       try {
         const response = await fetch(
-          `${apiUrl}/api/v1/workspaces/${workspaceId}`,
+          `${apiUrl}/workspaces/${workspaceId}`,
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
@@ -229,7 +229,7 @@ export function WorkspaceProvider({
       if (!apiUrl) return;
       try {
         const response = await fetch(
-          `${apiUrl}/api/v1/workspaces/${workspaceId}`,
+          `${apiUrl}/workspaces/${workspaceId}`,
           {
             method: "DELETE",
           }
@@ -255,7 +255,7 @@ export function WorkspaceProvider({
       if (!apiUrl) return;
       try {
         const response = await fetch(
-          `${apiUrl}/api/v1/workspaces/${workspaceId}/conversations`
+          `${apiUrl}/workspaces/${workspaceId}/conversations`
         );
         if (!response.ok)
           throw new Error("No se pudieron cargar las conversaciones");
@@ -275,7 +275,7 @@ export function WorkspaceProvider({
       if (!apiUrl) throw new Error("API URL no configurada");
       try {
         const response = await fetch(
-          `${apiUrl}/api/v1/workspaces/${workspaceId}/conversations`,
+          `${apiUrl}/workspaces/${workspaceId}/conversations`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -303,7 +303,7 @@ export function WorkspaceProvider({
       if (!apiUrl || !activeWorkspace) return;
       try {
         const response = await fetch(
-          `${apiUrl}/api/v1/workspaces/${activeWorkspace.id}/conversations/${conversationId}`,
+          `${apiUrl}/workspaces/${activeWorkspace.id}/conversations/${conversationId}`,
           {
             method: "DELETE",
           }
@@ -328,7 +328,7 @@ export function WorkspaceProvider({
       if (!apiUrl || !activeWorkspace) return [];
       try {
         const response = await fetch(
-          `${apiUrl}/api/v1/workspaces/${activeWorkspace.id}/conversations/${conversationId}`
+          `${apiUrl}/workspaces/${activeWorkspace.id}/conversations/${conversationId}`
         );
         if (!response.ok)
           throw new Error("No se pudieron cargar los mensajes");
@@ -348,7 +348,7 @@ export function WorkspaceProvider({
       if (!apiUrl) return;
       try {
         const response = await fetch(
-          `${apiUrl}/api/v1/workspaces/${workspaceId}/documents/export-csv`
+          `${apiUrl}/workspaces/${workspaceId}/documents/export-csv`
         );
         if (!response.ok) {
           const errorText = await response.text();
@@ -384,8 +384,8 @@ export function WorkspaceProvider({
       if (!apiUrl) return;
       try {
         const url = conversationId 
-          ? `${apiUrl}/api/v1/workspaces/${workspaceId}/chat/export/txt?conversation_id=${conversationId}`
-          : `${apiUrl}/api/v1/workspaces/${workspaceId}/chat/export/txt`;
+          ? `${apiUrl}/workspaces/${workspaceId}/chat/export/txt?conversation_id=${conversationId}`
+          : `${apiUrl}/workspaces/${workspaceId}/chat/export/txt`;
         
         const response = await fetch(url);
         if (!response.ok) {
@@ -422,8 +422,8 @@ export function WorkspaceProvider({
       if (!apiUrl) return;
       try {
         const url = conversationId 
-          ? `${apiUrl}/api/v1/workspaces/${workspaceId}/chat/export/pdf?conversation_id=${conversationId}`
-          : `${apiUrl}/api/v1/workspaces/${workspaceId}/chat/export/pdf`;
+          ? `${apiUrl}/workspaces/${workspaceId}/chat/export/pdf?conversation_id=${conversationId}`
+          : `${apiUrl}/workspaces/${workspaceId}/chat/export/pdf`;
         
         const response = await fetch(url);
         if (!response.ok) {
@@ -460,7 +460,7 @@ export function WorkspaceProvider({
       if (!apiUrl) return;
       try {
         const response = await fetch(
-          `${apiUrl}/api/v1/workspaces/${workspaceId}/chat/history`,
+          `${apiUrl}/workspaces/${workspaceId}/chat/history`,
           {
             method: "DELETE",
           }
@@ -481,7 +481,7 @@ export function WorkspaceProvider({
       if (!apiUrl) return;
       try {
         const response = await fetch(
-          `${apiUrl}/api/v1/workspaces/fulltext-search?query=${query}`
+          `${apiUrl}/workspaces/fulltext-search?query=${query}`
         );
         if (!response.ok)
           throw new Error("No se pudo realizar la búsqueda");
@@ -502,7 +502,7 @@ export function WorkspaceProvider({
       if (!apiUrl) return;
       try {
         const response = await fetch(
-          `${apiUrl}/api/v1/documents/${documentId}`,
+          `${apiUrl}/documents/${documentId}`,
           {
             method: "DELETE",
           }
@@ -526,12 +526,7 @@ export function WorkspaceProvider({
     fetchWorkspaces();
   }, [fetchWorkspaces]);
 
-  // Efecto para setear el primer workspace como activo
-  useEffect(() => {
-    if (!activeWorkspace && workspaces.length > 0) {
-      setActiveWorkspace(workspaces[0]);
-    }
-  }, [workspaces, activeWorkspace]);
+  // Nota: NO auto-seleccionar workspace al inicio - el usuario debe elegir manualmente
 
   const contextValue = useMemo(
     () => ({
@@ -612,3 +607,4 @@ export function useWorkspaces() {
   }
   return context;
 }
+

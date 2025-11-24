@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import "./globals.css"; // La importación de CSS en el layout raíz es correcta
 import QueryProvider from "@/providers/QueryProvider";
+import { WorkspaceProvider } from "@/context/WorkspaceContext";
 
 export const metadata: Metadata = {
   title: "Velvet Chat",
@@ -18,7 +19,9 @@ export default function RootLayout({
     <html lang="en" className="dark" style={{ fontFamily: 'Roboto, sans-serif' }}>
       <body>
         <QueryProvider>
-          {children}
+          <WorkspaceProvider>
+            {children}
+          </WorkspaceProvider>
         </QueryProvider>
         {/* Polyfill para Speech Recognition en navegadores que lo necesiten */}
         <Script
