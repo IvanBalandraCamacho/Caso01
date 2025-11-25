@@ -87,6 +87,11 @@ class RAGIngestRequest(BaseModel):
             raise ValueError('Content cannot be empty')
         return v.strip()
 
+class IngestResponse(BaseModel):
+    document_id: str
+    chunks_count: int
+    status: str
+
 class BatchIngestRequest(BaseModel):
     documents: List[RAGIngestRequest]
 
