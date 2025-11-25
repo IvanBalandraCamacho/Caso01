@@ -9,12 +9,13 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea"; // Importar Textarea
+import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useWorkspaces, Workspace, Document } from "@/context/WorkspaceContext";
 import { FileText, Trash2, Plus, Loader2, FileSpreadsheet, Presentation, File, FileType } from "lucide-react";
-import { UploadModal } from "./UploadModal"; // Reusamos el modal de subida
+import { UploadModal } from "./UploadModal";
 import { useDeleteDocument, useUpdateWorkspace } from "@/hooks/useApi";
+import { fetchWorkspaceDetails } from "@/lib/api";
 
 // Helper para obtener el icono según el tipo de archivo
 const getFileIcon = (fileName: string, fileType: string) => {
@@ -89,27 +90,18 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
   useEffect(() => {
     if (isOpen) {
       // 1. Cargar detalles del workspace (para 'instructions')
-      const fetchWorkspaceDetails = async () => {
+      const loadWorkspaceDetails = async () => {
         try {
-          const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-          const token = localStorage.getItem("access_token");
-          const response = await fetch(`${apiUrl}/workspaces/${workspace.id}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
-          if (response.ok) {
-            const data: Workspace & { instructions?: string } = await response.json();
-            setName(data.name);
-            setDescription(data.description || "");
-            setInstructions(data.instructions || ""); // Cargar instrucciones
-          }
+          const data: Workspace & { instructions?: string } = await fetchWorkspaceDetails(workspace.id);
+          setName(data.name);
+          setDescription(data.description || "");
+          setInstructions(data.instructions || "");
         } catch (error) {
-          console.error("Error al cargar detalles del workspace", error as Error);
+          console.error("Error al cargar detalles del workspace", error);
         }
       };
       
-      fetchWorkspaceDetails();
+      loadWorkspaceDetails();
       // 2. Cargar la lista de documentos
       fetchDocuments(workspace.id);
     }
@@ -125,9 +117,9 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
         updates: { name, description, instructions }
       });
       onClose(); // Cerrar al guardar
-    } catch (error: any) {
-      console.error("Error al actualizar workspace:", error as Error);
-      const errorMessage = error?.response?.data?.detail || error?.message || "Error desconocido";
+    } catch (error) {
+      console.error("Error al actualizar workspace:", error);
+      const errorMessage = error instanceof Error ? error.message : "Error desconocido";
       alert(`Error al actualizar el workspace: ${errorMessage}`);
     } finally {
       setIsSaving(false);
@@ -145,9 +137,9 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
       });
       // Refrescar la lista de documentos
       fetchDocuments(workspace.id);
-    } catch (error: any) {
-      console.error("Error al eliminar documento:", error as Error);
-      const errorMessage = error?.response?.data?.detail || error?.message || "Error desconocido";
+    } catch (error) {
+      console.error("Error al eliminar documento:", error);
+      const errorMessage = error instanceof Error ? error.message : "Error desconocido";
       alert(`Error al eliminar el documento: ${errorMessage}`);
     }
   };

@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import apiClient from '@/services/apiClient';
-import ragClient from '@/services/ragClient';
+import { api, ingestText, searchRAG, deleteRAGDocument, ragHealthCheck } from '@/lib/api';
 import {
   WorkspacePublic,
   WorkspaceCreate,
@@ -34,7 +33,7 @@ const CONVERSATION_DETAILS_QUERY_KEY = 'conversation-details';
  * GET /workspaces
  */
 const fetchWorkspaces = async (): Promise<WorkspacePublic[]> => {
-  const { data } = await apiClient.get<WorkspacePublic[]>('/workspaces');
+  const { data } = await api.get<WorkspacePublic[]>('/workspaces');
   return data;
 };
 
@@ -43,7 +42,7 @@ const fetchWorkspaces = async (): Promise<WorkspacePublic[]> => {
  * GET /workspaces/{id}
  */
 const fetchWorkspaceById = async (id: string): Promise<WorkspacePublic> => {
-  const { data } = await apiClient.get<WorkspacePublic>(`/workspaces/${id}`);
+  const { data } = await api.get<WorkspacePublic>(`/workspaces/${id}`);
   return data;
 };
 
@@ -52,7 +51,7 @@ const fetchWorkspaceById = async (id: string): Promise<WorkspacePublic> => {
  * POST /workspaces
  */
 const createWorkspace = async (newWorkspace: WorkspaceCreate): Promise<WorkspacePublic> => {
-  const { data } = await apiClient.post<WorkspacePublic>('/workspaces', newWorkspace);
+  const { data } = await api.post<WorkspacePublic>('/workspaces', newWorkspace);
   return data;
 };
 
@@ -67,7 +66,7 @@ const updateWorkspace = async ({
   id: string;
   updates: WorkspaceUpdate;
 }): Promise<WorkspacePublic> => {
-  const { data } = await apiClient.put<WorkspacePublic>(`/workspaces/${id}`, updates);
+  const { data } = await api.put<WorkspacePublic>(`/workspaces/${id}`, updates);
   return data;
 };
 
@@ -76,7 +75,7 @@ const updateWorkspace = async ({
  * DELETE /workspaces/{id}
  */
 const deleteWorkspace = async (id: string): Promise<void> => {
-  await apiClient.delete(`/workspaces/${id}`);
+  await api.delete(`/workspaces/${id}`);
 };
 
 // ============================================
@@ -88,7 +87,7 @@ const deleteWorkspace = async (id: string): Promise<void> => {
  * GET /workspaces/{id}/documents
  */
 const fetchWorkspaceDocuments = async (workspaceId: string): Promise<DocumentPublic[]> => {
-  const { data } = await apiClient.get<DocumentPublic[]>(`/workspaces/${workspaceId}/documents`);
+  const { data } = await api.get<DocumentPublic[]>(`/workspaces/${workspaceId}/documents`);
   return data;
 };
 
@@ -100,7 +99,7 @@ const uploadDocument = async ({ workspaceId, file }: UploadDocumentParams): Prom
   const formData = new FormData();
   formData.append('file', file);
 
-  const { data } = await apiClient.post<DocumentPublic>(
+  const { data } = await api.post<DocumentPublic>(
     `/workspaces/${workspaceId}/upload`,
     formData,
     {
@@ -117,7 +116,7 @@ const uploadDocument = async ({ workspaceId, file }: UploadDocumentParams): Prom
  * DELETE /documents/{id}
  */
 const deleteDocument = async ({ documentId, workspaceId }: { documentId: string; workspaceId?: string }): Promise<{ workspaceId?: string }> => {
-  await apiClient.delete(`/documents/${documentId}`);
+  await api.delete(`/documents/${documentId}`);
   return { workspaceId };
 };
 
@@ -133,7 +132,7 @@ const analyzeProposalFile = async (file: File): Promise<unknown> => {
   const formData = new FormData();
   formData.append('file', file);
 
-  const { data } = await apiClient.post('/proposals/analyze', formData, {
+  const { data } = await api.post('/proposals/analyze', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
@@ -146,7 +145,7 @@ const analyzeProposalFile = async (file: File): Promise<unknown> => {
  * POST /proposals/generate
  */
 const generateProposalDocx = async (proposalData: unknown): Promise<Blob> => {
-  const { data } = await apiClient.post('/proposals/generate', proposalData, {
+  const { data } = await api.post('/proposals/generate', proposalData, {
     responseType: 'blob',
   });
   return data;
@@ -174,7 +173,7 @@ const postChatQuery = async ({
     ...(conversationId && { conversation_id: conversationId }),
   };
 
-  const { data } = await apiClient.post<ChatResponse>(
+  const { data } = await api.post<ChatResponse>(
     `/workspaces/${workspaceId}/chat`,
     requestBody
   );
@@ -428,7 +427,7 @@ const fetchConversationWithMessages = async ({
   workspaceId: string;
   conversationId: string;
 }): Promise<ConversationWithMessages> => {
-  const { data } = await apiClient.get<ConversationWithMessages>(
+  const { data } = await api.get<ConversationWithMessages>(
     `/workspaces/${workspaceId}/conversations/${conversationId}`
   );
   return data;
@@ -447,7 +446,7 @@ const updateConversation = async ({
   conversationId: string;
   updates: ConversationUpdate;
 }): Promise<ConversationWithMessages> => {
-  const { data } = await apiClient.put<ConversationWithMessages>(
+  const { data } = await api.put<ConversationWithMessages>(
     `/workspaces/${workspaceId}/conversations/${conversationId}`,
     updates
   );
@@ -465,7 +464,7 @@ const deleteConversation = async ({
   workspaceId: string;
   conversationId: string;
 }): Promise<void> => {
-  await apiClient.delete(
+  await api.delete(
     `/workspaces/${workspaceId}/conversations/${conversationId}`
   );
 };
@@ -555,7 +554,7 @@ export const useGenerateProposal = () => {
  */
 export const useIngestText = () => {
   return useMutation({
-    mutationFn: (request: RAGIngestRequest) => ragClient.ingestText(request),
+    mutationFn: ingestText,
   });
 };
 
@@ -564,7 +563,7 @@ export const useIngestText = () => {
  */
 export const useSearchRAG = () => {
   return useMutation({
-    mutationFn: (request: SearchRequest) => ragClient.search(request),
+    mutationFn: searchRAG,
   });
 };
 
@@ -573,7 +572,7 @@ export const useSearchRAG = () => {
  */
 export const useDeleteRAGDocument = () => {
   return useMutation({
-    mutationFn: (documentId: string) => ragClient.deleteDocument(documentId),
+    mutationFn: deleteRAGDocument,
   });
 };
 
@@ -583,7 +582,7 @@ export const useDeleteRAGDocument = () => {
 export const useRAGHealthCheck = () => {
   return useQuery({
     queryKey: ['rag-health'],
-    queryFn: () => ragClient.healthCheck(),
+    queryFn: ragHealthCheck,
     refetchInterval: 30000, // Revalidar cada 30 segundos
     retry: 3,
   });

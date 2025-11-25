@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { memo } from "react";
 import { Document } from "@/context/WorkspaceContext";
 import { useDeleteDocument } from "@/hooks/useApi";
 import { Trash2, Loader2, FileText, File, FileSpreadsheet } from "lucide-react";
@@ -11,8 +11,6 @@ interface DocumentListProps {
   onDeleteSuccess?: () => void;
 }
 
-import { memo } from 'react';\n\nimport { memo } from 'react';
-
 export const DocumentList = memo(({ documents, workspaceId, onDeleteSuccess }: DocumentListProps) => {
   const deleteDocumentMutation = useDeleteDocument();
 
@@ -20,19 +18,10 @@ export const DocumentList = memo(({ documents, workspaceId, onDeleteSuccess }: D
     if (confirm(`¿Estás seguro de que quieres eliminar "${fileName}"?`)) {
       try {
         await deleteDocumentMutation.mutateAsync({ documentId, workspaceId: workspaceId || '' });
-      }
-      onDeleteSuccess?.();
-    } catch (error: unknown) {
-      const errorMessage = (error as any)?.response?.data?.detail || (error as Error)?.message || "Error desconocido";
-      alert(`Error al eliminar el documento: ${errorMessage}`);
-    }
-  });
-
-  DocumentList.displayName = 'DocumentList';
         onDeleteSuccess?.();
-      } catch (error: any) {
+      } catch (error) {
         console.error("Error al eliminar documento:", error);
-        const errorMessage = error?.response?.data?.detail || error?.message || "Error desconocido";
+        const errorMessage = error instanceof Error ? error.message : "Error desconocido";
         alert(`Error al eliminar el documento: ${errorMessage}`);
       }
     }
@@ -111,4 +100,6 @@ export const DocumentList = memo(({ documents, workspaceId, onDeleteSuccess }: D
       ))}
     </ul>
   );
-}
+});
+
+DocumentList.displayName = 'DocumentList';

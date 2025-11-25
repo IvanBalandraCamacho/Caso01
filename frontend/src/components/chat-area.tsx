@@ -13,6 +13,7 @@ import { Mic, Loader2, FileText, Copy, Check } from "lucide-react";
 import { useWorkspaces } from "@/context/WorkspaceContext";
 import { UploadModal } from "./UploadModal";
 import { useChat, useConversationWithMessages, streamChatQuery } from "@/hooks/useApi";
+import { generateConversationTitle } from "@/lib/api";
 import SpeechRecognition, {
   useSpeechRecognition,
 } from "react-speech-recognition";
@@ -181,58 +182,72 @@ export function ChatArea() {
       query: query,
       conversationId: currentConversationId,
       model: selectedModel,
-      onChunk: (data) => {
+      onChunk: (data: unknown) => {
         // Verificar que este stream sigue activo
         if (activeStreamRef.current !== streamId) {
           console.log("ChatArea: Stream cancelado, ignorando chunks");
           return;
         }
         
-        if (data.type === 'sources') {
+        const chunk = data as { 
+          type?: string; 
+          relevant_chunks?: unknown[]; 
+          model_used?: string; 
+          conversation_id?: string; 
+          text?: string; 
+          detail?: string;
+        };
+        
+        if (chunk.type === 'sources') {
           setChatHistory(prev => {
             const newHistory = [...prev];
             const lastMsg = { ...newHistory[newHistory.length - 1] };
             if (lastMsg.role === 'assistant') {
-              lastMsg.chunks = data.relevant_chunks;
-              lastMsg.modelUsed = data.model_used;
+              lastMsg.chunks = chunk.relevant_chunks as Array<{
+                document_id: string;
+                chunk_text: string;
+                score: number;
+              }>;
+              lastMsg.modelUsed = chunk.model_used;
               newHistory[newHistory.length - 1] = lastMsg;
             }
             return newHistory;
           });
-          if (data.conversation_id && !currentConversationId) {
-            setCurrentConversationId(data.conversation_id);
+          if (chunk.conversation_id && !currentConversationId) {
+            setCurrentConversationId(chunk.conversation_id);
           }
-        } else if (data.type === 'content') {
+        } else if (chunk.type === 'content') {
           setChatHistory(prev => {
             const newHistory = [...prev];
             const lastMsg = { ...newHistory[newHistory.length - 1] };
             if (lastMsg.role === 'assistant') {
-              lastMsg.content = lastMsg.content + data.text;
+              lastMsg.content = lastMsg.content + (chunk.text || '');
               newHistory[newHistory.length - 1] = lastMsg;
             }
             return newHistory;
           });
-        } else if (data.type === 'error') {
+        } else if (chunk.type === 'error') {
           setChatHistory(prev => {
             const newHistory = [...prev];
             const lastMsg = { ...newHistory[newHistory.length - 1] };
             if (lastMsg.role === 'assistant') {
-              lastMsg.content = lastMsg.content + `\n\n⚠️ Error: ${data.detail}`;
+              lastMsg.content = lastMsg.content + `\n\n⚠️ Error: ${chunk.detail || 'Error desconocido'}`;
               newHistory[newHistory.length - 1] = lastMsg;
             }
             return newHistory;
           });
         }
       },
-      onError: (err: any) => {
+      onError: (err: unknown) => {
         // Verificar que este stream sigue activo
         if (activeStreamRef.current !== streamId) return;
         
+        const error = err as { message?: string };
         setChatHistory(prev => {
           const newHistory = [...prev];
           const lastMsg = { ...newHistory[newHistory.length - 1] };
           if (lastMsg.role === 'assistant') {
-            lastMsg.content = lastMsg.content + `\n\n❌ Error de conexión: ${err.message}`;
+            lastMsg.content = lastMsg.content + `\n\n❌ Error de conexión: ${error.message || 'Error desconocido'}`;
             newHistory[newHistory.length - 1] = lastMsg;
           }
           return newHistory;
@@ -250,21 +265,9 @@ export function ChatArea() {
         // Si es el primer mensaje y tenemos conversation_id, generar título automáticamente
         if (isFirstMessage && currentConversationId && activeWorkspace) {
           try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1';
-            const token = localStorage.getItem("access_token");
-            const response = await fetch(
-              `${apiUrl}/workspaces/${activeWorkspace.id}/conversations/${currentConversationId}/generate-title`,
-              { 
-                method: 'POST',
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                }
-              }
-            );
-            if (response.ok) {
-              // Actualizar lista de conversaciones
-              fetchConversations(activeWorkspace.id);
-            }
+            await generateConversationTitle(activeWorkspace.id, currentConversationId);
+            // Actualizar lista de conversaciones
+            fetchConversations(activeWorkspace.id);
           } catch (error) {
             console.error("Error generando título:", error);
           }

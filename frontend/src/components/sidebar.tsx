@@ -27,6 +27,7 @@ import { useDeleteWorkspace } from "@/hooks/useApi";
 import Image from "next/image";
 import ProposalModal from "./ProposalModal";
 import { UserMenu } from "./UserMenu";
+import { updateConversationApi } from "@/lib/api";
 
 export function Sidebar() {
   const router = useRouter();
@@ -55,7 +56,7 @@ export function Sidebar() {
     null
   );
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<unknown[]>([]);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [workspaceSearchQuery, setWorkspaceSearchQuery] = useState("");
   const [editingConversationId, setEditingConversationId] = useState<string | null>(null);
@@ -160,24 +161,11 @@ export function Sidebar() {
     }
     
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1';
-      const token = localStorage.getItem("access_token");
-      const response = await fetch(
-        `${apiUrl}/workspaces/${activeWorkspace.id}/conversations/${convId}`,
-        {
-          method: 'PUT',
-          headers: { 
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ title: editingConversationTitle.trim() })
-        }
-      );
-      
-      if (response.ok) {
-        await fetchConversations(activeWorkspace.id);
-        setEditingConversationId(null);
-      }
+      await updateConversationApi(activeWorkspace.id, convId, { 
+        title: editingConversationTitle.trim() 
+      });
+      await fetchConversations(activeWorkspace.id);
+      setEditingConversationId(null);
     } catch (error) {
       console.error("Error al actualizar título:", error);
     }
