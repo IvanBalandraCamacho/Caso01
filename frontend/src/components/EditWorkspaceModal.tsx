@@ -105,7 +105,7 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
             setInstructions(data.instructions || ""); // Cargar instrucciones
           }
         } catch (error) {
-          console.error("Error al cargar detalles del workspace", error);
+          console.error("Error al cargar detalles del workspace", error as Error);
         }
       };
       
@@ -126,7 +126,7 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
       });
       onClose(); // Cerrar al guardar
     } catch (error: any) {
-      console.error("Error al actualizar workspace:", error);
+      console.error("Error al actualizar workspace:", error as Error);
       const errorMessage = error?.response?.data?.detail || error?.message || "Error desconocido";
       alert(`Error al actualizar el workspace: ${errorMessage}`);
     } finally {
@@ -146,7 +146,7 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
       // Refrescar la lista de documentos
       fetchDocuments(workspace.id);
     } catch (error: any) {
-      console.error("Error al eliminar documento:", error);
+      console.error("Error al eliminar documento:", error as Error);
       const errorMessage = error?.response?.data?.detail || error?.message || "Error desconocido";
       alert(`Error al eliminar el documento: ${errorMessage}`);
     }

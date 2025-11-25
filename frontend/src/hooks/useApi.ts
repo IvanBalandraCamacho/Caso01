@@ -129,7 +129,7 @@ const deleteDocument = async ({ documentId, workspaceId }: { documentId: string;
  * Analizar un archivo RFP (PDF) con IA
  * POST /proposals/analyze
  */
-const analyzeProposalFile = async (file: File): Promise<any> => {
+const analyzeProposalFile = async (file: File): Promise<unknown> => {
   const formData = new FormData();
   formData.append('file', file);
 
@@ -145,7 +145,7 @@ const analyzeProposalFile = async (file: File): Promise<any> => {
  * Generar documento Word de propuesta
  * POST /proposals/generate
  */
-const generateProposalDocx = async (proposalData: any): Promise<Blob> => {
+const generateProposalDocx = async (proposalData: unknown): Promise<Blob> => {
   const { data } = await apiClient.post('/proposals/generate', proposalData, {
     responseType: 'blob',
   });
@@ -197,8 +197,8 @@ export const streamChatQuery = async ({
   query: string;
   conversationId?: string;
   model?: string;
-  onChunk: (chunk: any) => void;
-  onError: (error: any) => void;
+  onChunk: (chunk: unknown) => void;
+  onError: (error: unknown) => void;
   onFinish: () => void;
 }) => {
   const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1';

@@ -80,9 +80,9 @@ export default function LoginPage() {
         router.push('/');
       }, 800);
 
-    } catch (error: any) {
-      console.error('Error en login:', error);
-      showToast(error.message || "Error al iniciar sesión", "error");
+    } catch (error: unknown) {
+      console.error('Error en login:', error as Error);
+      showToast((error as Error).message || "Error al iniciar sesión", "error");
     } finally {
       setIsLoading(false);
     }

@@ -102,8 +102,8 @@ export function UploadModal({ isOpen, onClose, onSuccess }: UploadModalProps) {
             onSuccess();
           }
 
-        } catch (error: any) {
-          console.error("Error en la subida:", error);
+        } catch (error: unknown) {
+          console.error("Error en la subida:", error as Error);
           // 3. Marcar como "error" y guardar el mensaje
           setFiles(prev => prev.map(f => 
             f.file.name === uploadableFile.file.name 

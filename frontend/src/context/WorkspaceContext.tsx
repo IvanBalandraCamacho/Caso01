@@ -84,7 +84,7 @@ interface WorkspaceContextType {
   notifications: Notification[];
   addNotification: (notification: Notification) => void;
 
-  searchResults: any[];
+  searchResults: unknown[];
   setSearchResults: (results: any[]) => void;
 
   // --- Conversations ---
@@ -112,7 +112,7 @@ interface WorkspaceContextType {
   exportChatToTxt: (workspaceId: string, conversationId?: string) => Promise<void>;
   exportChatToPdf: (workspaceId: string, conversationId?: string) => Promise<void>;
   deleteChatHistory: (workspaceId: string) => Promise<void>;
-  fulltextSearch: (query: string) => Promise<any>;
+  fulltextSearch: (query: string) => Promise<unknown[]>;
 }
 
 // 3. Creamos el Contexto
@@ -133,7 +133,7 @@ export function WorkspaceProvider({
   const [isLoadingDocs, setIsLoadingDocs] = useState(false);
   const [errorDocs, setErrorDocs] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<unknown[]>([]);
   
   // Estados para conversaciones
   const [conversations, setConversations] = useState<Conversation[]>([]);

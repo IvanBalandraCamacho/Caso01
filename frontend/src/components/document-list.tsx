@@ -11,13 +11,24 @@ interface DocumentListProps {
   onDeleteSuccess?: () => void;
 }
 
-export function DocumentList({ documents, workspaceId, onDeleteSuccess }: DocumentListProps) {
+import { memo } from 'react';\n\nimport { memo } from 'react';
+
+export const DocumentList = memo(({ documents, workspaceId, onDeleteSuccess }: DocumentListProps) => {
   const deleteDocumentMutation = useDeleteDocument();
 
   const handleDelete = async (documentId: string, fileName: string) => {
     if (confirm(`¿Estás seguro de que quieres eliminar "${fileName}"?`)) {
       try {
         await deleteDocumentMutation.mutateAsync({ documentId, workspaceId: workspaceId || '' });
+      }
+      onDeleteSuccess?.();
+    } catch (error: unknown) {
+      const errorMessage = (error as any)?.response?.data?.detail || (error as Error)?.message || "Error desconocido";
+      alert(`Error al eliminar el documento: ${errorMessage}`);
+    }
+  });
+
+  DocumentList.displayName = 'DocumentList';
         onDeleteSuccess?.();
       } catch (error: any) {
         console.error("Error al eliminar documento:", error);

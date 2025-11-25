@@ -174,8 +174,7 @@ export function ChatArea() {
     const streamId = Date.now().toString();
     activeStreamRef.current = streamId;
 
-    console.log("ChatArea: Enviando query con modelo:", selectedModel);
-
+  
     // Enviar consulta con streaming
     streamChatQuery({
       workspaceId: activeWorkspace.id,

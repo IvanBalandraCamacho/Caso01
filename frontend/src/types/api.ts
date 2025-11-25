@@ -7,7 +7,7 @@ export interface WorkspaceBase {
   instructions?: string | null;
 }
 
-export interface WorkspaceCreate extends WorkspaceBase {}
+// export interface WorkspaceCreate extends WorkspaceBase {} // Fixed empty interface
 
 export interface WorkspaceUpdate {
   name?: string | null;
@@ -77,7 +77,7 @@ export interface RAGIngestRequest {
   document_id: string;
   workspace_id: string;
   content: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   user_id?: string | null;
 }
 
@@ -99,6 +99,6 @@ export interface SearchResult {
   document_id: string;
   content: string;
   score: number;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 

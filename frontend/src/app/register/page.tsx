@@ -77,9 +77,9 @@ export default function RegisterPage() {
         router.push('/login');
       }, 1500);
 
-    } catch (error: any) {
-      console.error('Error en registro:', error);
-      showToast(error.message || "Error al crear la cuenta", "error");
+    } catch (error: unknown) {
+      console.error('Error en registro:', error as Error);
+      showToast((error as Error).message || "Error al crear la cuenta", "error");
     } finally {
       setIsLoading(false);
     }

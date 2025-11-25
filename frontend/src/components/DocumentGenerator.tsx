@@ -95,8 +95,8 @@ export function DocumentGenerator({ workspaceId, conversationId }: DocumentGener
       }
 
       setError(null);
-    } catch (err: any) {
-      setError(err.message || 'Error al generar documento');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Error al generar documento');
       setSuccess(null);
       console.error('Error generating document:', err);
     } finally {
