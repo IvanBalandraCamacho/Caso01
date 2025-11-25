@@ -88,7 +88,7 @@ class ChatRequest(BaseModel):
     """Schema para la pregunta del usuario."""
     query: str
     conversation_id: str | None = None  # Opcional: ID de conversación existente
-    model: str | None = None  # Opcional: modelo LLM a usar (gemini-2.0 o gpt-4.1-nano)
+    model: str | None = None  # Opcional: modelo LLM a usar (gpt-4o-mini)
     
     @validator('query')
     def query_must_not_be_empty(cls, v):

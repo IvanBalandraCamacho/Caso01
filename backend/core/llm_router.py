@@ -1,10 +1,10 @@
 """
-Router Inteligente de LLMs (Estrategia Refinada).
+Router Inteligente de LLMs (Solo OpenAI).
 
 Selecciona el mejor modelo según la tarea:
-- ANALIZAR: DeepSeek V3 (Económico y potente para lectura masiva)
-- CREAR: Gemini 1.5 Pro (Mayor calidad de escritura y razonamiento)
-- RESPONDER/GENERAL: Gemini 1.5 Flash (Rápido y eficiente para chat)
+- ANALIZAR: GPT-4o-mini (Económico y potente para lectura masiva)
+- CREAR: GPT-4o-mini (Mayor calidad de escritura y razonamiento)
+- RESPONDER/GENERAL: GPT-4o-mini (Rápido y eficiente para chat)
 """
 
 from enum import Enum
@@ -16,10 +16,10 @@ logger = logging.getLogger(__name__)
 
 class TaskType(Enum):
     """Tipos de tareas que el sistema puede realizar."""
-    ANALYZE = "analyze"      # Analizar documentos, extraer datos -> DeepSeek
-    CREATE = "create"        # Generar documentos, propuestas -> Gemini Pro
-    RESPOND = "respond"      # Chat general, Q&A simple -> Gemini Flash
-    GENERAL = "general"      # Default -> Gemini Flash
+    ANALYZE = "analyze"      # Analizar documentos, extraer datos -> GPT-4o-mini
+    CREATE = "create"        # Generar documentos, propuestas -> GPT-4o-mini
+    RESPOND = "respond"      # Chat general, Q&A simple -> GPT-4o-mini
+    GENERAL = "general"      # Default -> GPT-4o-mini
 
 
 class LLMRouter:
@@ -30,12 +30,12 @@ class LLMRouter:
     def __init__(self):
         """Inicializa el router."""
         self.model_mapping = {
-            TaskType.ANALYZE: "deepseek",       # Solicitado explícitamente para análisis
-            TaskType.CREATE: "gemini_pro",      # Mejor modelo para generación
-            TaskType.RESPOND: "gemini_flash",   # Rápido para chat
-            TaskType.GENERAL: "gemini_flash",
+            TaskType.ANALYZE: "gpt4o_mini",       # Solicitado explícitamente para análisis
+            TaskType.CREATE: "gpt4o_mini",      # Mejor modelo para generación
+            TaskType.RESPOND: "gpt4o_mini",   # Rápido para chat
+            TaskType.GENERAL: "gpt4o_mini",
         }
-        logger.info("LLM Router inicializado: DeepSeek(Analyze) + GeminiPro(Create) + GeminiFlash(Chat)")
+        logger.info("LLM Router inicializado: GPT-4o-mini para todas las tareas")
     
     def route(
         self, 
@@ -51,17 +51,17 @@ class LLMRouter:
         # 1. CREAR documentos (Propuestas, Informes)
         if self._is_creation_task(query_lower, expected_output_length):
             task_type = TaskType.CREATE
-            reason = "Generación de documento - Gemini 1.5 Pro (Mayor calidad)"
+            reason = "Generación de documento - GPT-4o-mini (Mayor calidad)"
             
         # 2. ANALIZAR documentos (Lectura, Extracción)
         elif self._is_analysis_task(query_lower, num_documents):
             task_type = TaskType.ANALYZE
-            reason = "Análisis de documentos - DeepSeek V3 (Especializado en análisis)"
+            reason = "Análisis de documentos - GPT-4o-mini (Especializado en análisis)"
             
         # 3. RESPONDER / GENERAL
         else:
             task_type = TaskType.RESPOND
-            reason = "Chat General - Gemini 1.5 Flash (Velocidad y eficiencia)"
+            reason = "Chat General - GPT-4o-mini (Velocidad y eficiencia)"
         
         model_name = self.model_mapping[task_type]
         logger.info(f"Router: {task_type.value} → {model_name}")
@@ -119,20 +119,10 @@ class LLMRouter:
     
     def get_model_info(self, model_name: str) -> dict:
         model_info = {
-            "gemini_flash": {
-                "name": "Gemini 1.5 Flash",
-                "cost": "Gratis / Bajo costo",
-                "best_for": "Chat general, respuestas rápidas"
-            },
-            "gemini_pro": {
-                "name": "Gemini 1.5 Pro",
-                "cost": "Moderado",
-                "best_for": "Generación de documentos, razonamiento complejo"
-            },
-            "deepseek": {
-                "name": "DeepSeek V3",
-                "cost": "$0.14/M tokens",
-                "best_for": "Análisis masivo de documentos"
+            "gpt4o_mini": {
+                "name": "GPT-4o-mini",
+                "cost": "Bajo costo",
+                "best_for": "Todas las tareas: análisis, generación, chat"
             }
         }
         return model_info.get(model_name, {})

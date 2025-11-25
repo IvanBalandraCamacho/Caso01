@@ -565,7 +565,7 @@ export function ChatArea() {
                   title="Ir al Dashboard"
                 >
                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                   Using: <span className="font-semibold text-gray-200">{selectedModel === "gpt-4o-mini" ? "Velvet" : selectedModel === "gpt-4.1-nano" ? "GPT-4.1 Nano" : "Gemini 2.0 Flash"}</span>
+                   Using: <span className="font-semibold text-gray-200">{selectedModel === "gpt-4o-mini" ? "GPT-4o Mini" : selectedModel}</span>
                 </span>
              </div>
            )}

@@ -258,13 +258,7 @@ export function Sidebar() {
                 <SelectValue placeholder="Select AI Model" />
               </SelectTrigger>
               <SelectContent style={{ backgroundColor: '#1F2123', borderColor: '#374151' }}>
-                <SelectItem value="gemini-2.0-flash-exp" style={{ color: '#ffffff' }}>Gemini 2.0 Flash</SelectItem>
-                <SelectItem value="gpt-4o-mini" style={{ color: '#ffffff' }}>Velvet (GPT-4o Mini)</SelectItem>
-                <SelectItem value="gpt-4o" style={{ color: '#ffffff' }}>GPT-4o</SelectItem>
-                <SelectItem value="gpt-4-turbo" style={{ color: '#ffffff' }}>GPT-4 Turbo</SelectItem>
-                <SelectItem value="llama-3.3-70b-versatile" style={{ color: '#ffffff' }}>Llama 3.3 70B (Groq)</SelectItem>
-                <SelectItem value="deepseek-chat" style={{ color: '#ffffff' }}>DeepSeek Chat</SelectItem>
-                <SelectItem value="deepseek-reasoner" style={{ color: '#ffffff' }}>DeepSeek Reasoner</SelectItem>
+                <SelectItem value="gpt-4o-mini" style={{ color: '#ffffff' }}>GPT-4o Mini</SelectItem>
               </SelectContent>
             </Select>
           </div>

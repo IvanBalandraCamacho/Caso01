@@ -13,7 +13,6 @@ class Settings(BaseSettings):
     # DEPRECADO: Qdrant local (mantener para compatibilidad temporal)
     QDRANT_URL: str = "http://qdrant:6333"  # Opcional durante migración
     
-    GEMINI_API_KEY: str
     CORS_ALLOWED_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", secrets.token_urlsafe(32))
     JWT_ALGORITHM: str = "HS256"
@@ -26,12 +25,9 @@ class Settings(BaseSettings):
     GOOGLE_OAUTH_REDIRECT_URI: str | None = None
 
     # LLM Provider Configuration
-    LLM_PROVIDER: str = "gemini"
-    GEMINI_API_KEY: str
-    GEMINI_MODEL: str = "gemini-2.0-flash-exp"      # Chat rápido / General
-    GEMINI_PRO_MODEL: str = "gemini-1.5-pro"        # Generación de documentos (Mayor calidad)
+    LLM_PROVIDER: str = "openai"
     
-    # OpenAI Configuration (Para ANÁLISIS)
+    # OpenAI Configuration
     OPENAI_API_KEY: str = Field(default="", description="OpenAI API Key")
     OPENAI_MODEL: str = "gpt-4o-mini"
     

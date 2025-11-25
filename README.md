@@ -12,21 +12,13 @@ El sistema está construido sobre una arquitectura moderna y modular:
 - **Cache**: Redis
 - **LLM Engine**: Sistema Multi-LLM con Routing Inteligente
 
-## 🧠 Sistema Multi-LLM
+## 🧠 Sistema LLM
 
-El backend implementa una estrategia de IA híbrida para optimizar costos y calidad:
+El backend utiliza OpenAI GPT-4o-mini para todas las tareas de IA:
 
-1. **Gemini 1.5 Flash (Google)**: 
-   - *Rol*: Modelo Principal (Chat, Respuestas rápidas, Análisis general)
-   - *Ventaja*: Rápido, ventana de contexto de 1M tokens, económico.
-
-2. **Gemini 1.5 Pro (Google)**:
-   - *Rol*: Generación de Documentos
-   - *Ventaja*: Alta calidad de escritura y razonamiento complejo.
-
-3. **DeepSeek V3 (DeepSeek)**:
-   - *Rol*: Análisis Intensivo
-   - *Ventaja*: Costo extremadamente bajo para lectura masiva de tokens.
+- **GPT-4o-mini (OpenAI)**: 
+   - *Rol*: Modelo Principal (Chat, Respuestas rápidas, Análisis general, Generación de documentos)
+   - *Ventaja*: Rápido, económico, alta calidad.
 
 ## 🛠 Configuración
 
@@ -37,8 +29,7 @@ El backend implementa una estrategia de IA híbrida para optimizar costos y cali
    ```
    
    Claves críticas:
-   - `GEMINI_API_KEY`: Para modelos Gemini.
-   - `DEEPSEEK_API_KEY`: Para modelo DeepSeek.
+   - `OPENAI_API_KEY`: Para modelo GPT-4o-mini.
    - `DATABASE_URL`: Conexión a MySQL.
    - `REDIS_URL`: Conexión a Redis.
 
@@ -63,7 +54,7 @@ backend/
 ├── api/                # Endpoints de la API
 │   └── routes/         # Rutas organizadas por recurso
 ├── core/               # Lógica central
-│   ├── providers/      # Integraciones con LLMs (Gemini, DeepSeek)
+│   ├── providers/      # Integración con OpenAI
 │   ├── llm_router.py   # Lógica de selección de modelos
 │   └── llm_service.py  # Servicio unificado de LLM
 ├── models/             # Modelos de base de datos (SQLAlchemy)

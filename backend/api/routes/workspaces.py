@@ -388,7 +388,7 @@ async def chat_with_workspace(
     
     Paso 2 (Augment & Generate):
     - Construye un prompt con la pregunta y los chunks.
-    - Llama al LLM (Gemini) para obtener una respuesta en lenguaje natural.
+    - Llama al LLM (GPT-4o-mini) para obtener una respuesta en lenguaje natural.
     """
     
     # 1. Verificar que el Workspace exista
@@ -502,11 +502,10 @@ async def chat_with_workspace(
             ]
 
             # Determinar qué modelo se está usando
-            model_used = chat_request.model or "gemini-2.0"  # Default
+            model_used = chat_request.model or "gpt-4o-mini"  # Default
             print(f"API_CHAT: Modelo solicitado: '{chat_request.model}', usando: '{model_used}'")
             model_name_display = {
-                "gemini-2.0": "Gemini 2.0 Flash",
-                "gpt-4.1-nano": "GPT-4.1 Nano"
+                "gpt-4o-mini": "GPT-4o Mini"
             }.get(model_used, model_used)
 
             yield json.dumps({

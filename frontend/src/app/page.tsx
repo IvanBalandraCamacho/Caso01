@@ -93,7 +93,7 @@ export default function Home() {
                     <ul className="space-y-2 text-sm text-gray-400">
                       <li>✓ Búsqueda semántica en documentos</li>
                       <li>✓ Respuestas con fuentes citadas</li>
-                      <li>✓ Multi-modelo (Gemini, OpenAI, Groq)</li>
+                      <li>✓ Multi-modelo (OpenAI GPT-4o-mini)</li>
                     </ul>
                   </div>
                 </div>
