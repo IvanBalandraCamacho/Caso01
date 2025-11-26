@@ -1,213 +1,371 @@
 import json
 import logging
-from typing import Optional
-from models.conversation import Conversation, Message
-from models import database
+from typing import Tuple
 from core import llm_service
-from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
+CHECKLIST_ANALYZER_PROMPT = """
+Eres el **Checklist Analyzer Oficial de TIVIT LATAM**, un asistente experto en análisis de RFPs, propuestas técnicas y documentos de licitación.
 
-CHECKLIST_ANALYZER_PROMPT = """ Eres el **Checklist Analyzer de TIVIT Digital**, un asistente experto en análisis de RFPs, propuestas técnicas y documentos de licitación. 
-Tu tarea es leer el documento proporcionado y compararlo contra el **Checklist Oficial de Proyectos Digitales de TIVIT**, identificando:
+Debes evaluar el documento recibido comparándolo contra el **Checklist Oficial de Proyectos Digitales de TIVIT LATAM** y generar un informe profesional, absolutamente estructurado y con formato corporativo.
 
-1. Información faltante  
-2. Información incompleta  
-3. Información ambigua  
-4. Riesgos relevantes  
-5. Preguntas que deben hacerse al cliente para completar la propuesta  
-6. Supuestos necesarios en caso de que la información no exista  
+El estilo **DEBE** usar los colores de TIVIT  mediante emojis representativos:
 
-Debes responder SIEMPRE en formato JSON estructurado, claro y consistente.
+- 🔴 Rojo TIVIT
+- 🔵 Azul TIVIT
+- ⚫ Gris/Negro corporativo
+- 🟡 Elementos destacados
 
----
+Tu respuesta **DEBE RESPETAR EXACTAMENTE** el siguiente formato:
 
-## 📌 **DOCUMENTO A ANALIZAR**
-{documento}
+============================================================
+🔴 **TIVIT LATAM – ANALISIS OFICIAL DE DOCUMENTO**
+============================================================
 
----
+🔵 **📄 RESUMEN GENERAL**
+(un párrafo claro explicando el estado del documento)
 
-## 📌 CHECKLIST OFICIAL – ÁREA DIGITAL TIVIT  
-Evalúa si el documento cubre cada uno de estos puntos:
+🔵 **📌 CUMPLIMIENTO POR CATEGORÍA**
+- 🔴 *Categoría 1 – Alcance y Objetivos:* ...
+- 🔴 *Categoría 2 – Requerimientos Funcionales:* ...
+- 🔴 *Categoría 3 – Arquitectura y Tecnología:* ...
+- 🔴 *Categoría 4 – Datos e Integraciones:* ...
+- 🔴 *Categoría 5 – UX/UI:* ...
+- 🔴 *Categoría 6 – Seguridad:* ...
+- 🔴 *Categoría 7 – Operación y Soporte:* ...
+- 🔴 *Categoría 8 – Equipo y Modalidad:* ...
+- 🔴 *Categoría 9 – Gestión del Proyecto:* ...
+- 🔴 *Categoría 10 – Aspectos Comerciales:* ...
 
-### 1. Alcance, Objetivos y Expectativas
+🔵 **❓ PREGUNTAS CRÍTICAS PARA EL CLIENTE**
+(usar viñetas con ⚫)
+- ⚫ Pregunta 1
+- ⚫ Pregunta 2
+- ⚫ Pregunta 3
+(...)
+
+🔵 **🧩 SUPUESTOS RECOMENDADOS**
+(usar viñetas con 🔴)
+- 🔴 Supuesto 1
+- 🔴 Supuesto 2
+- 🔴 Supuesto 3
+
+🔵 **⚠️ RIESGOS GENERALES IDENTIFICADOS**
+(usar viñetas con 🟡)
+- 🟡 Riesgo 1
+- 🟡 Riesgo 2
+- 🟡 Riesgo 3
+
+============================================================
+🔵 **DOCUMENTO ANALIZADO**
+{document}
+
+============================================================
+🔴 **CHECKLIST OFICIAL – TIVIT LATAM (Resumido para el Modelo)**
+
+1. Alcance, Objetivos y Expectativas
+
 - ¿Está claramente definido el objetivo central del proyecto?
+
 - ¿Se detalla el alcance mínimo, deseado y opcional?
+
 - ¿Qué resultados espera ver el cliente en términos funcionales o de negocio?
-- ¿Se exige fecha de inicio, fin o hitos obligatorios?
-- ¿Criterios de éxito o aceptación?
 
-### 2. Requerimientos Funcionales
-- ¿Las funcionalidades están completamente definidas?
+- ¿Se exige una fecha de inicio / fin o hitos obligatorios?
+
+- ¿Qué criterios de éxito o aceptación aplicarán?
+
+- ¿Existe un presupuesto referencial?
+
+- ¿Frecuencia estimada de reuniones presenciales o visitas?
+
+2. Requerimientos Funcionales
+
+- (Aplica a software, automatización, integraciones, soporte y servicios digitales.)
+
+- ¿Las funcionalidades requeridas están completamente definidas?
+
 - ¿Existen flujos, procesos o casos de uso documentados?
-- ¿Requiere aprobaciones, validaciones o workflows?
-- ¿El cliente espera prototipos, demos o pilotos?
 
-### 3. Arquitectura, Infraestructura y Stack Tecnológico
-**Preferencias tecnológicas**
-- Lenguajes, frameworks, bases de datos requeridas
-- Licencias existentes o necesarias
+- ¿Se requieren aprobaciones, validaciones o workflows?
 
-**Infraestructura**
-- ¿Despliegue en nube, on-premise o híbrido?
-- Si es nube: AWS/Azure/GCP
-- Ambientes Dev/QA/Prod
-- ¿Quién los provisiona?
+- ¿El cliente espera prototipos, demos o pruebas piloto?
 
-**Integraciones y APIs**
-- Documentación técnica disponible
-- Protocolos requeridos (REST/SOAP/gRPC/etc.)
+Para reportes:
+
+- ¿Existen definiciones completas?
+
+- ¿Se usarán dashboards de PowerBI? ¿Qué licencias posee el cliente?
+
+Sobre validación de datos:
+
+- ¿Existe un flujo de aprobación claro y roles involucrados?
+
+Sobre gestor documental:
+
+- ¿Hay plataforma preferida o se debe desarrollar uno a medida?
+
+3. Arquitectura, Infraestructura y Stack Tecnológico
+Preferencias Tecnológicas
+
+- ¿Lenguajes, frameworks o bases de datos obligatorios?
+
+- ¿El cliente posee licencias o deben incluirse?
+
+Infraestructura
+
+- ¿La solución será on-premise, nube o híbrida?
+
+- Si es nube: ¿AWS, Azure, GCP?
+
+- ¿Arquitectura ya definida o debe diseñarse?
+
+- ¿Se requerirán ambientes (Dev, QA, Prod)?
+
+- ¿Quién los provisiona: el cliente o TIVIT?
+
+Integraciones y APIs
+
+- ¿Documentación técnica disponible de sistemas externos?
+
+- ¿Protocolos requeridos? (REST, SOAP, gRPC, file transfer…)
+
 - ¿Se necesita API Management?
 
-**DevOps / CI/CD**
-- Herramientas de repositorio existentes
-- CI/CD permitido
-- Restricciones de seguridad
+- ¿Volumen estimado de transacciones o concurrencia?
 
-### 4. Datos, Integraciones y Migración
-- Sistemas origen/destino
-- Estado de los datos (limpios, sucios, estructurados)
-- Volumen estimado
-- Estándares de calidad
-- Requerimientos de anonimización o encriptación
+DevOps / CI/CD
 
-### 5. UX/UI
-- Manual de marca o lineamientos
-- Prototipos necesarios
-- Accesibilidad (WCAG)
+- ¿Qué repositorio usa el cliente? (Git, GitLab, GitHub, SVN)
 
-### 6. Seguridad, Riesgos y Cumplimiento
-- Ethical Hacking: ¿requerido? ¿quién lo ejecuta?
-- Normativas (ISO, PCI, GDPR)
-- Restricciones para subcontratación o personal extranjero
-- Requisitos de ingreso físico a oficinas
-- Documentación de seguridad esperada
+- ¿Se permite CI/CD? (Jenkins, GitLab CI, Azure DevOps)
 
-### 7. Operación, Soporte y Mantenimiento
-- Horarios requeridos (8x5, 24x7…)
-- SLAs esperados
-- Backlog actual de tickets
-- Herramientas de gestión (Jira, ServiceNow…)
-- Necesidad de monitoreo/observabilidad
-- Gestión de incidentes/problemas/cambios
+- ¿Restricciones de seguridad para pipelines?
 
-### 8. Equipo, Roles y Modalidad de Trabajo
-- Perfiles solicitados
-- ¿Se permite talento de otras oficinas de TIVIT?
-- ¿Se aceptan experiencias internacionales?
-- Tiempo máximo de reposición ante rotación
-- Modalidad (remoto, presencial, híbrido)
-- ¿Exige PM, arquitecto, SM?
+Sistemas Existentes
 
-### 9. Gestión del Proyecto
-- Metodología solicitada (Ágil / Cascada / Híbrida)
-- ¿Se debe entregar un Plan de Proyecto formal?
-- Entregables obligatorios (plan de calidad, pruebas, manuales)
-- Interlocutores técnicos y funcionales
-- Proceso de validación y aprobación
+- Versiones específicas (ej: PHP, Oracle, Red Hat u otros).
 
-### 10. Aspectos Comerciales y Contractuales
-- ¿Existe presupuesto referencial?
-- Forma de facturación (hitos, mensual, T&M)
-- Penalidades por SLA
-- Boletas/pólizas requeridas
-- Plazos de pago
-- Condiciones de renovación
+- ¿Controles de versiones instalados?
 
+- ¿Ambientes realmente separados?
 
-# 🎯 **INSTRUCCIONES DE RESPUESTA**
-Debes generar un JSON con la siguiente estructura EXACTA:
+4. Datos, Integraciones y Migración
 
-{{"resumen_general": "...", "cumplimiento_por_categoria": {{ ... }} , "preguntas_criticas_para_el_cliente": [], "supuestos_recomendados": [], "riesgos_generales": []}}
+- ¿Qué sistemas serán origen/destino?
+
+- ¿Estado actual de los datos (limpios, sucios, estructurados)?
+
+- ¿Volumen aproximado de migración?
+
+- ¿Volumetría actual de operación?
+
+- ¿Requerimientos de calidad de datos?
+
+- ¿Necesidad de anonimización, encriptación o clasificación?
+
+- ¿Organismos externos involucrados?
+
+- ¿Documentación técnica de APIs externas?
+
+- ¿Acceso a estándares y documentación?
+
+- ¿Dimensionamiento de poder de cómputo necesario?
+
+5. UX/UI y Experiencia de Usuario
+
+- ¿El cliente posee manual de marca, guía de estilo o componentes?
+
+- ¿Se deben presentar prototipos (Figma u otro)?
+
+- ¿Existen criterios obligatorios de accesibilidad (WCAG)?
+
+- ¿Diseño existente o debe ser propuesto desde cero?
+
+6. Seguridad, Riesgos y Cumplimientos
+
+- ¿Debe realizarse Ethical Hacking? ¿Quién lo ejecuta?
+
+- ¿Normas obligatorias? (ISO 27001, PCI, GDPR, Ley de Datos…)
+
+- ¿Restricciones para subcontratación o personal extranjero?
+
+- ¿Controles para ingreso físico (acreditaciones, vacunas, permisos)?
+
+- ¿Debe incluirse documentación formal de seguridad?
+
+- ¿Políticas de backup, retención o recuperación ante desastres?
+
+7. Operación del Servicio, Soporte y Mantenimiento
+
+(Aplica a servicios administrados, soporte, operación continua o evolutivos.)
+
+- ¿Requerimientos de cobertura? (8x5, 24x7, guardias, turnos…)
+
+- ¿SLAs exigidos?
+
+- ¿Backlog actual o histórico de tickets?
+
+- ¿Herramientas de gestión requeridas? (Jira, ServiceNow, correo…)
+
+- ¿Se debe incluir monitoreo, alertas, observabilidad?
+
+- ¿Cómo se gestionan incidentes, problemas y cambios?
+
+- ¿Volumetría mensual para servicios evolutivos?
+
+- ¿Equipos portátiles los provee el cliente o el proveedor?
+
+8. Equipo, Roles y Modalidad de Trabajo
+
+- ¿Perfiles exigidos y cantidad por rol?
+
+- ¿Es válido ofrecer talento nearshore/offshore?
+
+- ¿Se aceptan experiencias internacionales como referencia?
+
+- ¿Tiempo máximo de reposición ante rotación?
+
+- ¿Requisitos de idioma?
+
+- ¿Trabajo remoto, híbrido o presencial?
+
+- ¿Se exige PM, Scrum Master, arquitecto, QA, etc.?
+
+- ¿Condiciones de ingreso a oficinas del cliente?
+
+9. Gestión del Proyecto
+
+- ¿Metodología solicitada? (Ágil, Cascada, Híbrida)
+
+- ¿Plan de proyecto formal requerido?
+
+- ¿Entregables obligatorios?
+(Plan de Calidad, Pruebas, Manuales, Capacitación, etc.)
+
+- ¿Interlocutores técnicos y funcionales?
+
+- ¿Proceso de aprobación de entregables?
+
+- ¿Herramientas de gestión obligatorias? (Jira, Trello, Azure DevOps)
+
+10. Aspectos Comerciales y Contractuales
+
+- ¿Presupuesto estimado?
+
+- Forma de facturación:
+
+- Por hitos
+
+Mensual
+
+Time & Materials
+
+- ¿Multas o penalidades por SLA?
+
+- ¿Boletas de garantía o pólizas requeridas?
+
+- ¿Plazos de pago?
+
+- ¿Moneda para cotización económica?
+
+- ¿Condiciones de renovación o extensión del contrato?
+
+Preguntas Comerciales Adicionales
+
+- ¿Qué licencias aprovisiona el cliente?
+
+- ¿Qué certificaciones exige el personal?
+
+- ¿Condiciones para costos de viaje?
+
+- ¿Condiciones para incorporación de personal extranjero?
+
+============================================================
+RESPONDE SOLO CON EL INFORME FINAL EN FORMATO CORPORATIVO.
 """
 
-def analyze_text_and_save(
-    text: str,
-    document_id: str,
-    file_name: str,
-    workspace_id: str,
-    user_id: Optional[str],
-    db: Session,
-    conversation_title: Optional[str] = None
-):
-    """
-    Analiza el texto con el Checklist Analyzer y guarda el resultado como mensaje del asistente
-    en una conversación del workspace.
 
-    Args:
-        text: Texto completo del documento.
-        document_id: ID del documento en la BD.
-        file_name: Nombre del archivo (para usar en el título).
-        workspace_id: Workspace donde crear la conversación.
-        user_id: ID del usuario dueño (puede ser None).
-        db: SQLAlchemy Session abierta (se usa la sesión del worker).
-        conversation_title: Título opcional de la conversación; si no, se genera uno.
+def analyze_document_for_suggestions(text: str, file_name: str) -> Tuple[str, str]:
     """
-    
-    
+    Procesa el texto con el Checklist Analyzer y retorna:
+
+    - short_message: mensaje breve para el chat inicial
+    - full_message: mensaje largo y estructurado con todo el análisis
+
+    Este análisis NO es JSON. Es texto bien formateado para mostrar al usuario.
+    """
+
+    # -----------------------------
+    # ENVIAR PROMPT AL MODELO LLM
+    # -----------------------------
+    provider = llm_service.get_provider()
+    logger.info("Checklist Analyzer: solicitando análisis al LLM...")
+
+    prompt = CHECKLIST_ANALYZER_PROMPT.format(document=text)
+
+    response_text = provider.generate_response(
+        query="",
+        context_chunks=[],
+        custom_prompt=prompt
+    )
+
+    # Guardamos el resultado completo por si necesitamos revisar fallos
+    full_message = response_text.strip()
+
+    # -----------------------------
+    #  EXTRAER RESUMEN GENERAL
+    # -----------------------------
+    resumen = "No se pudo extraer el resumen."
     try:
-        prompt = CHECKLIST_ANALYZER_PROMPT.format(document=text)
-
-        # Obtener provider directamente para pasar custom_prompt
-        provider = llm_service.get_provider()
-        logger.info("Checklist Analyzer: llamando al LLM para analizar documento")
-        response_text = provider.generate_response(query="", context_chunks=[], custom_prompt=prompt)
-
-        # Intentar parsear JSON (el prompt exige JSON)
-        parsed = None
-        try:
-            parsed = json.loads(response_text)
-        except Exception as e_json:
-            # Si falla, guardamos el texto crudo y una nota de error de parseo
-            logger.warning(f"Checklist Analyzer: no se pudo parsear JSON: {e_json}")
-            parsed = {
-                "resumen_general": response_text[:500],
-                "error": "No se pudo parsear la respuesta como JSON. Revisar raw_response."
-            }
-
-        # Preparar mensaje breve para el chat (meta-resumen)
-        resumen = parsed.get("resumen_general") if isinstance(parsed, dict) else None
-        preguntas = parsed.get("preguntas_criticas_para_el_cliente", []) if isinstance(parsed, dict) else []
-        preguntas_count = len(preguntas) if isinstance(preguntas, list) else (1 if preguntas else 0)
-
-        short_text = f"Analicé el documento '{file_name}'. {('Resumen: ' + resumen) if resumen else 'Resumen corto no disponible.'} "
-        # Añadir CTA para que el usuario pida ver las preguntas
-        if preguntas_count > 0:
-            short_text += f"He detectado {preguntas_count} preguntas sugeridas. ¿Quieres que te muestre las preguntas sugeridas ahora? Responde 'Sí' para verlas."
-        else:
-            short_text += "No pude identificar preguntas críticas automáticamente."
-
-        # Crear (o buscar) una conversación automática para este documento
-        conv_title = conversation_title or f"Checklist automático - {file_name}"
-        conversation = Conversation(workspace_id=workspace_id, title=conv_title)
-        db.add(conversation)
-        db.commit()
-        db.refresh(conversation)
-
-        # Guardar el mensaje corto del asistente (visible en chat)
-        assistant_short_msg = Message(
-            conversation_id=conversation.id,
-            role="assistant",
-            content=short_text
-        )
-        db.add(assistant_short_msg)
-        db.commit()
-
-        # Guardar también el JSON completo como mensaje invisiblemente accesible
-        # Lo guardamos en otro mensaje (puede ser usado por la UI para "mostrar checklist")
-        full_json_msg_content = f"[CHECKLIST_JSON]\n{json.dumps(parsed, ensure_ascii=False, indent=2)}"
-        assistant_full_msg = Message(
-            conversation_id=conversation.id,
-            role="assistant",
-            content=full_json_msg_content
-        )
-        db.add(assistant_full_msg)
-        db.commit()
-
-        logger.info(f"Checklist Analyzer: resultados guardados en conversación {conversation.id} (doc {document_id})")
-        return conversation.id
-
+        if "RESUMEN GENERAL" in response_text:
+            after_header = response_text.split("RESUMEN GENERAL")[1]
+            # Saltamos primer salto de línea y tomamos el párrafo siguiente
+            lines = after_header.strip().split("\n")
+            # Buscar primera línea que no esté vacía
+            for line in lines:
+                if line.strip():
+                    resumen = line.strip()
+                    break
     except Exception as e:
-        logger.error(f"Checklist Analyzer error: {e}", exc_info=True)
-        return None
+        logger.warning("No se pudo extraer el resumen: %s", e)
+
+    # -----------------------------
+    #  CONTAR PREGUNTAS CRÍTICAS
+    # -----------------------------
+    preguntas_count = 0
+    try:
+        if "PREGUNTAS CRÍTICAS" in response_text:
+            preguntas_section = response_text.split("PREGUNTAS CRÍTICAS")[1]
+            preguntas_lines = [
+                line for line in preguntas_section.split("\n")
+                if line.strip().startswith("- ")
+            ]
+            preguntas_count = len(preguntas_lines)
+    except Exception as e:
+        logger.warning("No se pudieron contar preguntas críticas: %s", e)
+
+    # -----------------------------
+    #   CONSTRUIR MENSAJE CORTO
+    # -----------------------------
+    short_message = (
+        f"🔍 He analizado tu documento **{file_name}**.\n\n"
+        f"📝 **Resumen breve:** {resumen}\n"
+    )
+
+    if preguntas_count > 0:
+        short_message += (
+            f"\nEncontré **{preguntas_count} vacíos importantes** en el documento "
+            f"que podrían afectar la propuesta.\n"
+            f"¿Deseas ver el análisis completo?"
+        )
+    else:
+        short_message += (
+            "\nNo encontré preguntas críticas relevantes, aunque sí realicé un análisis completo."
+        )
+
+    logger.info("Mensaje corto generado:\n%s", short_message)
+    logger.info("Mensaje largo generado:\n%s", full_message)
+
+    return short_message, full_message

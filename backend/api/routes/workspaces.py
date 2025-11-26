@@ -17,6 +17,7 @@ import csv
 import io
 from datetime import datetime
 import json
+from core.chat_router import handle_user_message
 
 # Rate Limiting
 from slowapi import Limiter
@@ -370,7 +371,7 @@ def get_workspace_documents(
     response_model=schemas.ChatResponse,
     summary="Procesar una pregunta de chat (Pipeline RAG Completo)"
 )
-@limiter.limit("5/minute")  # Máximo 5 consultas de chat por minuto
+@limiter.limit("5/minute")
 async def chat_with_workspace(
     request: Request,
     workspace_id: str,
@@ -379,170 +380,139 @@ async def chat_with_workspace(
     db: Session = Depends(database.get_db)
 ):
     """
-    Maneja una consulta de chat contra un workspace (Pipeline RAG Completo).
-    
-    Requiere autenticación. Solo el owner puede chatear con el workspace.
-    
-    Paso 1 (Retrieve):
-    - Busca en Qdrant los chunks más relevantes de este workspace.
-    
-    Paso 2 (Augment & Generate):
-    - Construye un prompt con la pregunta y los chunks.
-    - Llama al LLM (GPT-4o-mini) para obtener una respuesta en lenguaje natural.
+    Endpoint general de chat.
+    - Guarda el mensaje del usuario
+    - Realiza retrieval (RAG)
+    - Genera respuesta del LLM
+    - Guarda la respuesta del asistente
+    - **Activa lógica interna de sugerencias** (handle_user_message)
     """
-    
-    # 1. Verificar que el Workspace exista
+
+    # -------------------------------------------------------------
+    # 1. Verificar existencia y permisos del workspace
+    # -------------------------------------------------------------
     db_workspace = db.query(workspace_model.Workspace).filter(
         workspace_model.Workspace.id == workspace_id
     ).first()
-    
+
     if not db_workspace:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Workspace con id {workspace_id} no encontrado."
-        )
+        raise HTTPException(status_code=404, detail="Workspace no encontrado.")
 
-    # Verificar ownership
     if db_workspace.owner_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permiso para chatear con este workspace."
-        )
+        raise HTTPException(status_code=403, detail="No autorizado.")
 
-    try:
-        # 2. Obtener o crear conversación
-        conversation = None
-        if chat_request.conversation_id:
-            conversation = db.query(Conversation).filter(
+    # -------------------------------------------------------------
+    # 2. Obtener o crear conversación
+    # -------------------------------------------------------------
+    if chat_request.conversation_id:
+        conversation = (
+            db.query(Conversation)
+            .filter(
                 Conversation.id == chat_request.conversation_id,
                 Conversation.workspace_id == workspace_id
-            ).first()
-            if not conversation:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversación no encontrada.")
-        else:
-            title = chat_request.query[:50] + "..." if len(chat_request.query) > 50 else chat_request.query
-            conversation = Conversation(workspace_id=workspace_id, title=title)
-            db.add(conversation)
-            db.commit()
-            db.refresh(conversation)
-
-        # Guardar mensaje del usuario
-        user_message = Message(conversation_id=conversation.id, role="user", content=chat_request.query)
-        db.add(user_message)
-        db.commit()
-
-        # Recuperación (Retrieve) con top_k dinámico
-        query_length = len(chat_request.query.split())
-        top_k = 15 if query_length > 20 else 10
-
-        # Búsqueda en servicio RAG externo (si está habilitado)
-        if settings.RAG_SERVICE_ENABLED and rag_client:
-            try:
-                rag_results = await rag_client.search(
-                    query=chat_request.query,
-                    workspace_id=workspace_id,
-                    limit=top_k,
-                    threshold=0.25  # Threshold más bajo para consultas genéricas
-                )
-                
-                # Convertir resultados RAG a formato DocumentChunk
-                relevant_chunks = [
-                    schemas.DocumentChunk(
-                        document_id=result.document_id,
-                        chunk_text=result.content,
-                        chunk_index=0,  # El servicio externo puede no tener índice
-                        score=result.score
-                    ) for result in rag_results
-                ]
-            except Exception as e:
-                print(f"ERROR usando RAG externo: {e}")
-                # Fallback: retornar mensaje de error
-                relevant_chunks = []
-        else:
-            # TODO: Implementar fallback o retornar error
-            print("ADVERTENCIA: RAG_SERVICE_ENABLED=false, servicio RAG no disponible")
-            relevant_chunks = []
-
-        # Si no hay chunks, devolver mensaje informativo
-        if not relevant_chunks:
-            print(f"CHAT: No hay documentos RAG disponibles, continuando con chat directo (sin contexto)")
-            # Permitir chat directo sin contexto de documentos
-            # El LLM responderá basándose solo en su conocimiento general
-            relevant_chunks = []  # Lista vacía, el LLM responderá sin contexto
-
-        # Enriquecer contexto con datos de TIVIT si es relevante (OPTIMIZADO)
-        query_lower = chat_request.query.lower()
-        if any(keyword in query_lower for keyword in ["armar equipo", "equipo", "trabajadores", "personal", "staff"]):
-            try:
-                # Extraer keywords para filtrado inteligente
-                query_keywords = extract_query_keywords(chat_request.query)
-                
-                # Obtener chunks cacheados y filtrados
-                tivit_chunks = get_cached_tivit_chunks(query_keywords)
-                
-                # Agregar chunks al contexto (limitado a 12 para no sobrecargar)
-                relevant_chunks.extend(tivit_chunks[:12])
-                
-                print(f"TIVIT: Agregados {len(tivit_chunks[:12])} chunks filtrados para keywords: {query_keywords}")
-                    
-            except Exception as e:
-                print(f"Error cargando datos TIVIT optimizados: {e}")
-                # Continuar sin datos adicionales
-
-        # Generador para streaming NDJSON
-        def stream_response_generator(conversation_id, relevant_chunks):
-            # Emitir fuentes/metadatos primero
-            sources_data = [
-                schemas.DocumentChunk(
-                    document_id=chunk.document_id,
-                    chunk_text=chunk.chunk_text,
-                    chunk_index=chunk.chunk_index,
-                    score=chunk.score,
-                ).model_dump() for chunk in relevant_chunks
-            ]
-
-            # Determinar qué modelo se está usando
-            model_used = chat_request.model or "gpt-4o-mini"  # Default
-            print(f"API_CHAT: Modelo solicitado: '{chat_request.model}', usando: '{model_used}'")
-            model_name_display = {
-                "gpt-4o-mini": "GPT-4o Mini"
-            }.get(model_used, model_used)
-
-            yield json.dumps({
-                "type": "sources",
-                "relevant_chunks": sources_data,
-                "conversation_id": conversation_id,
-                "model_used": model_name_display
-            }) + "\n"
-
-            full_response_text = ""
-            try:
-                for token in llm_service.generate_response_stream(chat_request.query, relevant_chunks, chat_request.model):
-                    full_response_text += token
-                    yield json.dumps({"type": "content", "text": token}) + "\n"
-            except Exception as e:
-                print(f"API_CHAT: Error durante streaming: {e}")
-                yield json.dumps({"type": "error", "detail": str(e)}) + "\n"
-                return
-
-            # Guardar mensaje del asistente al final del stream
-            try:
-                with database.SessionLocal() as db_session:
-                    assistant_message = Message(conversation_id=conversation_id, role="assistant", content=full_response_text)
-                    db_session.add(assistant_message)
-                    db_session.commit()
-                    print(f"API_CHAT: Respuesta guardada para conversación {conversation_id}")
-            except Exception as e:
-                print(f"API_CHAT: Error guardando historial: {e}")
-
-        return StreamingResponse(stream_response_generator(conversation.id, relevant_chunks), media_type="application/x-ndjson")
-        
-    except Exception as e:
-        print(f"API_CHAT: Error al procesar el chat: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al procesar la solicitud de chat: {e}"
+            )
+            .first()
         )
+        if not conversation:
+            raise HTTPException(status_code=404, detail="Conversación no encontrada.")
+    else:
+        title = (
+            chat_request.query[:50] + "..."
+            if len(chat_request.query) > 50 else chat_request.query
+        )
+        conversation = Conversation(workspace_id=workspace_id, title=title)
+        db.add(conversation)
+        db.commit()
+        db.refresh(conversation)
+
+    # -------------------------------------------------------------
+    # 3. Guardar mensaje del usuario en la BD
+    # -------------------------------------------------------------
+    user_message = Message(
+        conversation_id=conversation.id,
+        role="user",
+        content=chat_request.query
+    )
+    db.add(user_message)
+    db.commit()
+
+  
+
+    # -------------------------------------------------------------
+    # 5. Retrieval dinámico
+    # -------------------------------------------------------------
+    query_length = len(chat_request.query.split())
+    top_k = 15 if query_length > 20 else 10
+
+    relevant_chunks = []
+    if settings.RAG_SERVICE_ENABLED and rag_client:
+        try:
+            rag_results = await rag_client.search(
+                query=chat_request.query,
+                workspace_id=workspace_id,
+                limit=top_k,
+                threshold=0.25
+            )
+            relevant_chunks = [
+                schemas.DocumentChunk(
+                    document_id=r.document_id,
+                    chunk_text=r.content,
+                    chunk_index=0,
+                    score=r.score
+                ) for r in rag_results
+            ]
+        except Exception as e:
+            print(f"ERROR RAG: {e}")
+
+    # -------------------------------------------------------------
+    # 6. Streaming de respuesta del modelo
+    # -------------------------------------------------------------
+    def stream_response_generator(conversation_id, relevant_chunks):
+        sources_data = [
+            chunk.model_dump() for chunk in relevant_chunks
+        ]
+
+        model_used = chat_request.model or "gpt-4o-mini"
+
+        yield json.dumps({
+            "type": "sources",
+            "relevant_chunks": sources_data,
+            "conversation_id": conversation_id,
+            "model_used": model_used
+        }) + "\n"
+
+        full_response_text = ""
+
+        try:
+            for token in llm_service.generate_response_stream(
+                chat_request.query,
+                relevant_chunks,
+                chat_request.model
+            ):
+                full_response_text += token
+                yield json.dumps({"type": "content", "text": token}) + "\n"
+
+        except Exception as e:
+            yield json.dumps({"type": "error", "detail": str(e)}) + "\n"
+            return
+
+        # Guardar respuesta del asistente
+        with database.SessionLocal() as db_session:
+            msg = Message(
+                conversation_id=conversation_id,
+                role="assistant",
+                content=full_response_text
+            )
+            db_session.add(msg)
+            db_session.commit()
+
+    return StreamingResponse(
+        stream_response_generator(conversation.id, relevant_chunks),
+        media_type="application/x-ndjson"
+    )
+
+
+
 
 @router.get(
     "/workspaces/{workspace_id}",

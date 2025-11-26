@@ -12,11 +12,11 @@ class Conversation(Base):
     
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     workspace_id = Column(String(36), ForeignKey("workspaces.id"), nullable=False)
-    title = Column(String(255), nullable=False)  # Generado automáticamente del primer mensaje
+    title = Column(String(255), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
-    # ÍNDICES para optimización de consultas
+    # ÍNDICES
     __table_args__ = (
         Index('idx_workspace_updated', 'workspace_id', 'updated_at'),
     )
@@ -24,6 +24,13 @@ class Conversation(Base):
     # Relaciones
     workspace = relationship("Workspace", back_populates="conversations")
     messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan")
+
+    # 🔥 NUEVA RELACIÓN: documentos procesados que reportan a esta conversación
+    documents = relationship(
+        "Document",
+        back_populates="conversation",
+        passive_deletes=True
+    )
 
 
 class Message(Base):
@@ -34,12 +41,12 @@ class Message(Base):
     
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     conversation_id = Column(String(36), ForeignKey("conversations.id"), nullable=False)
-    role = Column(String(20), nullable=False)  # 'user' o 'assistant'
+    role = Column(String(20), nullable=False)
     content = Column(Text, nullable=False)
-    chunk_references = Column(Text, nullable=True)  # JSON string de los chunks usados
+    chunk_references = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     
-    # ÍNDICES para optimización de consultas
+    # ÍNDICES
     __table_args__ = (
         Index('idx_conversation_created', 'conversation_id', 'created_at'),
         Index('idx_role', 'role'),
