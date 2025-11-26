@@ -1,147 +1,76 @@
-# Sistema de Asistente RAG "Velvet" (Caso 01)
+# 🚀 Caso01 Backend
 
-Este repositorio contiene el código fuente de un sistema de Inteligencia Artificial para consulta de documentos internos. Utiliza un pipeline de **RAG (Retrieval-Augmented Generation)** para analizar y responder preguntas sobre documentos (como propuestas comerciales) utilizando LLMs.
+Backend robusto y escalable para la plataforma de análisis de documentos con IA.
 
-El proyecto está completamente contenedorizado con Docker.
+## 🏗 Arquitectura
 
-## 🚀 Stack Tecnológico
+El sistema está construido sobre una arquitectura moderna y modular:
 
-El sistema está dividido en dos servicios principales (backend y frontend) y cuatro servicios de soporte.
+- **API Framework**: FastAPI (Python 3.10+)
+- **Base de Datos**: MySQL (Datos relacionales)
+- **Cola de Tareas**: Celery + Redis (Procesamiento asíncrono)
+- **Cache**: Redis
+- **LLM Engine**: Sistema Multi-LLM con Routing Inteligente
 
-* **Backend:**
-    * **Framework:** FastAPI (Python)
-    * **Procesamiento Asíncrono:** Celery
-    * **LLM:** Google Gemini (conectado vía API)
-    * **Embeddings:** `all-MiniLM-L6-v2` (vía `sentence-transformers`)
-    * **ORM:** SQLAlchemy
-    * **Parsing de Documentos:** `PyPDF2`, `python-docx`, `pandas`
+## 🧠 Sistema LLM
 
-* **Frontend:**
-    * **Framework:** Next.js 14 (App Router)
-    * **Lenguaje:** TypeScript
-    * **UI:** Tailwind CSS
-    * **Componentes:** shadcn/ui
+El backend utiliza OpenAI GPT-4o-mini para todas las tareas de IA:
 
-* **Infraestructura (Servicios):**
-    * **Contenedores:** Docker Compose
-    * **Base de Datos (Metadatos):** MySQL 8.0
-    * **Base de Datos (Vectores):** Qdrant
-    * **Broker de Tareas:** Redis
+- **GPT-4o-mini (OpenAI)**: 
+   - *Rol*: Modelo Principal (Chat, Respuestas rápidas, Análisis general, Generación de documentos)
+   - *Ventaja*: Rápido, económico, alta calidad.
 
-## 📋 Prerrequisitos
+## 🛠 Configuración
 
-Para ejecutar este proyecto, solo necesitará tener instalados:
+1. **Variables de Entorno**:
+   Copiar `.env.example` a `.env` y configurar las claves:
+   ```bash
+   cp .env.example .env
+   ```
+   
+   Claves críticas:
+   - `OPENAI_API_KEY`: Para modelo GPT-4o-mini.
+   - `DATABASE_URL`: Conexión a MySQL.
+   - `REDIS_URL`: Conexión a Redis.
 
-* [Docker](https://www.docker.com/products/docker-desktop/)
-* [Git](https://git-scm.com/)
+2. **Instalación de Dependencias**:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-## ⚙️ Guía de Instalación y Ejecución
+3. **Ejecución**:
+   ```bash
+   # Servidor de Desarrollo
+   uvicorn main:app --reload
+   
+   # Worker de Celery (en otra terminal)
+   celery -A core.celery_app worker --loglevel=info
+   ```
 
-Siga estos pasos para levantar el entorno de desarrollo completo.
-
-### 1. Clonar el Repositorio
-
-```bash
-git clone https://github.com/ivanbalandracamacho/caso01.git
-cd Caso01-dev
-```
-
-### 2. Configurar Variables de Entorno
-
-Este proyecto requiere dos archivos `.env`.
-
-#### A. Archivo Raíz (`.env`)
-Utilizado por `docker-compose.yml` para configurar la base de datos MySQL.
-
-Cree un archivo llamado `.env` en la raíz del proyecto con el siguiente contenido:
-
-```ini
-MYSQL_DATABASE=ia_db
-MYSQL_USER=admin
-MYSQL_PASSWORD=supersecret
-MYSQL_ROOT_PASSWORD=supersecret_root
-```
-
-#### B. Archivo de Backend (`backend/.env`)
-Usado por FastAPI y el worker de Celery.
-
-Cree un archivo llamado `.env` dentro de la carpeta `backend` con el siguiente contenido:
-
-```ini
-# Consiga su clave de API en Google AI Studio
-GEMINI_API_KEY="AIzaSy...tu-clave-aqui"
-ACTIVE_LLM_SERVICE="GEMINI"
-```
-
-### 3. Construir y Ejecutar los Contenedores
-
-Una vez configurados los archivos `.env`, puede construir e iniciar todos los servicios:
-
-```bash
-docker-compose up --build -d
-```
-
-**Flags útiles:**  
-`--build`: Fuerza la construcción de las imágenes (necesario la primera vez).  
-`-d`: Ejecuta los contenedores en segundo plano.
-
-**Solución de problemas:** Si experimenta errores de caché durante la construcción:
-
-```bash
-docker-compose build --no-cache
-docker-compose up -d
-```
-
-### 4. Acceder a la Aplicación
-
-Una vez que los contenedores estén en funcionamiento:
-
-- **Frontend (UI):** http://localhost:3000  
-- **Backend (API Docs):** http://localhost:8000/docs  
-- **Qdrant (Vector DB UI):** http://localhost:6333/dashboard  
-
-## 📁 Estructura del Repositorio
+## 📂 Estructura del Proyecto
 
 ```
-.
-├── backend/
-│   ├── api/
-│   │   └── routes/         # Endpoints (health.py, workspaces.py)
-│   ├── core/               # Lógica central (celery_app.py, config.py, llm_service.py)
-│   ├── models/             # Definiciones de datos (database.py, document.py, schemas.py)
-│   ├── processing/         # Lógica RAG (parser.py, tasks.py, vector_store.py)
-│   ├── temp_uploads/       # Almacenamiento temporal de archivos
-│   ├── .env                # Claves de API (requiere creación manual)
-│   ├── Dockerfile          # Instrucciones del contenedor Backend/Celery
-│   ├── main.py             # Punto de entrada de FastAPI
-│   └── requirements.txt    # Dependencias de Python
-│
-├── frontend/
-│   ├── public/             # Assets estáticos
-│   ├── src/
-│   │   ├── app/            # Páginas y layouts de Next.js (page.tsx, layout.tsx)
-│   │   ├── components/     # Componentes de React (sidebar.tsx, chat-area.tsx)
-│   │   │   └── ui/         # Componentes Shadcn (button.tsx, select.tsx, etc.)
-│   │   └── lib/            # Utilidades (utils.ts)
-│   ├── .dockerignore       # Ignora node_modules en el build de Docker
-│   ├── Dockerfile          # Instrucciones del contenedor Frontend
-│   ├── next.config.mjs     # Configuración de Next.js (con 'output: standalone')
-│   ├── package.json        # Dependencias de Node.js
-│   └── tailwind.config.ts  # Configuración de Tailwind (con colores brand)
-│
-├── .env                    # Contraseñas de BD (requiere creación manual)
-└── docker-compose.yml      # Orquesta todos los servicios
+backend/
+├── api/                # Endpoints de la API
+│   └── routes/         # Rutas organizadas por recurso
+├── core/               # Lógica central
+│   ├── providers/      # Integración con OpenAI
+│   ├── llm_router.py   # Lógica de selección de modelos
+│   └── llm_service.py  # Servicio unificado de LLM
+├── models/             # Modelos de base de datos (SQLAlchemy)
+├── processing/         # Tareas asíncronas (Celery)
+└── main.py             # Punto de entrada de la aplicación
 ```
 
-## 🕹️ Flujo de Trabajo (Cómo Probar)
+## 🔒 Seguridad
 
-Puede probar el pipeline completo usando la documentación de la API:
+- **Autenticación**: JWT (JSON Web Tokens).
+- **Rate Limiting**: Protección contra abuso de API.
+- **Validación**: Pydantic para validación estricta de datos.
+- **CORS**: Configurado para permitir solo orígenes confiables.
 
-1. Vaya a http://localhost:8000/docs  
-2. Use el endpoint **POST /api/v1/workspaces** para crear un nuevo workspace  
-3. Copie el `id` del workspace de la respuesta  
-4. Use el endpoint **POST /api/v1/workspaces/{workspace_id}/upload** para subir un archivo (ej. PDF)  
-5. Espere unos segundos a que el `ia_celery_worker` procese el archivo  
-   (puede monitorear esto con `docker-compose logs -f celery_worker`)  
-6. Use el endpoint **POST /api/v1/workspaces/{workspace_id}/chat** para hacer una pregunta sobre su documento  
-7. Revise la respuesta JSON: contendrá la `llm_response` (respuesta de Gemini) y los `relevant_chunks` (contexto de Qdrant)
+## 📄 Documentación API
+
+Una vez iniciado el servidor, visitar:
+- Swagger UI: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`

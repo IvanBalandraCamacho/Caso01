@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone', // <-- AÑADIR ESTA LÍNEA
+  output: 'standalone',
 };
 
 export default nextConfig;

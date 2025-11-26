@@ -11,12 +11,14 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useWorkspaces } from "@/context/WorkspaceContext";
-import { FileText, UploadCloud, X, Loader2, CheckCircle, AlertTriangle } from "lucide-react"; // <-- AÑADIDO: AlertTriangle
+import { FileText, UploadCloud, X, Loader2, CheckCircle, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { uploadDocumentApi } from "@/lib/api";
 
 interface UploadModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
 type FileUploadStatus = "pending" | "uploading" | "success" | "error";
@@ -27,7 +29,7 @@ interface UploadableFile {
   errorMessage?: string; // <-- AÑADIDO: Para mostrar errores
 }
 
-export function UploadModal({ isOpen, onClose }: UploadModalProps) {
+export function UploadModal({ isOpen, onClose, onSuccess }: UploadModalProps) {
   const { activeWorkspace } = useWorkspaces();
   const [files, setFiles] = useState<UploadableFile[]>([]);
 
@@ -70,34 +72,25 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
         formData.append("file", uploadableFile.file);
 
         try {
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-          const response = await fetch(
-            `${apiUrl}/api/v1/workspaces/${activeWorkspace.id}/upload`,
-            {
-              method: "POST",
-              body: formData,
-            }
-          );
-
-          if (!response.ok) {
-            // --- CORRECCIÓN CRÍTICA ---
-            // Capturar el error del backend si no fue 2xx
-            const errorData = await response.json();
-            throw new Error(errorData.detail || "Error al subir el archivo");
-            // --------------------------
-          }
+          await uploadDocumentApi(activeWorkspace.id, formData);
           
           // 2. Marcar como "success"
           setFiles(prev => prev.map(f => 
             f.file.name === uploadableFile.file.name ? { ...f, status: 'success' } : f
           ));
 
-        } catch (error: any) {
+          // 3. Notificar éxito para refrescar lista
+          if (onSuccess) {
+            onSuccess();
+          }
+
+        } catch (error) {
           console.error("Error en la subida:", error);
+          const errorMessage = error instanceof Error ? error.message : "Error al subir el archivo";
           // 3. Marcar como "error" y guardar el mensaje
           setFiles(prev => prev.map(f => 
             f.file.name === uploadableFile.file.name 
-              ? { ...f, status: 'error', errorMessage: error.message } 
+              ? { ...f, status: 'error', errorMessage } 
               : f
           ));
         }
@@ -156,7 +149,10 @@ export function UploadModal({ isOpen, onClose }: UploadModalProps) {
                 <div className="flex flex-col">
                   <div className="flex items-center gap-2">
                     <FileText className="h-5 w-5 text-gray-300" />
-                    <span className="text-sm text-gray-300">{file.name}</span>
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-300">{file.name}</span>
+                      <span className="text-xs text-gray-500 uppercase">{file.type || file.name.split('.').pop()}</span>
+                    </div>
                   </div>
                   {/* --- AÑADIDO: Mostrar mensaje de error --- */}
                   {status === 'error' && (

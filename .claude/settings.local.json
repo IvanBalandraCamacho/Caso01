@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm ls --depth=0)",
+      "Bash(sort:*)",
+      "Bash(next build --debug)",
+      "Bash(npm prune -f)",
+      "Bash(npm audit fix)",
+      "Bash(npm run build)",
+      "Bash(npx next build --debug)",
+      "Bash(npm i -D @types/lucide-react)",
+      "Bash(npm run lint -- --fix)",
+      "Bash(git rev-parse --show-toplevel)",
+      "Bash(docker compose ps)",
+      "Bash(python:*)",
+      "Bash(npm run lint)",
+      "Bash(git rev-parse --git-dir)",
+      "Bash(cat:*)",
+      "Bash(npm install)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(docker compose restart frontend)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

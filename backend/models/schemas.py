@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from datetime import datetime, timezone # <-- AÑADIR timezone
 import uuid
 import mimetypes
@@ -42,6 +42,7 @@ class DocumentPublic(DocumentBase):
     status: str
     chunk_count: int
     created_at: datetime
+    insights_conversation_id: str | None = None   # <-- NUEVO
     
     class Config:
         from_attributes = True
@@ -51,11 +52,25 @@ class DocumentPublic(DocumentBase):
         """Helper para crear un DocumentPublic desde un UploadFile."""
         file_type = mimetypes.guess_type(file.filename)[0] or "unknown"
         
-        simple_file_type = file_type.split('/')[-1]
-        if "openxmlformats-officedocument.wordprocessingml.document" in simple_file_type:
-            simple_file_type = "docx"
-        elif "openxmlformats-officedocument.spreadsheetml.sheet" in simple_file_type:
-            simple_file_type = "xlsx"
+        # Mapear tipos MIME a extensiones simples
+        mime_to_extension = {
+            "application/pdf": "pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+            "application/msword": "doc",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+            "application/vnd.ms-excel": "xls",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+            "application/vnd.ms-powerpoint": "ppt",
+            "text/csv": "csv",
+            "text/plain": "txt",
+        }
+        
+        simple_file_type = mime_to_extension.get(file_type, file_type.split('/')[-1] if file_type != "unknown" else "unknown")
+        
+        # Si aún no se pudo determinar, extraer del nombre del archivo
+        if simple_file_type == "unknown" and file.filename:
+            extension = file.filename.rsplit('.', 1)[-1].lower()
+            simple_file_type = extension if extension != file.filename else "unknown"
         
         return cls(
             id="temp-id",
@@ -73,6 +88,16 @@ class DocumentPublic(DocumentBase):
 class ChatRequest(BaseModel):
     """Schema para la pregunta del usuario."""
     query: str
+    conversation_id: str | None = None  # Opcional: ID de conversación existente
+    model: str | None = None  # Opcional: modelo LLM a usar (gpt-4o-mini)
+    
+    @validator('query')
+    def query_must_not_be_empty(cls, v):
+        if not v or not v.strip():
+            raise ValueError('La consulta no puede estar vacía')
+        if len(v.strip()) < 3:
+            raise ValueError('La consulta debe tener al menos 3 caracteres')
+        return v.strip()
     
 class DocumentChunk(BaseModel):
     """Representa un chunk de contexto recuperado."""
@@ -86,8 +111,103 @@ class ChatResponse(BaseModel):
     query: str
     llm_response: str
     relevant_chunks: list[DocumentChunk]
+    conversation_id: str  # ID de la conversación creada o usada
     
 class WorkspaceUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
     instructions: str | None = None
+
+# --- Conversation Schemas ---
+
+class MessageCreate(BaseModel):
+    """Schema para crear un mensaje."""
+    role: str  # 'user' o 'assistant'
+    content: str
+    chunk_references: str | None = None
+
+class MessagePublic(BaseModel):
+    """Schema para devolver un mensaje."""
+    id: str
+    conversation_id: str
+    role: str
+    content: str
+    chunk_references: str | None = None
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class ConversationCreate(BaseModel):
+    """Schema para crear una conversación."""
+    title: str
+
+class ConversationUpdate(BaseModel):
+    """Schema para actualizar una conversación."""
+    title: str
+
+class ConversationPublic(BaseModel):
+    """Schema para devolver una conversación."""
+    id: str
+    workspace_id: str
+    title: str
+    created_at: datetime
+    updated_at: datetime
+    message_count: int = 0  # Calculado
+    
+    class Config:
+        from_attributes = True
+
+class ConversationWithMessages(ConversationPublic):
+    """Schema para conversación con todos sus mensajes."""
+    messages: list[MessagePublic] = []
+
+# ========================
+# Document Generation Schemas
+# ========================
+
+# --- Schemas para Generación de Documentos Descargables ---
+
+class GenerateDownloadableDocRequest(BaseModel):
+    """Schema para solicitar generación de documento descargable."""
+    format: str = "markdown"  # 'txt', 'markdown', 'pdf'
+    document_type: str = "complete"  # 'complete', 'summary', 'key_points'
+    include_metadata: bool = True
+    custom_instructions: str | None = None
+
+class DownloadableDocumentResponse(BaseModel):
+    """Schema para respuesta de documento descargable."""
+    content: str
+    filename: str
+    format: str
+    word_count: int
+    message: str
+
+
+# --- User Schemas (Autenticación) ---
+
+class UserBase(BaseModel):
+    email: str
+    full_name: str | None = None
+
+class UserCreate(UserBase):
+    password: str
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class UserPublic(UserBase):
+    id: str
+    is_active: bool
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+class TokenData(BaseModel):
+    email: str | None = None

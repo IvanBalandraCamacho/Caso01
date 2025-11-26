@@ -1,85 +1,95 @@
-import google.generativeai as genai
+"""
+LLM Service - Factory for OpenAI provider.
+Provides a unified interface to OpenAI LLM backend.
+
+Sistema LLM:
+- OpenAI GPT-4o-mini: Para todas las tareas
+"""
+from typing import List, Generator
 from core.config import settings
+from core.providers import LLMProvider, OpenAIProvider
+from core.llm_router import LLMRouter, TaskType
 from models.schemas import DocumentChunk
+import logging
 
-# Configurar el cliente de Google AI
-print("LLM_SERVICE: Configurando el cliente de Gemini...")
-genai.configure(api_key=settings.GEMINI_API_KEY)
+logger = logging.getLogger(__name__)
 
-# Configuración de generación y seguridad
-generation_config = {
-  "temperature": 0.2, # Un valor bajo para respuestas más consistentes y basadas en hechos
-  "top_p": 1,
-  "top_k": 1,
-  "max_output_tokens": 2048,
-}
+# Global provider instances
+_providers = {}
+_router = None
 
-safety_settings = [
-  {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-  {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-  {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-  {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-]
 
-# Inicializar el modelo
-try:
-    model = genai.GenerativeModel(model_name="gemini-2.5-flash", # Usamos el modelo estándar
-                                  generation_config=generation_config,
-                                  safety_settings=safety_settings)
-    print("LLM_SERVICE: Modelo Gemini 'gemini-2.5-flash' cargado.")
-except Exception as e:
-    print(f"LLM_SERVICE: ERROR al cargar el modelo Gemini: {e}")
-    model = None
-
-def _build_prompt(query: str, context_chunks: list[DocumentChunk]) -> str:
+def initialize_providers():
     """
-    Construye el prompt para el LLM, combinando la consulta y el contexto.
+    Inicializa el provider de OpenAI.
     """
+    global _providers, _router
     
-    # 1. Formatear el contexto
-    context_string = ""
-    for i, chunk in enumerate(context_chunks):
-        context_string += f"--- Contexto Chunk {i+1} (del Documento {chunk.document_id}) ---\n"
-        context_string += chunk.chunk_text
-        context_string += "\n--------------------------------------------------\n\n"
+    logger.info("Inicializando sistema LLM con OpenAI...")
+    
+    # 1. OpenAI GPT-4o-mini
+    if hasattr(settings, 'OPENAI_API_KEY') and settings.OPENAI_API_KEY:
+        try:
+            _providers["gpt4o_mini"] = OpenAIProvider(
+                api_key=settings.OPENAI_API_KEY,
+                model_name="gpt-4o-mini"
+            )
+            logger.info("✅ OpenAI GPT-4o-mini inicializado")
+        except Exception as e:
+            logger.error(f"❌ Error OpenAI GPT-4o-mini: {e}")
+    
+    # Inicializar router
+    _router = LLMRouter()
+    logger.info("✅ LLM Router inicializado")
+    
+    logger.info(f"Sistema LLM listo con {len(_providers)} providers")
+
+
+def get_provider(model_name: str = None, task_type: str = None) -> LLMProvider:
+    """
+    Obtiene el provider de OpenAI.
+    
+    Args:
+        model_name: Nombre específico del modelo (opcional)
+        task_type: Tipo de tarea (opcional, ignorado ya que solo hay uno)
         
-    # 2. Crear el prompt final
-    prompt = f"""
-    Eres un asistente de IA experto en analizar documentos. Tu tarea es responder la pregunta del usuario basándote ÚNICA Y EXCLUSIVAMENTE en el contexto proporcionado.
-    
-    No utilices ningún conocimiento externo. Si la respuesta no se encuentra en el contexto, di "No encontré información suficiente en los documentos para responder a esa pregunta."
-    
-    =========================
-    CONTEXTO PROPORCIONADO:
-    {context_string}
-    =========================
-    
-    PREGUNTA DEL USUARIO:
-    {query}
-    
-    RESPUESTA:
+    Returns:
+        OpenAIProvider instance
     """
-    return prompt
+    if not _providers:
+        initialize_providers()
+    
+    # Siempre retornar GPT-4o-mini
+    return _providers.get("gpt4o_mini")
 
-def generate_response(query: str, context_chunks: list[DocumentChunk]) -> str:
-    """
-    Genera una respuesta de lenguaje natural usando el LLM.
-    """
-    if model is None:
-        return "Error: El modelo LLM no se inicializó correctamente."
 
-    # 1. Construir el prompt
-    prompt = _build_prompt(query, context_chunks)
+def generate_response(query: str, context_chunks: List[DocumentChunk], model_override: str = None) -> str:
+    """
+    Genera una respuesta usando el LLM apropiado.
     
-    print(f"LLM_SERVICE: Enviando prompt a Gemini (longitud: {len(prompt)})...")
-    
-    try:
-        # 2. Llamar a la API de Gemini
-        response = model.generate_content(prompt)
+    Args:
+        query: Pregunta del usuario
+        context_chunks: Documentos relevantes del RAG
+        model_override: Modelo específico a usar (opcional)
         
-        print("LLM_SERVICE: Respuesta recibida de Gemini.")
-        return response.text
+    Returns:
+        Respuesta generada
+    """
+    provider = get_provider(model_name=model_override)
+    return provider.generate_response(query, context_chunks)
+
+
+def generate_response_stream(query: str, context_chunks: List[DocumentChunk], model_override: str = None) -> Generator[str, None, None]:
+    """
+    Genera una respuesta en streaming usando el LLM apropiado.
     
-    except Exception as e:
-        print(f"LLM_SERVICE: Error durante la generación de contenido: {e}")
-        return f"Error al contactar la API de Gemini: {e}"
+    Args:
+        query: Pregunta del usuario
+        context_chunks: Documentos relevantes del RAG
+        model_override: Modelo específico a usar (opcional)
+        
+    Yields:
+        Fragmentos de la respuesta
+    """
+    provider = get_provider(model_name=model_override)
+    return provider.generate_response_stream(query, context_chunks)

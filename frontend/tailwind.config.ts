@@ -19,15 +19,15 @@ const config: Config = {
     },
     extend: {
       fontFamily: {
-        sans: ["Roboto", "sans-serif"],
+        sans: ["Inter", "Roboto", "sans-serif"],
       },
       colors: {
         brand: {
-          red: "#DC2626",
-          dark: "#111111",
-          "dark-secondary": "#1E1E1E",
-          light: "#FFFFFF",
-          "light-secondary": "#F9FAFB",
+          red: "#7F1D1D",
+          dark: "#1F2937",
+          "dark-secondary": "#374151",
+          light: "#F9FAFB",
+          "light-secondary": "#F3F4F6",
         },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -62,6 +62,8 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        success: "hsl(var(--success))",
+        danger: "hsl(var(--danger))",
       },
       borderRadius: {
         lg: "var(--radius)",

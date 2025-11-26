@@ -1,11 +1,39 @@
-# Python
+# ===== PYTHON =====
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+
+# Entornos virtuales
 .venv/
 venv/
-.env
 
-# Next.js / Node.js
-/frontend/.next/
-/frontend/node_modules/
-/frontend/out/
+# Config y entorno
+.env
+*.env
+
+# Archivos temporales
+*.log
+*.tmp
+
+# Uploads temporales del backend
+backend/temp_uploads/
+
+# Documentos que no deberían entrar al repo
+*.docx
+
+# ===== NEXT.JS / NODE =====
+frontend/.next/
+frontend/node_modules/
+frontend/out/
+frontend/.turbo/
+frontend/.vercel/
+
+# ===== EDITORES =====
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store

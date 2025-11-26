@@ -8,6 +8,13 @@ python-multipart
 # --- Configuración ---
 pydantic-settings
 
+# --- Seguridad ---
+pyjwt
+passlib[bcrypt]
+bcrypt==4.0.1
+slowapi  # Rate limiting
+python-jose[cryptography]  # JWT tokens
+
 # --- Base de datos y Cache ---
 pymysql
 cryptography  # Requerido por PyMySQL
@@ -15,17 +22,18 @@ sqlalchemy
 redis
 celery
 
-# --- IA y RAG ---
-langchain-text-splitters  # <-- CAMBIO: Paquete separado en LangChain 0.1+
-langchain-core
-qdrant-client
-google-generativeai
-sentence-transformers
+# --- IA y LLM ---
+openai>=1.54.0  # Cliente requerido para OpenAI
+tenacity>=8.0.0  # Para retry logic en llamadas a LLM
+
+# --- HTTP Client (para servicio RAG externo) ---
+httpx
 
 # --- Procesamiento de Documentos ---
 pandas
 openpyxl
 python-docx
 python-pptx
-PyPDF2
+pypdf
 pdfplumber
+reportlab  # Para generar PDFs con formato profesional

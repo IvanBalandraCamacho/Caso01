@@ -10,14 +10,19 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      # CAMBIO: Usar pymysql en lugar de mysqlclient
+      # Database & Services
       - DATABASE_URL=mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
       - REDIS_URL=redis://redis:6379
       - QDRANT_URL=http://qdrant:6333
+      # RAG External Service (ahora disponible)
+      - RAG_SERVICE_URL=http://rag-service:8080
+      - RAG_SERVICE_API_KEY=${RAG_SERVICE_API_KEY:-}
+      - RAG_SERVICE_ENABLED=true
     depends_on:
       - mysql
-      - qdrant
       - redis
+      - qdrant
+      - rag-service
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
   # 2. Frontend (Next.js)
@@ -43,7 +48,7 @@ services:
       # Mantenemos un volumen para el caché de build de Next.js
       - /app/.next
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
     depends_on:
       - backend
     command: npm run dev
@@ -63,7 +68,14 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
 
-  # 4. Vector Store (Qdrant)
+  # 4. Cache y Message Broker (Redis)
+  redis:
+    image: redis:7-alpine
+    container_name: ia_redis
+    ports:
+      - "6379:6379"
+
+  # 5. Vector Database (Qdrant)
   qdrant:
     image: qdrant/qdrant:latest
     container_name: ia_qdrant
@@ -73,12 +85,20 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
 
-  # 5. Cache y Message Broker (Redis)
-  redis:
-    image: redis:7-alpine
-    container_name: ia_redis
+  # 6. Servicio RAG (NUEVO)
+  rag-service:
+    build: ./rag-service
+    container_name: ia_rag_service
     ports:
-      - "6379:6379"
+      - "8080:8080"
+    env_file:
+      - ./backend/.env
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    volumes:
+      - rag_data:/app/data
 
   # 6. Worker Asíncrono (Celery)
   celery_worker:
@@ -90,17 +110,24 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      - PYTHONPATH=/app  # <-- ¡ESTA ES LA SOLUCIÓN!
-      # CAMBIO: Usar pymysql en lugar de mysqlclient
+      - PYTHONPATH=/app
       - DATABASE_URL=mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
       - REDIS_URL=redis://redis:6379
       - QDRANT_URL=http://qdrant:6333
+      # RAG External Service
+      - RAG_SERVICE_URL=http://rag-service:8080
+      - RAG_SERVICE_API_KEY=${RAG_SERVICE_API_KEY:-}
+      - RAG_SERVICE_ENABLED=true
+      # OpenAI API Key
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
       - backend
       - redis
       - mysql
       - qdrant
+      - rag-service
 
 volumes:
   mysql_data:
   qdrant_data:
+  rag_data:

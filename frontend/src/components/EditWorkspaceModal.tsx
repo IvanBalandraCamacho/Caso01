@@ -9,11 +9,59 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea"; // Importar Textarea
+import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useWorkspaces, Workspace, Document } from "@/context/WorkspaceContext";
-import { FileText, Trash2, Plus, Loader2 } from "lucide-react";
-import { UploadModal } from "./UploadModal"; // Reusamos el modal de subida
+import { FileText, Trash2, Plus, Loader2, FileSpreadsheet, Presentation, File, FileType } from "lucide-react";
+import { UploadModal } from "./UploadModal";
+import { useDeleteDocument, useUpdateWorkspace } from "@/hooks/useApi";
+import { fetchWorkspaceDetails } from "@/lib/api";
+
+// Helper para obtener el icono según el tipo de archivo
+const getFileIcon = (fileName: string, fileType: string) => {
+  const ext = fileName.split('.').pop()?.toLowerCase() || '';
+  const type = fileType?.toLowerCase() || '';
+  
+  // Priorizar la extensión del nombre del archivo
+  if (ext === 'pdf' || type.includes('pdf')) {
+    return <FileType className="h-5 w-5 text-red-500 shrink-0" />;
+  } else if (ext === 'docx' || ext === 'doc' || type.includes('word') || type === 'docx' || type === 'doc') {
+    return <FileText className="h-5 w-5 text-blue-500 shrink-0" />;
+  } else if (ext === 'xlsx' || ext === 'xls' || ext === 'csv' || type.includes('excel') || type === 'xlsx' || type === 'xls' || type === 'csv') {
+    return <FileSpreadsheet className="h-5 w-5 text-green-500 shrink-0" />;
+  } else if (ext === 'pptx' || ext === 'ppt' || type.includes('powerpoint') || type === 'pptx' || type === 'ppt') {
+    return <Presentation className="h-5 w-5 text-orange-500 shrink-0" />;
+  } else if (ext === 'txt' || type.includes('text') || type === 'txt') {
+    return <File className="h-5 w-5 text-gray-400 shrink-0" />;
+  }
+  
+  return <FileText className="h-5 w-5 text-gray-400 shrink-0" />;
+};
+
+// Helper para limpiar el nombre del archivo (quitar extensión)
+const getCleanFileName = (fileName: string) => {
+  return fileName.replace(/\.[^/.]+$/, '');
+};
+
+// Helper para obtener la extensión del archivo
+const getFileExtension = (fileName: string, fileType: string) => {
+  // Primero intentar obtener del nombre del archivo
+  const match = fileName.match(/\.([^/.]+)$/);
+  if (match) {
+    return match[1].toUpperCase();
+  }
+  
+  // Si no, mapear desde el tipo MIME
+  const type = fileType?.toLowerCase() || '';
+  if (type.includes('pdf')) return 'PDF';
+  if (type.includes('word') || type.includes('docx')) return 'DOCX';
+  if (type.includes('excel') || type.includes('xlsx')) return 'XLSX';
+  if (type.includes('powerpoint') || type.includes('pptx')) return 'PPTX';
+  if (type.includes('csv')) return 'CSV';
+  if (type.includes('text') || type.includes('txt')) return 'TXT';
+  
+  return 'FILE';
+};
 
 interface EditWorkspaceModalProps {
   isOpen: boolean;
@@ -33,27 +81,27 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
 
   // Estado para la lógica de guardado
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Hooks de mutación
+  const updateWorkspaceMutation = useUpdateWorkspace();
+  const deleteDocumentMutation = useDeleteDocument();
 
   // Cargar datos del workspace (incluyendo 'instructions') y sus documentos
   useEffect(() => {
     if (isOpen) {
       // 1. Cargar detalles del workspace (para 'instructions')
-      const fetchWorkspaceDetails = async () => {
+      const loadWorkspaceDetails = async () => {
         try {
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-          const response = await fetch(`${apiUrl}/api/v1/workspaces/${workspace.id}`);
-          if (response.ok) {
-            const data: Workspace & { instructions?: string } = await response.json();
-            setName(data.name);
-            setDescription(data.description || "");
-            setInstructions(data.instructions || ""); // Cargar instrucciones
-          }
+          const data: Workspace & { instructions?: string } = await fetchWorkspaceDetails(workspace.id);
+          setName(data.name);
+          setDescription(data.description || "");
+          setInstructions(data.instructions || "");
         } catch (error) {
           console.error("Error al cargar detalles del workspace", error);
         }
       };
       
-      fetchWorkspaceDetails();
+      loadWorkspaceDetails();
       // 2. Cargar la lista de documentos
       fetchDocuments(workspace.id);
     }
@@ -62,19 +110,38 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
   // Lógica para guardar los cambios del workspace
   const handleUpdate = async () => {
     setIsSaving(true);
-    // TODO: Llamar a la función del contexto que actualiza
-    // await updateWorkspace(workspace.id, { name, description, instructions });
-    console.log("Guardando:", { name, description, instructions });
-    setIsSaving(false);
-    onClose(); // Cerrar al guardar
+    
+    try {
+      await updateWorkspaceMutation.mutateAsync({
+        id: workspace.id,
+        updates: { name, description, instructions }
+      });
+      onClose(); // Cerrar al guardar
+    } catch (error) {
+      console.error("Error al actualizar workspace:", error);
+      const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+      alert(`Error al actualizar el workspace: ${errorMessage}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Lógica para eliminar un documento
-  const handleDeleteDocument = async (docId: string) => {
-    if (!confirm("¿Estás seguro de que quieres eliminar este documento?")) return;
-    // TODO: Llamar a la función del contexto que elimina
-    // await deleteDocument(docId);
-    console.log("Eliminando documento:", docId);
+  const handleDeleteDocument = async (docId: string, fileName: string) => {
+    if (!confirm(`¿Estás seguro de que quieres eliminar "${fileName}"?`)) return;
+    
+    try {
+      await deleteDocumentMutation.mutateAsync({ 
+        documentId: docId, 
+        workspaceId: workspace.id 
+      });
+      // Refrescar la lista de documentos
+      fetchDocuments(workspace.id);
+    } catch (error) {
+      console.error("Error al eliminar documento:", error);
+      const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+      alert(`Error al eliminar el documento: ${errorMessage}`);
+    }
   };
 
   return (
@@ -139,19 +206,24 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
                 {documents.map((doc) => (
                   <div key={doc.id} className="bg-gray-800 p-3 rounded-lg flex items-center gap-3 justify-between">
                     <div className="flex items-center gap-3 overflow-hidden">
-                      <FileText className="h-5 w-5 text-blue-400 shrink-0" />
+                      {getFileIcon(doc.file_name, doc.file_type)}
                       <div className="flex-grow overflow-hidden">
-                        <p className="text-sm text-white truncate font-medium">{doc.file_name}</p>
-                        <p className="text-xs text-gray-400 uppercase">{doc.file_type}</p>
+                        <p className="text-sm text-white truncate font-medium">{getCleanFileName(doc.file_name)}</p>
+                        <p className="text-xs text-gray-400 uppercase">{getFileExtension(doc.file_name, doc.file_type)}</p>
                       </div>
                     </div>
                     <Button 
                       variant="ghost" 
                       size="icon" 
                       className="text-red-500 hover:text-red-400 shrink-0"
-                      onClick={() => handleDeleteDocument(doc.id)}
+                      onClick={() => handleDeleteDocument(doc.id, doc.file_name)}
+                      disabled={deleteDocumentMutation.isPending}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      {deleteDocumentMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
                     </Button>
                   </div>
                 ))}
@@ -188,8 +260,10 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
         isOpen={isUploading} 
         onClose={() => {
           setIsUploading(false);
-          fetchDocuments(workspace.id); // Refrescar la lista de documentos al cerrar
         }} 
+        onSuccess={() => {
+          fetchDocuments(workspace.id); // Refrescar la lista de documentos
+        }}
       />
     </>
   );
