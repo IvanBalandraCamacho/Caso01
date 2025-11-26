@@ -200,6 +200,25 @@ export default function ProposalModal({ open, onClose }: ProposalModalProps) {
               </div>
             )}
 
+            {/* Preguntas Sugeridas */}
+            {analysis.preguntas_sugeridas.length > 0 && (
+              <div className="bg-yellow-50 p-4 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <FileText className="h-5 w-5 text-yellow-600 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-yellow-900 mb-2">Preguntas Sugeridas</h3>
+                    <ul className="space-y-1">
+                      {analysis.preguntas_sugeridas.map((pregunta, idx) => (
+                        <li key={idx} className="text-sm text-yellow-700">
+                          • {pregunta}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Equipo Sugerido */}
             {analysis.equipo_sugerido.length > 0 && (
               <div className="bg-indigo-50 p-4 rounded-lg">
