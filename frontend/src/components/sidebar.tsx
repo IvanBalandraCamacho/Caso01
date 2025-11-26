@@ -267,8 +267,8 @@ export function Sidebar() {
           </div>
         )}
 
-        <ScrollArea className="flex-1 px-3">
-          <div className="space-y-4">
+        <ScrollArea className="flex-1 px-3 overflow-y-auto">
+          <div className="space-y-4 ">
             {/* Workspaces */}
             <div>
               {!isCollapsed && (
@@ -287,7 +287,7 @@ export function Sidebar() {
                 </div>
               )}
 
-              <ScrollArea className="h-[180px]">
+              <ScrollArea className="min-h-[100px]">
                 <div className="space-y-1 pr-2">
                   {filteredWorkspaces.map((ws) => (
                     <div key={ws.id} className="group relative">
@@ -339,7 +339,7 @@ export function Sidebar() {
                   History
                 </h2>
               )}
-              <ScrollArea className="h-[200px]">
+              <ScrollArea className="min-h-[100px]">
                 <div className="space-y-1 pr-2">
                   {conversations.map((conv) => (
                     <div key={conv.id} className="group relative">
