@@ -1,8 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import dynamic from 'next/dynamic';
-const Sidebar = dynamic<React.ComponentType>(() => import('@/components/sidebar').then((mod) => mod.Sidebar), { ssr: false, loading: () => <div className="w-20 h-full bg-gray-900 animate-pulse" /> });
-const ChatArea = dynamic<React.ComponentType>(() => import('@/components/chat-area').then((mod) => mod.ChatArea), { ssr: false, loading: () => <div className="flex-1 bg-gray-900 animate-pulse" /> });
+import { Sidebar } from "@/components/sidebar";
+import { ChatArea } from "@/components/chat-area";
 import { useWorkspaces } from "@/context/WorkspaceContext";
 import { SearchResults } from "@/components/search-results";
 import ProposalModal from "@/components/ProposalModal";

@@ -11,9 +11,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useWorkspaces } from "@/context/WorkspaceContext";
-import { FileText, UploadCloud, X, Loader2, CheckCircle, AlertTriangle } from "lucide-react";
+import { FileText, UploadCloud, X, Loader2, CheckCircle, AlertTriangle } from "lucide-react"; // <-- AÑADIDO: AlertTriangle
 import { cn } from "@/lib/utils";
-import { uploadDocumentApi } from "@/lib/api";
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -72,7 +71,26 @@ export function UploadModal({ isOpen, onClose, onSuccess }: UploadModalProps) {
         formData.append("file", uploadableFile.file);
 
         try {
-          await uploadDocumentApi(activeWorkspace.id, formData);
+          const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+          const token = localStorage.getItem("access_token");
+          const response = await fetch(
+            `${apiUrl}/workspaces/${activeWorkspace.id}/upload`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+              body: formData,
+            }
+          );
+
+          if (!response.ok) {
+            // --- CORRECCIÓN CRÍTICA ---
+            // Capturar el error del backend si no fue 2xx
+            const errorData = await response.json();
+            throw new Error(errorData.detail || "Error al subir el archivo");
+            // --------------------------
+          }
           
           // 2. Marcar como "success"
           setFiles(prev => prev.map(f => 
@@ -84,13 +102,12 @@ export function UploadModal({ isOpen, onClose, onSuccess }: UploadModalProps) {
             onSuccess();
           }
 
-        } catch (error) {
+        } catch (error: any) {
           console.error("Error en la subida:", error);
-          const errorMessage = error instanceof Error ? error.message : "Error al subir el archivo";
           // 3. Marcar como "error" y guardar el mensaje
           setFiles(prev => prev.map(f => 
             f.file.name === uploadableFile.file.name 
-              ? { ...f, status: 'error', errorMessage } 
+              ? { ...f, status: 'error', errorMessage: error.message } 
               : f
           ));
         }

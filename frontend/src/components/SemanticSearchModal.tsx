@@ -96,7 +96,7 @@ export function SemanticSearchModal({
 
             {!searchMutation.isPending && results.length === 0 && query && (
               <div className="text-center py-8 text-muted-foreground">
-                No se encontraron resultados para &quot;{query}&quot;
+                No se encontraron resultados para "{query}"
               </div>
             )}
 

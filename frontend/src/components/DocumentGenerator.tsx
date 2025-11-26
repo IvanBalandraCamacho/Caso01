@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { generateDownloadableDocument } from '@/lib/api';
 
 interface DocumentGeneratorProps {
   workspaceId: string;
@@ -27,27 +26,40 @@ export function DocumentGenerator({ workspaceId, conversationId }: DocumentGener
     setSuccess(null);
 
     try {
-      const response = await generateDownloadableDocument(
-        workspaceId,
-        conversationId,
+      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1';
+      const token = localStorage.getItem("access_token");
+      const response = await fetch(
+        `${apiUrl}/workspaces/${workspaceId}/conversations/${conversationId}/generate-downloadable`,
         {
-          format: format,
-          document_type: type,
-          include_metadata: true
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            format: format,
+            document_type: type,
+            include_metadata: true
+          })
         }
       );
 
-      const contentType = response.headers['content-type'];
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Error al generar documento');
+      }
+
+      const contentType = response.headers.get('content-type');
 
       if (contentType && contentType.includes('application/pdf')) {
-        const blob = response.data;
+        const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
 
         // Intentar obtener nombre del archivo del header
         let filename = `document_${workspaceId}.pdf`;
-        const disposition = response.headers['content-disposition'];
+        const disposition = response.headers.get('content-disposition');
         if (disposition && disposition.indexOf('attachment') !== -1) {
           const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
           const matches = filenameRegex.exec(disposition);
@@ -64,9 +76,7 @@ export function DocumentGenerator({ workspaceId, conversationId }: DocumentGener
 
         setSuccess(`✅ Documento PDF descargado`);
       } else {
-        // Parse blob as JSON
-        const text = await response.data.text();
-        const data = JSON.parse(text);
+        const data = await response.json();
 
         // Crear blob y descargar archivo (TXT/MD)
         const blob = new Blob([data.content], {
@@ -85,9 +95,8 @@ export function DocumentGenerator({ workspaceId, conversationId }: DocumentGener
       }
 
       setError(null);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error al generar documento';
-      setError(errorMessage);
+    } catch (err: any) {
+      setError(err.message || 'Error al generar documento');
       setSuccess(null);
       console.error('Error generating document:', err);
     } finally {

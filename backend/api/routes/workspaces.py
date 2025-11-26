@@ -1255,4 +1255,3 @@ def analyze_query_endpoint(
     
     analysis = analyze_query_complexity(query_request.query, context_chunks)
     return analysis
-

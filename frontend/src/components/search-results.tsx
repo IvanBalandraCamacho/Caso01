@@ -1,14 +1,8 @@
 "use client";
 import React from "react";
 
-interface SearchResult {
-  id: string;
-  file_name: string;
-  text: string;
-}
-
 interface SearchResultsProps {
-  results: SearchResult[];
+  results: any[];
 }
 
 export function SearchResults({ results }: SearchResultsProps) {

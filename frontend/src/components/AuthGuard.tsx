@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { checkAuthMe } from "@/lib/api";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -34,11 +33,23 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
       // Verificar si el token es válido con el backend
       try {
-        await checkAuthMe();
-        setIsAuthenticated(true);
+        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1';
+        const response = await fetch(`${apiUrl}/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          setIsAuthenticated(true);
+        } else {
+          // Token inválido o expirado
+          console.log("Invalid token, redirecting to login");
+          localStorage.removeItem('access_token');
+          router.push('/login');
+        }
       } catch (error) {
-        // Token inválido o expirado
-        console.log("Invalid token, redirecting to login");
+        console.error("Error checking authentication:", error);
         localStorage.removeItem('access_token');
         router.push('/login');
       }
