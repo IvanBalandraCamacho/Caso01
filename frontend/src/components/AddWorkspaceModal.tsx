@@ -67,7 +67,7 @@ export function AddWorkspaceModal({ isOpen, onClose, onSuccess }: AddWorkspaceMo
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="bg-brand-dark-secondary border-gray-700 text-gray-300 max-w-2xl">
+      <DialogContent className="bg-brand-dark-secondary border-gray-700 text-gray-300 max-w-2xl rounded-[20_!important] pt-6">
         <DialogHeader>
           <DialogTitle className="text-white text-xl">Crear Nuevo Workspace</DialogTitle>
           <DialogDescription className="text-gray-400">
@@ -76,7 +76,7 @@ export function AddWorkspaceModal({ isOpen, onClose, onSuccess }: AddWorkspaceMo
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 pb-4 pt-6">
             {/* Nombre del Workspace */}
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-2">
@@ -88,7 +88,7 @@ export function AddWorkspaceModal({ isOpen, onClose, onSuccess }: AddWorkspaceMo
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Ej: Proyecto Marketing Q4"
-                className="bg-brand-dark border-gray-700 text-white focus-visible:ring-brand-red"
+                className="bg-brand-dark border-gray-700 text-white focus-visible:ring-brand-red rounded-[8_!important]"
                 disabled={createWorkspaceMutation.isPending}
                 required
               />
@@ -104,7 +104,7 @@ export function AddWorkspaceModal({ isOpen, onClose, onSuccess }: AddWorkspaceMo
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Breve descripción del workspace..."
-                className="bg-brand-dark border-gray-700 text-white focus-visible:ring-brand-red min-h-[80px] resize-none"
+                className="bg-brand-dark border-gray-700 text-white focus-visible:ring-brand-red min-h-[80px] resize-none rounded-[8_!important]"
                 disabled={createWorkspaceMutation.isPending}
               />
             </div>
@@ -119,7 +119,7 @@ export function AddWorkspaceModal({ isOpen, onClose, onSuccess }: AddWorkspaceMo
                 value={instructions}
                 onChange={(e) => setInstructions(e.target.value)}
                 placeholder="Ej: Responde siempre en español formal. Enfócate en análisis de marketing..."
-                className="bg-brand-dark border-gray-700 text-white focus-visible:ring-brand-red min-h-[100px] resize-none"
+                className="bg-brand-dark border-gray-700 text-white focus-visible:ring-brand-red min-h-[100px] resize-none rounded-[8_!important] "
                 disabled={createWorkspaceMutation.isPending}
               />
               <p className="text-xs text-gray-500 mt-1">
@@ -133,14 +133,14 @@ export function AddWorkspaceModal({ isOpen, onClose, onSuccess }: AddWorkspaceMo
               type="button"
               variant="outline"
               onClick={handleClose}
-              className="border-gray-700 text-gray-300 hover:bg-gray-800"
+              className="border-gray-700 text-gray-300 hover:bg-gray-800 rounded-[8_!important] border-none"
               disabled={createWorkspaceMutation.isPending}
             >
               Cancelar
             </Button>
             <Button
               type="submit"
-              className="bg-brand-red text-white hover:bg-red-700"
+              className="bg-brand-red text-white hover:bg-red-700 rounded-[8_!important]"
               disabled={createWorkspaceMutation.isPending || !name.trim()}
             >
               {createWorkspaceMutation.isPending ? (

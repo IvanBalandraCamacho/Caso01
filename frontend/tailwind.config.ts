@@ -25,7 +25,7 @@ const config: Config = {
         brand: {
           red: "#7F1D1D",
           dark: "#1F2937",
-          "dark-secondary": "#374151",
+          "dark-secondary": "#2b3545",
           light: "#F9FAFB",
           "light-secondary": "#F3F4F6",
         },

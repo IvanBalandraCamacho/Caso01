@@ -22,7 +22,7 @@ export function QuickPrompts({ onPromptSelect }: QuickPromptsProps) {
           key={index}
           variant="outline"
           size="sm"
-          className="bg-gray-700/50 hover:bg-gray-600/50 text-gray-300 border-gray-600"
+          className="bg-gray-700/50 rounded-xl hover:bg-gray-600/50 text-gray-300 border-gray-600"
           onClick={() => onPromptSelect(prompt)}
         >
           {prompt}
