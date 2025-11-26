@@ -9,7 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Mic, Loader2, FileText, Copy, Check } from "lucide-react";
+import { Mic, Loader2, FileText, Copy, Check, SendHorizontal, Plus } from "lucide-react";
 import { useWorkspaces } from "@/context/WorkspaceContext";
 import { UploadModal } from "./UploadModal";
 import { useChat, useConversationWithMessages, streamChatQuery } from "@/hooks/useApi";
@@ -355,7 +355,7 @@ export function ChatArea() {
   }
 
   return (
-    <main className="flex-1 flex flex-col h-screen overflow-hidden" style={{ backgroundColor: '#1B1C1D' }}>
+    <main className="flex-1 flex flex-col h-screen overflow-hidden bg-[#1B1C1D]" >
       <UploadModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -573,7 +573,7 @@ export function ChatArea() {
           )}
 
           {/* Input Container */}
-          <div className={`bg-gray-900 border border-gray-700 rounded-2xl flex flex-col overflow-hidden transition-all duration-200 ${activeWorkspace ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+          <div className={`bg-[#2B2B2E] border border-gray-700 rounded-3xl flex flex-col  overflow-hidden transition-all duration-200 ${activeWorkspace ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
             {/* Attached Files */}
             {attachedFiles.length > 0 && (
               <div className="px-4 pt-3 flex flex-wrap gap-2 bg-muted/30 pb-2">
@@ -595,7 +595,7 @@ export function ChatArea() {
               </div>
             )}
 
-            <div className="flex items-end p-3 gap-2">
+            <div className="flex items-center px-3 py-2 gap-2">
               <input
                 type="file"
                 id="file-attach"
@@ -608,11 +608,11 @@ export function ChatArea() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl h-10 w-10"
+                className="text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-xl h-10 w-10"
                 onClick={() => document.getElementById('file-attach')?.click()}
                 title="Adjuntar archivos al contexto"
               >
-                <span className="text-2xl leading-none">+</span>
+                <Plus />
               </Button>
 
               <textarea
@@ -637,11 +637,11 @@ export function ChatArea() {
                 style={{ height: 'auto', minHeight: '2.5rem' }}
               />
 
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className={`${listening ? 'text-destructive animate-pulse' : 'text-muted-foreground hover:text-foreground'} rounded-xl h-10 w-10`}
+                  className={`${listening ? 'text-destructive animate-pulse' : 'text-muted-foreground hover:text-foreground hover:bg-white/5'} rounded-xl h-10 w-10`}
                   onClick={listening ? stopListening : startListening}
                   title="Entrada por voz (reconocimiento de audio)"
                 >
@@ -650,11 +650,11 @@ export function ChatArea() {
 
                 <Button
                   size="icon"
-                  className="bg-blue-600 text-white hover:bg-blue-700 rounded-xl h-10 w-10 transition-transform active:scale-95"
+                  className="bg-brand-red text-white hover:bg-brand-red/80 rounded-xl h-10 w-10 transition-transform active:scale-95"
                   onClick={() => handleSendMessage()}
                   disabled={!activeWorkspace || !message.trim() || isStreaming}
                 >
-                  {isStreaming ? <Loader2 className="h-5 w-5 animate-spin" /> : <span className="text-lg font-bold">↑</span>}
+                  {isStreaming ? <Loader2 className="h-5 w-5 animate-spin" /> : <SendHorizontal />}
                 </Button>
               </div>
             </div>

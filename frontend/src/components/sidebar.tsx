@@ -242,7 +242,7 @@ export function Sidebar() {
               AI Model
             </label>
             <Select value={selectedModel} onValueChange={setSelectedModel}>
-              <SelectTrigger className="w-full h-9 text-sm" style={{ backgroundColor: '#1F2123', color: '#ffffff', borderColor: '#374151' }}>
+              <SelectTrigger className="w-full h-9 text-sm !rounded-[10]" style={{ backgroundColor: '#1F2123', color: '#ffffff', borderColor: '#374151' }}>
                 <SelectValue placeholder="Select AI Model" />
               </SelectTrigger>
               <SelectContent style={{ backgroundColor: '#1F2123', borderColor: '#374151' }}>
