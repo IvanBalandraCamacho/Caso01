@@ -77,7 +77,7 @@ export interface RAGIngestRequest {
   document_id: string;
   workspace_id: string;
   content: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   user_id?: string | null;
 }
 
@@ -99,6 +99,33 @@ export interface SearchResult {
   document_id: string;
   content: string;
   score: number;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
+}
+
+// --- Conversation Types ---
+export interface Message {
+  id: string;
+  conversation_id: string;
+  role: "user" | "assistant";
+  content: string;
+  chunk_references: string | null;
+  created_at: string;
+}
+
+export interface Conversation {
+  id: string;
+  workspace_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+}
+
+export interface ConversationWithMessages extends Conversation {
+  messages: Message[];
+}
+
+export interface ConversationUpdate {
+  title?: string;
 }
 

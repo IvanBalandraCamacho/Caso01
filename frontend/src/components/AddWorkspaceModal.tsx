@@ -50,9 +50,9 @@ export function AddWorkspaceModal({ isOpen, onClose, onSuccess }: AddWorkspaceMo
       // Cerrar modal y notificar éxito
       onClose();
       onSuccess?.();
-    } catch (error: any) {
-      console.error("Error al crear workspace:", error);
-      alert(`Error al crear workspace: ${error.response?.data?.detail || error.message}`);
+    } catch (error: unknown) {
+      console.error("Error al crear workspace:", error as Error);
+      alert(`Error al crear workspace: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     }
   };
 
