@@ -42,6 +42,7 @@ class DocumentPublic(DocumentBase):
     status: str
     chunk_count: int
     created_at: datetime
+    suggestionAlert: str | None = None   # <-- NUEVO
     
     class Config:
         from_attributes = True
