@@ -7,7 +7,11 @@ Este módulo proporciona endpoints para:
 """
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
+from docx import Document
+from doc.shared import Pt
+from datetime import datetime
 from typing import Dict, Any
 from models import database
 from models.user import User
@@ -205,12 +209,74 @@ async def generate_proposal_document(
     """
     
     try:
-        # TODO: Implementar generación de documento Word
-        # Por ahora, retornamos error indicando que está en desarrollo
+        # Crear documento Word
+        doc = Document()
         
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="Generación de documentos Word en desarrollo"
+        # PORTADA
+        title = doc.add_heading('Propuesta Técnica', level=0)
+        title.alignment = 1  # Centrado
+        
+        doc.add_paragraph(f"Fecha: {datetime.now().strftime('%Y-%m-%d')}")
+        doc.add_paragraph(f"Cliente: {proposal_data.get('cliente', 'No especificado')}")
+        doc.add_page_break()
+        
+        # SECCIÓN: Información general
+        doc.add_heading('1. Información General del Proyecto', level=1)
+        doc.add_paragraph(f"Fecha de Entrega: {proposal_data.get('fecha_entrega', 'No especificada')}")
+        doc.add_paragraph(f"Cliente: {proposal_data.get('cliente', 'No especificado')}")
+        
+        # SECCIÓN: Alcance Económico
+        doc.add_heading('2. Alcance Económico', level=1)
+        alcance = proposal_data.get('alcance_economico', {})
+        
+        doc.add_paragraph(f"Presupuesto: {alcance.get('presupuesto', 'No especificado')}")
+        doc.add_paragraph(f"Moneda: {alcance.get('moneda', 'No especificada')}")
+        
+        # SECCIÓN: Tecnologías Requeridas
+        doc.add_heading('3. Tecnologías Requeridas', level=1)
+        tecnologias = proposal_data.get('tecnologias_requeridas', [])
+        for tech in tecnologias:
+            doc.add_paragraph(f"- {tech}", style='List Bullet')
+            
+        # SECCIÓN: Riesgos Detectados
+        doc.add_heading('4. Riesgos Detectados', level=1)
+        riesgos = proposal_data.get('riesgos_detectados', [])
+        if riesgos:
+            for riesgo in riesgos:
+                doc.add_paragraph(f"- {riesgo}", style='List Bullet')
+        else:
+            doc.add_paragraph("No se detectaron riesgos significativos.")
+            
+        # SECCIÓN: Preguntas Sugeridas
+        doc.add_heading('5. Preguntas Sugeridas', level=1)
+        preguntas = proposal_data.get('preguntas_sugeridas', [])
+        for pregunta in preguntas:
+            doc.add_paragraph(f"- {pregunta}", style='List Bullet')
+            
+        # SECCIÓN: Equipo Sugerido
+        doc.add_heading('6. Equipo Sugerido', level=1)
+        equipo = proposal_data.get('equipo_sugerido', [])
+        for miembro in equipo:
+            doc.add_heading(miembro.get('nombre', 'Rol no especificado'), level=2)
+            doc.add_paragraph(f"Rol: {miembro.get('rol', 'No especificado')}")
+            doc.add_paragraph(f"Experiencia: {miembro.get('experiencia', 'No especificada')}")
+            skills = miembro.get('skills', [])
+            if skills:
+                doc.add_paragraph("Skills:", style='List Bullet')
+                for skill in skills:
+                    doc.add_paragraph(f"- {skill}", style='List Bullet 2')
+        
+        # Guardar documento temporalmente
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as tmp_file:
+            tmp_path = tmp_file.name
+            doc.save(tmp_path)
+            
+        file_name = f"Propuesta_{proposal_data.get('cliente', 'Cliente')}.docx"
+        
+        return FileResponse(
+            path=tmp_path,
+            filename=file_name,
+            media_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         )
         
     except HTTPException:
