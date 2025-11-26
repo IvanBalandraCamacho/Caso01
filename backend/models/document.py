@@ -15,6 +15,9 @@ class Document(Base):
     
     chunk_count = Column(Integer, default=0) # Cuántos chunks vectoriales tiene en Qdrant
     
+    # Sugerencias generadas por IA
+    suggestion_short = Column(Text, nullable=True)  # Sugerencia corta/resumen
+    suggestion_full = Column(Text, nullable=True)   # Sugerencia completa/detallada
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
