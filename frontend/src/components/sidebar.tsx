@@ -190,8 +190,8 @@ export function Sidebar() {
         <div className="p-4 flex items-center justify-between">
           {!isCollapsed && (
             <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => router.push('/')} title="Ir al Dashboard">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-primary-foreground font-bold">V</div>
-              <h1 className="text-lg font-bold tracking-tight" style={{ color: '#ffffff' }}>Velvet</h1>
+              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-primary-foreground font-bold">T</div>
+              <h1 className="text-lg font-bold tracking-tight" style={{ color: '#ffffff' }}>TIVIT CHAT</h1>
             </div>
           )}
           <Button
@@ -247,6 +247,8 @@ export function Sidebar() {
               </SelectTrigger>
               <SelectContent style={{ backgroundColor: '#1F2123', borderColor: '#374151' }}>
                 <SelectItem value="gpt-4o-mini" style={{ color: '#ffffff' }}>GPT-4o Mini</SelectItem>
+                <SelectItem value="Velvet-2b" style={{ color: '#ffffff' }}>Velvet 2B</SelectItem>
+                <SelectItem value="Velvet-14b" style={{ color: '#ffffff' }}>Velvet 14B</SelectItem>
               </SelectContent>
             </Select>
           </div>
