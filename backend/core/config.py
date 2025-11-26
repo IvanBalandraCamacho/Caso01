@@ -55,6 +55,7 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = 'utf-8'
         extra = "ignore"  # Ignora variables extra del .env que no estén en el modelo
+        case_sensitive = False # Permite que las variables de entorno sean case-insensitive
 
 # Instancia única de la configuración
 settings = Settings()
