@@ -66,7 +66,7 @@ export default function ProposalModal({ open, onClose }: ProposalModalProps) {
 
     try {
       const blob = await generateMutation.mutateAsync(analysis);
-      
+
       // Descargar el archivo
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -94,7 +94,7 @@ export default function ProposalModal({ open, onClose }: ProposalModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-brand-dark-secondary !rounded-[20]">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">
             🚀 Generar Propuesta Inteligente
@@ -104,9 +104,9 @@ export default function ProposalModal({ open, onClose }: ProposalModalProps) {
         {/* Estado: Upload */}
         {state === "upload" && (
           <div className="space-y-6">
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+            <div className="border-2 border-dashed  border-gray-600 rounded-xl p-8 text-center">
               <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-gray-400 mb-4">
                 Sube el archivo PDF del RFP para análisis automático
               </p>
               <Input
@@ -124,7 +124,7 @@ export default function ProposalModal({ open, onClose }: ProposalModalProps) {
             <Button
               onClick={handleAnalyze}
               disabled={!selectedFile}
-              className="w-full"
+              className="w-full !rounded-[8]"
               size="lg"
             >
               Analizar RFP con IA
@@ -245,7 +245,7 @@ export default function ProposalModal({ open, onClose }: ProposalModalProps) {
               <Button
                 onClick={handleGenerateWord}
                 disabled={generateMutation.isPending}
-                className="flex-1"
+                className="flex-1 !rounded-[8]"
                 size="lg"
               >
                 {generateMutation.isPending ? (
@@ -260,6 +260,7 @@ export default function ProposalModal({ open, onClose }: ProposalModalProps) {
               <Button
                 onClick={handleClose}
                 variant="outline"
+                className="!rounded-[8]"
                 size="lg"
               >
                 Cancelar

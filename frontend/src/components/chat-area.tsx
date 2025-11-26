@@ -123,7 +123,7 @@ export function ChatArea() {
       // Cancelar stream activo si hay uno
       activeStreamRef.current = null;
       setIsStreaming(false);
-      
+
       setCurrentConversationId(activeConversation.id);
       // Cargar mensajes de la conversación si están disponibles
       if (conversationData?.messages) {
@@ -170,12 +170,12 @@ export function ChatArea() {
     setChatHistory((prev) => [...prev, assistantMessage]);
 
     setIsStreaming(true);
-    
+
     // Generar ID único para este stream
     const streamId = Date.now().toString();
     activeStreamRef.current = streamId;
 
-  
+
     // Enviar consulta con streaming
     streamChatQuery({
       workspaceId: activeWorkspace.id,
@@ -188,16 +188,16 @@ export function ChatArea() {
           console.log("ChatArea: Stream cancelado, ignorando chunks");
           return;
         }
-        
-        const chunk = data as { 
-          type?: string; 
-          relevant_chunks?: unknown[]; 
-          model_used?: string; 
-          conversation_id?: string; 
-          text?: string; 
+
+        const chunk = data as {
+          type?: string;
+          relevant_chunks?: unknown[];
+          model_used?: string;
+          conversation_id?: string;
+          text?: string;
           detail?: string;
         };
-        
+
         if (chunk.type === 'sources') {
           setChatHistory(prev => {
             const newHistory = [...prev];
@@ -241,7 +241,7 @@ export function ChatArea() {
       onError: (err: unknown) => {
         // Verificar que este stream sigue activo
         if (activeStreamRef.current !== streamId) return;
-        
+
         const error = err as { message?: string };
         setChatHistory(prev => {
           const newHistory = [...prev];
@@ -258,10 +258,10 @@ export function ChatArea() {
       onFinish: async () => {
         // Verificar que este stream sigue activo
         if (activeStreamRef.current !== streamId) return;
-        
+
         activeStreamRef.current = null;
         setIsStreaming(false);
-        
+
         // Si es el primer mensaje y tenemos conversation_id, generar título automáticamente
         if (isFirstMessage && currentConversationId && activeWorkspace) {
           try {
@@ -356,9 +356,9 @@ export function ChatArea() {
 
   return (
     <main className="flex-1 flex flex-col h-screen overflow-hidden" style={{ backgroundColor: '#1B1C1D' }}>
-      <UploadModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+      <UploadModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
         onSuccess={() => {
           // Refrescar documentos del workspace activo
           if (activeWorkspace) {
@@ -413,144 +413,144 @@ export function ChatArea() {
                 </p>
               </div>
             ) : chatHistory.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full max-w-3xl mx-auto px-4">
-            <div className="mb-8 text-center">
-              <h3 className="text-2xl font-bold text-foreground mb-2">
-                {activeWorkspace.name}
-              </h3>
-              <p className="text-muted-foreground">
-                Sistema listo para analizar y consultar su documentación empresarial.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mb-8">
-              <button 
-                onClick={() => setIsModalOpen(true)}
-                className="p-6 bg-card hover:bg-accent border border-border rounded-xl text-left transition-all hover:shadow-lg group flex flex-col gap-3"
-              >
-                <div className="p-2 bg-primary/10 w-fit rounded-lg group-hover:bg-primary/20 transition-colors">
-                  <FileText className="h-6 w-6 text-primary" />
+              <div className="flex flex-col items-center justify-center h-full max-w-3xl mx-auto px-4">
+                <div className="mb-8 text-center">
+                  <h3 className="text-2xl font-bold text-foreground mb-2">
+                    {activeWorkspace.name}
+                  </h3>
+                  <p className="text-muted-foreground">
+                    Sistema listo para analizar y consultar su documentación empresarial.
+                  </p>
                 </div>
-                <div>
-                  <h4 className="font-semibold text-foreground">Cargar Documentos</h4>
-                  <p className="text-sm text-muted-foreground mt-1">Agregue archivos PDF, DOCX, XLSX o TXT al contexto de análisis.</p>
-                </div>
-              </button>
 
-              <button 
-                onClick={() => handleQuickPrompt("Genera un resumen ejecutivo completo de todos los documentos disponibles en este espacio de trabajo, destacando los puntos clave, conclusiones principales y recomendaciones.")}
-                className="p-6 bg-card hover:bg-accent border border-border rounded-xl text-left transition-all hover:shadow-lg group flex flex-col gap-3"
-              >
-                <div className="p-2 bg-success/10 w-fit rounded-lg group-hover:bg-success/20 transition-colors">
-                  <FileText className="h-6 w-6 text-success" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-foreground">Resumen Ejecutivo del Workspace</h4>
-                  <p className="text-sm text-muted-foreground mt-1">Obtenga una síntesis inteligente de toda la documentación disponible.</p>
-                </div>
-              </button>
-            </div>
-
-            <div className="w-full">
-              <QuickPrompts onPromptSelect={handleQuickPrompt} />
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-6 max-w-4xl mx-auto">
-            {chatHistory.map((msg, index) => (
-              <div
-                key={index}
-                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"
-                  }`}
-              >
-                <div
-                  className={`max-w-[85%] break-words ${msg.role === "user"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-card text-card-foreground border border-border"
-                    } rounded-2xl p-5 relative group shadow-sm`}
-                >
-                  {/* Botón de copiar (solo para mensajes del asistente) */}
-                  {msg.role === "assistant" && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
-                      onClick={() => {
-                        navigator.clipboard.writeText(msg.content);
-                        setCopiedMessageId(`${index}`);
-                        showToast('Respuesta copiada al portapapeles', 'success');
-                        setTimeout(() => setCopiedMessageId(null), 2000);
-                      }}
-                      title="Copiar respuesta"
-                    >
-                      {copiedMessageId === `${index}` ? (
-                        <Check className="h-4 w-4 text-green-400" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </Button>
-                  )}
-
-                  {msg.role === "user" ? (
-                    <p className="whitespace-pre-wrap">{msg.content}</p>
-                  ) : (
-                    <div className="markdown-content">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        rehypePlugins={[rehypeRaw]}
-                      >
-                        {msg.content}
-                      </ReactMarkdown>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mb-8">
+                  <button
+                    onClick={() => setIsModalOpen(true)}
+                    className="p-6 bg-card hover:bg-accent border border-border rounded-xl text-left transition-all hover:shadow-lg group flex flex-col gap-3"
+                  >
+                    <div className="p-2 bg-primary/10 w-fit rounded-lg group-hover:bg-primary/20 transition-colors">
+                      <FileText className="h-6 w-6 text-primary" />
                     </div>
-                  )}
-
-                  {/* Model used badge for assistant messages */}
-                  {msg.role === "assistant" && msg.modelUsed && (
-                    <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-2">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground font-medium">
-                        🤖 {msg.modelUsed}
-                      </span>
+                    <div>
+                      <h4 className="font-semibold text-foreground">Cargar Documentos</h4>
+                      <p className="text-sm text-muted-foreground mt-1">Agregue archivos PDF, DOCX, XLSX o TXT al contexto de análisis.</p>
                     </div>
-                  )}
+                  </button>
 
-                  {/* Mostrar chunks relevantes si existen */}
-                  {msg.chunks && msg.chunks.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-border/50">
-                      <p className="text-xs text-muted-foreground mb-2 font-medium uppercase tracking-wider">
-                        Sources ({msg.chunks.length})
-                      </p>
-                      <div className="flex gap-2 overflow-x-auto pb-2">
-                        {msg.chunks.slice(0, 3).map((chunk, idx) => (
-                          <div
-                            key={idx}
-                            className="min-w-[200px] max-w-[250px] text-xs bg-muted/50 p-3 rounded-lg border border-border/50"
-                          >
-                            <p className="font-semibold mb-1 text-foreground truncate">
-                              Score: {chunk.score.toFixed(2)}
-                            </p>
-                            <p className="line-clamp-3 text-muted-foreground">{chunk.chunk_text}</p>
-                          </div>
-                        ))}
-                      </div>
+                  <button
+                    onClick={() => handleQuickPrompt("Genera un resumen ejecutivo completo de todos los documentos disponibles en este espacio de trabajo, destacando los puntos clave, conclusiones principales y recomendaciones.")}
+                    className="p-6 bg-card hover:bg-accent border border-border rounded-xl text-left transition-all hover:shadow-lg group flex flex-col gap-3"
+                  >
+                    <div className="p-2 bg-success/10 w-fit rounded-lg group-hover:bg-success/20 transition-colors">
+                      <FileText className="h-6 w-6 text-success" />
                     </div>
-                  )}
+                    <div>
+                      <h4 className="font-semibold text-foreground">Resumen Ejecutivo del Workspace</h4>
+                      <p className="text-sm text-muted-foreground mt-1">Obtenga una síntesis inteligente de toda la documentación disponible.</p>
+                    </div>
+                  </button>
+                </div>
+
+                <div className="w-full">
+                  <QuickPrompts onPromptSelect={handleQuickPrompt} />
                 </div>
               </div>
-            ))}
+            ) : (
+              <div className="space-y-6 max-w-4xl mx-auto">
+                {chatHistory.map((msg, index) => (
+                  <div
+                    key={index}
+                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"
+                      }`}
+                  >
+                    <div
+                      className={`max-w-[85%] break-words ${msg.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-card text-card-foreground border border-border"
+                        } rounded-2xl p-5 relative group shadow-sm`}
+                    >
+                      {/* Botón de copiar (solo para mensajes del asistente) */}
+                      {msg.role === "assistant" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
+                          onClick={() => {
+                            navigator.clipboard.writeText(msg.content);
+                            setCopiedMessageId(`${index}`);
+                            showToast('Respuesta copiada al portapapeles', 'success');
+                            setTimeout(() => setCopiedMessageId(null), 2000);
+                          }}
+                          title="Copiar respuesta"
+                        >
+                          {copiedMessageId === `${index}` ? (
+                            <Check className="h-4 w-4 text-green-400" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </Button>
+                      )}
 
-            {/* Indicador de "Escribiendo..." */}
-            {isStreaming && (
-              <div className="flex justify-start">
-                <div className="bg-card border border-border text-muted-foreground rounded-2xl p-4 flex items-center gap-3 shadow-sm">
-                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                  <span className="text-sm font-medium">Thinking...</span>
-                </div>
+                      {msg.role === "user" ? (
+                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                      ) : (
+                        <div className="markdown-content">
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            rehypePlugins={[rehypeRaw]}
+                          >
+                            {msg.content}
+                          </ReactMarkdown>
+                        </div>
+                      )}
+
+                      {/* Model used badge for assistant messages */}
+                      {msg.role === "assistant" && msg.modelUsed && (
+                        <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-2">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground font-medium">
+                            🤖 {msg.modelUsed}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Mostrar chunks relevantes si existen */}
+                      {msg.chunks && msg.chunks.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-border/50">
+                          <p className="text-xs text-muted-foreground mb-2 font-medium uppercase tracking-wider">
+                            Sources ({msg.chunks.length})
+                          </p>
+                          <div className="flex gap-2 overflow-x-auto pb-2">
+                            {msg.chunks.slice(0, 3).map((chunk, idx) => (
+                              <div
+                                key={idx}
+                                className="min-w-[200px] max-w-[250px] text-xs bg-muted/50 p-3 rounded-lg border border-border/50"
+                              >
+                                <p className="font-semibold mb-1 text-foreground truncate">
+                                  Score: {chunk.score.toFixed(2)}
+                                </p>
+                                <p className="line-clamp-3 text-muted-foreground">{chunk.chunk_text}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Indicador de "Escribiendo..." */}
+                {isStreaming && (
+                  <div className="flex justify-start">
+                    <div className="bg-card border border-border text-muted-foreground rounded-2xl p-4 flex items-center gap-3 shadow-sm">
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                      <span className="text-sm font-medium">Thinking...</span>
+                    </div>
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
               </div>
             )}
-
-            <div ref={messagesEndRef} />
-          </div>
-        )}
           </div>
         </ScrollArea>
       </div>
@@ -558,110 +558,110 @@ export function ChatArea() {
       {/* Input Area Fija en el bottom */}
       <div className="flex-shrink-0 border-t border-gray-800/50 p-4" style={{ backgroundColor: '#1B1C1D' }}>
         <div className="max-w-4xl mx-auto">
-           {/* Model Badge */}
-           {activeWorkspace && (
-             <div className="flex justify-center mb-2">
-                <span 
-                  className="bg-gray-800/90 border border-gray-700 px-3 py-1 rounded-full text-xs text-gray-400 flex items-center gap-2 cursor-pointer hover:border-gray-600 hover:bg-gray-800 transition-all"
-                  onClick={() => router.push('/')}
-                  title="Ir al Dashboard"
-                >
-                   <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                   Using: <span className="font-semibold text-gray-200">{selectedModel === "gpt-4o-mini" ? "GPT-4o Mini" : selectedModel}</span>
-                </span>
-             </div>
-           )}
+          {/* Model Badge */}
+          {activeWorkspace && (
+            <div className="flex justify-center mb-2">
+              <span
+                className="bg-gray-800/90 border border-gray-700 px-3 py-1 rounded-full text-xs text-gray-400 flex items-center gap-2 cursor-pointer hover:border-gray-600 hover:bg-gray-800 transition-all"
+                onClick={() => router.push('/')}
+                title="Ir al Dashboard"
+              >
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                Using: <span className="font-semibold text-gray-200">{selectedModel === "gpt-4o-mini" ? "GPT-4o Mini" : selectedModel}</span>
+              </span>
+            </div>
+          )}
 
-           {/* Input Container */}
-           <div className={`bg-gray-900 border border-gray-700 rounded-2xl flex flex-col overflow-hidden transition-all duration-200 ${activeWorkspace ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
-              {/* Attached Files */}
-              {attachedFiles.length > 0 && (
-                 <div className="px-4 pt-3 flex flex-wrap gap-2 bg-muted/30 pb-2">
-                    {attachedFiles.map((file, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center gap-2 bg-background border border-border rounded-md px-2 py-1 text-xs text-foreground shadow-sm"
-                      >
-                        <FileText className="h-3 w-3 text-primary" />
-                        <span className="max-w-[150px] truncate">{file.name}</span>
-                        <button
-                          onClick={() => removeAttachedFile(index)}
-                          className="text-muted-foreground hover:text-destructive transition-colors"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                 </div>
-              )}
-              
-              <div className="flex items-end p-3 gap-2">
-                 <input
-                    type="file"
-                    id="file-attach"
-                    className="hidden"
-                    multiple
-                    accept=".pdf,.docx,.xlsx,.txt,.csv"
-                    onChange={handleFileAttach}
-                    disabled={!activeWorkspace}
-                  />
-                 <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl h-10 w-10" 
-                    onClick={() => document.getElementById('file-attach')?.click()}
-                      title="Adjuntar archivos al contexto"
-                 >
-                    <span className="text-2xl leading-none">+</span>
-                 </Button>
-                 
-                 <textarea
-                    ref={textareaRef}
-                    className="flex-1 bg-transparent border-0 focus:ring-0 resize-none py-2.5 max-h-40 text-foreground placeholder:text-muted-foreground leading-relaxed"
-                    placeholder="Escriba su consulta o solicitud al asistente inteligente..."
-                    disabled={!activeWorkspace || isStreaming}
-                    value={message}
-                    onChange={(e) => {
-                      setMessage(e.target.value);
-                      const target = e.target as HTMLTextAreaElement;
-                      target.style.height = 'auto';
-                      target.style.height = Math.min(target.scrollHeight, 160) + 'px';
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSendMessage();
-                      }
-                    }}
-                    rows={1}
-                    style={{ height: 'auto', minHeight: '2.5rem' }}
-                 />
-                 
-                 <div className="flex items-center gap-1">
-                   <Button
-                      variant="ghost"
-                      size="icon"
-                      className={`${listening ? 'text-destructive animate-pulse' : 'text-muted-foreground hover:text-foreground'} rounded-xl h-10 w-10`}
-                      onClick={listening ? stopListening : startListening}
-                      title="Entrada por voz (reconocimiento de audio)"
-                   >
-                      <Mic className="h-5 w-5" />
-                   </Button>
-
-                   <Button 
-                      size="icon" 
-                      className="bg-blue-600 text-white hover:bg-blue-700 rounded-xl h-10 w-10 transition-transform active:scale-95"
-                      onClick={() => handleSendMessage()}
-                      disabled={!activeWorkspace || !message.trim() || isStreaming}
-                   >
-                      {isStreaming ? <Loader2 className="h-5 w-5 animate-spin" /> : <span className="text-lg font-bold">↑</span>}
-                   </Button>
-                 </div>
+          {/* Input Container */}
+          <div className={`bg-gray-900 border border-gray-700 rounded-2xl flex flex-col overflow-hidden transition-all duration-200 ${activeWorkspace ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+            {/* Attached Files */}
+            {attachedFiles.length > 0 && (
+              <div className="px-4 pt-3 flex flex-wrap gap-2 bg-muted/30 pb-2">
+                {attachedFiles.map((file, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 bg-background border border-border rounded-md px-2 py-1 text-xs text-foreground shadow-sm"
+                  >
+                    <FileText className="h-3 w-3 text-primary" />
+                    <span className="max-w-[150px] truncate">{file.name}</span>
+                    <button
+                      onClick={() => removeAttachedFile(index)}
+                      className="text-muted-foreground hover:text-destructive transition-colors"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
               </div>
-           </div>
-           <div className="text-center mt-2 text-xs text-gray-500">
-              La IA puede cometer errores. Por favor, verifique la información crítica para decisiones empresariales.
-           </div>
+            )}
+
+            <div className="flex items-end p-3 gap-2">
+              <input
+                type="file"
+                id="file-attach"
+                className="hidden"
+                multiple
+                accept=".pdf,.docx,.xlsx,.txt,.csv"
+                onChange={handleFileAttach}
+                disabled={!activeWorkspace}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl h-10 w-10"
+                onClick={() => document.getElementById('file-attach')?.click()}
+                title="Adjuntar archivos al contexto"
+              >
+                <span className="text-2xl leading-none">+</span>
+              </Button>
+
+              <textarea
+                ref={textareaRef}
+                className="flex-1 bg-transparent border-0 outline-none focus:ring-0 resize-none py-2.5 max-h-40 text-foreground placeholder:text-muted-foreground leading-relaxed"
+                placeholder="Escriba su consulta o solicitud al asistente inteligente..."
+                disabled={!activeWorkspace || isStreaming}
+                value={message}
+                onChange={(e) => {
+                  setMessage(e.target.value);
+                  const target = e.target as HTMLTextAreaElement;
+                  target.style.height = 'auto';
+                  target.style.height = Math.min(target.scrollHeight, 160) + 'px';
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                rows={1}
+                style={{ height: 'auto', minHeight: '2.5rem' }}
+              />
+
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={`${listening ? 'text-destructive animate-pulse' : 'text-muted-foreground hover:text-foreground'} rounded-xl h-10 w-10`}
+                  onClick={listening ? stopListening : startListening}
+                  title="Entrada por voz (reconocimiento de audio)"
+                >
+                  <Mic className="h-5 w-5" />
+                </Button>
+
+                <Button
+                  size="icon"
+                  className="bg-blue-600 text-white hover:bg-blue-700 rounded-xl h-10 w-10 transition-transform active:scale-95"
+                  onClick={() => handleSendMessage()}
+                  disabled={!activeWorkspace || !message.trim() || isStreaming}
+                >
+                  {isStreaming ? <Loader2 className="h-5 w-5 animate-spin" /> : <span className="text-lg font-bold">↑</span>}
+                </Button>
+              </div>
+            </div>
+          </div>
+          <div className="text-center mt-2 text-xs text-gray-500">
+            La IA puede cometer errores. Por favor, verifique la información crítica para decisiones empresariales.
+          </div>
         </div>
       </div>
     </main>

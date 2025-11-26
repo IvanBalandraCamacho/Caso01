@@ -208,7 +208,7 @@ export function Sidebar() {
         <div className="px-3 mb-4">
           <Button
             className={cn(
-              "w-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-sm transition-all rounded-xl",
+              "w-full bg-primary/50 text-primary-foreground hover:bg-primary/90 font-medium shadow-sm transition-all rounded-xl",
               isCollapsed ? "px-0 justify-center" : "justify-start"
             )}
             onClick={handleNewConversation}

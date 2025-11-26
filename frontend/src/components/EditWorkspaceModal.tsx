@@ -7,6 +7,18 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,7 +33,7 @@ import { fetchWorkspaceDetails } from "@/lib/api";
 const getFileIcon = (fileName: string, fileType: string) => {
   const ext = fileName.split('.').pop()?.toLowerCase() || '';
   const type = fileType?.toLowerCase() || '';
-  
+
   // Priorizar la extensión del nombre del archivo
   if (ext === 'pdf' || type.includes('pdf')) {
     return <FileType className="h-5 w-5 text-red-500 shrink-0" />;
@@ -34,7 +46,7 @@ const getFileIcon = (fileName: string, fileType: string) => {
   } else if (ext === 'txt' || type.includes('text') || type === 'txt') {
     return <File className="h-5 w-5 text-gray-400 shrink-0" />;
   }
-  
+
   return <FileText className="h-5 w-5 text-gray-400 shrink-0" />;
 };
 
@@ -50,7 +62,7 @@ const getFileExtension = (fileName: string, fileType: string) => {
   if (match) {
     return match[1].toUpperCase();
   }
-  
+
   // Si no, mapear desde el tipo MIME
   const type = fileType?.toLowerCase() || '';
   if (type.includes('pdf')) return 'PDF';
@@ -59,7 +71,7 @@ const getFileExtension = (fileName: string, fileType: string) => {
   if (type.includes('powerpoint') || type.includes('pptx')) return 'PPTX';
   if (type.includes('csv')) return 'CSV';
   if (type.includes('text') || type.includes('txt')) return 'TXT';
-  
+
   return 'FILE';
 };
 
@@ -74,14 +86,14 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
   const [name, setName] = useState(workspace.name);
   const [description, setDescription] = useState(workspace.description || "");
   const [instructions, setInstructions] = useState(""); // Se cargará desde la API
-  
+
   // Estado para la lista de documentos
   const { documents, fetchDocuments, isLoadingDocs } = useWorkspaces();
   const [isUploading, setIsUploading] = useState(false); // Para el modal de subida
 
   // Estado para la lógica de guardado
   const [isSaving, setIsSaving] = useState(false);
-  
+
   // Hooks de mutación
   const updateWorkspaceMutation = useUpdateWorkspace();
   const deleteDocumentMutation = useDeleteDocument();
@@ -100,7 +112,7 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
           console.error("Error al cargar detalles del workspace", error);
         }
       };
-      
+
       loadWorkspaceDetails();
       // 2. Cargar la lista de documentos
       fetchDocuments(workspace.id);
@@ -110,7 +122,7 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
   // Lógica para guardar los cambios del workspace
   const handleUpdate = async () => {
     setIsSaving(true);
-    
+
     try {
       await updateWorkspaceMutation.mutateAsync({
         id: workspace.id,
@@ -127,13 +139,11 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
   };
 
   // Lógica para eliminar un documento
-  const handleDeleteDocument = async (docId: string, fileName: string) => {
-    if (!confirm(`¿Estás seguro de que quieres eliminar "${fileName}"?`)) return;
-    
+  const handleDeleteDocument = async (docId: string) => {
     try {
-      await deleteDocumentMutation.mutateAsync({ 
-        documentId: docId, 
-        workspaceId: workspace.id 
+      await deleteDocumentMutation.mutateAsync({
+        documentId: docId,
+        workspaceId: workspace.id
       });
       // Refrescar la lista de documentos
       fetchDocuments(workspace.id);
@@ -147,13 +157,13 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="bg-brand-dark-secondary border-gray-700 text-brand-light max-w-2xl">
+        <DialogContent className="bg-brand-dark-secondary border-gray-700 text-brand-light max-w-2xl py-8 rounded-[20_!important]">
           <DialogHeader>
             <DialogTitle>Editar Propiedades</DialogTitle>
           </DialogHeader>
-          
+
           {/* Contenido del formulario */}
-          <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-4">
+          <div className="space-y-6 max-h-[70vh] overflow-y-auto px-1 pr-4">
             {/* Nombre */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1" htmlFor="nombre">
@@ -163,7 +173,7 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
                 id="nombre"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="bg-gray-800 border-gray-700 text-white"
+                className="!bg-gray-800 border-gray-700 text-white !rounded-[8]"
               />
             </div>
 
@@ -176,7 +186,7 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
                 id="descripcion"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="bg-gray-800 border-gray-700 text-white"
+                className="!bg-gray-800 border-gray-700 text-white !rounded-[8]"
               />
             </div>
 
@@ -189,12 +199,12 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
                 id="instrucciones"
                 value={instructions}
                 onChange={(e) => setInstructions(e.target.value)}
-                className="bg-gray-800 border-gray-700 text-white min-h-[120px]"
+                className="bg-gray-800 border-gray-700 text-white min-h-[120px] !rounded-[8]"
                 rows={6}
                 placeholder="Ej: Eres un asistente experto en finanzas. Responde de forma concisa..."
               />
             </div>
-            
+
             {/* Conocimientos (Lista de Documentos) */}
             <div>
               <h3 className="text-sm font-medium text-gray-300 mb-2">
@@ -202,9 +212,9 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {isLoadingDocs && <Loader2 className="animate-spin" />}
-                
+
                 {documents.map((doc) => (
-                  <div key={doc.id} className="bg-gray-800 p-3 rounded-lg flex items-center gap-3 justify-between">
+                  <div key={doc.id} className="bg-gray-800 p-3 !rounded-[8] flex items-center gap-3 justify-between">
                     <div className="flex items-center gap-3 overflow-hidden">
                       {getFileIcon(doc.file_name, doc.file_type)}
                       <div className="flex-grow overflow-hidden">
@@ -212,25 +222,41 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
                         <p className="text-xs text-gray-400 uppercase">{getFileExtension(doc.file_name, doc.file_type)}</p>
                       </div>
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="text-red-500 hover:text-red-400 shrink-0"
-                      onClick={() => handleDeleteDocument(doc.id, doc.file_name)}
-                      disabled={deleteDocumentMutation.isPending}
-                    >
-                      {deleteDocumentMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-4 w-4" />
-                      )}
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-red-500 hover:text-red-400 shrink-0"
+                          disabled={deleteDocumentMutation.isPending}
+                        >
+                          {deleteDocumentMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="bg-brand-dark-secondary rounded-[20_!important]">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>{`¿Estás seguro de que quieres eliminar "${doc.file_name}"?`}</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Esta acción es irreversible. El documento será eliminado de forma permanente y no podrás recuperarlo.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="!rounded-[8]">Cancelar</AlertDialogCancel>
+                          <AlertDialogAction className="bg-brand-red !rounded-[8]" onClick={() => handleDeleteDocument(doc.id)}>Eliminar</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+
                   </div>
                 ))}
-                
+
                 {/* Botón para añadir más */}
-                <button 
-                  className="bg-gray-700 p-3 rounded-lg flex items-center justify-center gap-2 text-gray-300 hover:bg-gray-600 transition-colors"
+                <button
+                  className="bg-gray-700 p-3 !rounded-[8] border-dashed border-2 border-gray-600 flex items-center justify-center gap-2 text-gray-300 hover:bg-gray-600 transition-colors"
                   onClick={() => setIsUploading(true)} // Abre el otro modal
                 >
                   <Plus className="h-4 w-4" />
@@ -239,11 +265,11 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
               </div>
             </div>
           </div>
-          
+
           <DialogFooter>
-            <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-            <Button 
-              className="bg-brand-red text-white hover:bg-red-700" 
+            <Button variant="ghost" onClick={onClose} className="!rounded-[8] bg-gray-600">Cancelar</Button>
+            <Button
+              className="bg-brand-red text-white hover:bg-red-700 !rounded-[8]"
               onClick={handleUpdate}
               disabled={isSaving}
             >
@@ -252,15 +278,15 @@ export function EditWorkspaceModal({ isOpen, onClose, workspace }: EditWorkspace
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
+
       {/* Reutilizamos el UploadModal. 
         Este modal usará automáticamente el 'activeWorkspace' del contexto.
       */}
-      <UploadModal 
-        isOpen={isUploading} 
+      <UploadModal
+        isOpen={isUploading}
         onClose={() => {
           setIsUploading(false);
-        }} 
+        }}
         onSuccess={() => {
           fetchDocuments(workspace.id); // Refrescar la lista de documentos
         }}
