@@ -46,8 +46,10 @@ class Settings(BaseSettings):
                 pass
     
     # RAG External Service Configuration (NUEVO)
-    RAG_SERVICE_URL: str = "http://localhost:8080"
+    RAG_SERVICE_URL: str = "http://rag-service:8080"
     RAG_SERVICE_API_KEY: str | None = None
+    RAG_SERVICE_TIMEOUT: float = 60.0
+    RAG_SERVICE_ENABLED: bool = True
     RAG_SERVICE_TIMEOUT: float = 120.0  # 120 segundos para documentos grandes
     RAG_SERVICE_ENABLED: bool = True  # Ahora habilitado por defecto
 

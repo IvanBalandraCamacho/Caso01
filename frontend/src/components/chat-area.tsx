@@ -9,10 +9,24 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Mic, Loader2, FileText, Copy, Check, SendHorizontal, Plus } from "lucide-react";
+import {
+  Mic,
+  Loader2,
+  FileText,
+  Copy,
+  Check,
+  SendHorizontal,
+  Plus,
+} from "lucide-react";
 import { useWorkspaces } from "@/context/WorkspaceContext";
 import { UploadModal } from "./UploadModal";
-import { useChat, useConversationWithMessages, streamChatQuery } from "@/hooks/useApi";
+import { ConversationDocumentList } from "./conversation-document-list";
+import {
+  useChat,
+  useConversationWithMessages,
+  useConversationDocuments,
+  streamChatQuery,
+} from "@/hooks/useApi";
 import { generateConversationTitle } from "@/lib/api";
 import SpeechRecognition, {
   useSpeechRecognition,
@@ -54,7 +68,9 @@ export function ChatArea() {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
-  const [currentConversationId, setCurrentConversationId] = useState<string | undefined>(undefined);
+  const [currentConversationId, setCurrentConversationId] = useState<
+    string | undefined
+  >(undefined);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -83,15 +99,26 @@ export function ChatArea() {
   // const chatMutation = useChat(activeWorkspace?.id || ''); // Deprecated for streaming
 
   // Hook para cargar conversación con mensajes
-  const { data: conversationData, isLoading: isLoadingConversation, error: conversationError } = useConversationWithMessages({
-    workspaceId: activeWorkspace?.id || '',
+  const {
+    data: conversationData,
+    isLoading: isLoadingConversation,
+    error: conversationError,
+  } = useConversationWithMessages({
+    workspaceId: activeWorkspace?.id || "",
     conversationId: activeConversation?.id,
   });
+
+  // Hook para cargar documentos de la conversación
+  const { data: conversationDocuments, refetch: refetchConversationDocuments } =
+    useConversationDocuments(
+      activeWorkspace?.id || "",
+      activeConversation?.id || "",
+    );
 
   // Si hay error 404, la conversación no existe - limpiar el estado
   useEffect(() => {
     if (conversationError && activeConversation) {
-      console.warn('Conversación no encontrada, limpiando estado');
+      console.warn("Conversación no encontrada, limpiando estado");
       setChatHistory([]);
       setCurrentConversationId(undefined);
     }
@@ -127,11 +154,15 @@ export function ChatArea() {
       setCurrentConversationId(activeConversation.id);
       // Cargar mensajes de la conversación si están disponibles
       if (conversationData?.messages) {
-        const loadedMessages: ChatMessage[] = conversationData.messages.map(msg => ({
-          role: msg.role,
-          content: msg.content,
-          chunks: msg.chunk_references ? JSON.parse(msg.chunk_references) : undefined,
-        }));
+        const loadedMessages: ChatMessage[] = conversationData.messages.map(
+          (msg) => ({
+            role: msg.role,
+            content: msg.content,
+            chunks: msg.chunk_references
+              ? JSON.parse(msg.chunk_references)
+              : undefined,
+          }),
+        );
         setChatHistory(loadedMessages);
       }
     }
@@ -175,7 +206,6 @@ export function ChatArea() {
     const streamId = Date.now().toString();
     activeStreamRef.current = streamId;
 
-
     // Enviar consulta con streaming
     streamChatQuery({
       workspaceId: activeWorkspace.id,
@@ -198,11 +228,11 @@ export function ChatArea() {
           detail?: string;
         };
 
-        if (chunk.type === 'sources') {
-          setChatHistory(prev => {
+        if (chunk.type === "sources") {
+          setChatHistory((prev) => {
             const newHistory = [...prev];
             const lastMsg = { ...newHistory[newHistory.length - 1] };
-            if (lastMsg.role === 'assistant') {
+            if (lastMsg.role === "assistant") {
               lastMsg.chunks = chunk.relevant_chunks as Array<{
                 document_id: string;
                 chunk_text: string;
@@ -216,22 +246,24 @@ export function ChatArea() {
           if (chunk.conversation_id && !currentConversationId) {
             setCurrentConversationId(chunk.conversation_id);
           }
-        } else if (chunk.type === 'content') {
-          setChatHistory(prev => {
+        } else if (chunk.type === "content") {
+          setChatHistory((prev) => {
             const newHistory = [...prev];
             const lastMsg = { ...newHistory[newHistory.length - 1] };
-            if (lastMsg.role === 'assistant') {
-              lastMsg.content = lastMsg.content + (chunk.text || '');
+            if (lastMsg.role === "assistant") {
+              lastMsg.content = lastMsg.content + (chunk.text || "");
               newHistory[newHistory.length - 1] = lastMsg;
             }
             return newHistory;
           });
-        } else if (chunk.type === 'error') {
-          setChatHistory(prev => {
+        } else if (chunk.type === "error") {
+          setChatHistory((prev) => {
             const newHistory = [...prev];
             const lastMsg = { ...newHistory[newHistory.length - 1] };
-            if (lastMsg.role === 'assistant') {
-              lastMsg.content = lastMsg.content + `\n\n⚠️ Error: ${chunk.detail || 'Error desconocido'}`;
+            if (lastMsg.role === "assistant") {
+              lastMsg.content =
+                lastMsg.content +
+                `\n\n⚠️ Error: ${chunk.detail || "Error desconocido"}`;
               newHistory[newHistory.length - 1] = lastMsg;
             }
             return newHistory;
@@ -243,11 +275,13 @@ export function ChatArea() {
         if (activeStreamRef.current !== streamId) return;
 
         const error = err as { message?: string };
-        setChatHistory(prev => {
+        setChatHistory((prev) => {
           const newHistory = [...prev];
           const lastMsg = { ...newHistory[newHistory.length - 1] };
-          if (lastMsg.role === 'assistant') {
-            lastMsg.content = lastMsg.content + `\n\n❌ Error de conexión: ${error.message || 'Error desconocido'}`;
+          if (lastMsg.role === "assistant") {
+            lastMsg.content =
+              lastMsg.content +
+              `\n\n❌ Error de conexión: ${error.message || "Error desconocido"}`;
             newHistory[newHistory.length - 1] = lastMsg;
           }
           return newHistory;
@@ -265,7 +299,10 @@ export function ChatArea() {
         // Si es el primer mensaje y tenemos conversation_id, generar título automáticamente
         if (isFirstMessage && currentConversationId && activeWorkspace) {
           try {
-            await generateConversationTitle(activeWorkspace.id, currentConversationId);
+            await generateConversationTitle(
+              activeWorkspace.id,
+              currentConversationId,
+            );
             // Actualizar lista de conversaciones
             fetchConversations(activeWorkspace.id);
           } catch (error) {
@@ -274,7 +311,7 @@ export function ChatArea() {
         } else if (activeWorkspace) {
           fetchConversations(activeWorkspace.id);
         }
-      }
+      },
     });
 
     // Limpiar input y archivos adjuntos
@@ -317,24 +354,27 @@ export function ChatArea() {
     try {
       // Verificar permisos de micrófono
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach(track => track.stop()); // Detener el stream de prueba
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+        stream.getTracks().forEach((track) => track.stop()); // Detener el stream de prueba
 
         // Iniciar reconocimiento de voz
         SpeechRecognition.startListening({
           continuous: true,
-          language: 'es-ES', // Español de España
+          language: "es-ES", // Español de España
         });
       } else {
-        throw new Error('Tu navegador no soporta acceso al micrófono');
+        throw new Error("Tu navegador no soporta acceso al micrófono");
       }
     } catch (error: any) {
-      console.error('❌ Error al iniciar reconocimiento de voz:', error);
-      const errorMsg = error.name === 'NotAllowedError'
-        ? 'Permiso de micrófono denegado. Por favor, permite el acceso al micrófono en la configuración de tu navegador.'
-        : error.name === 'NotFoundError'
-          ? 'No se detectó ningún micrófono. Conecta un micrófono e intenta nuevamente.'
-          : `Error: ${error.message}`;
+      console.error("❌ Error al iniciar reconocimiento de voz:", error);
+      const errorMsg =
+        error.name === "NotAllowedError"
+          ? "Permiso de micrófono denegado. Por favor, permite el acceso al micrófono en la configuración de tu navegador."
+          : error.name === "NotFoundError"
+            ? "No se detectó ningún micrófono. Conecta un micrófono e intenta nuevamente."
+            : `Error: ${error.message}`;
       setVoiceError(errorMsg);
       alert(errorMsg);
     }
@@ -355,7 +395,7 @@ export function ChatArea() {
   }
 
   return (
-    <main className="flex-1 flex flex-col h-screen overflow-hidden bg-[#1B1C1D]" >
+    <main className="flex-1 flex flex-col h-screen overflow-hidden bg-[#1B1C1D]">
       <UploadModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -377,7 +417,8 @@ export function ChatArea() {
             variant="outline"
             className="text-gray-300 border-gray-700 hover:bg-gray-800 transition-all"
             onClick={() =>
-              activeWorkspace && exportChatToTxt(activeWorkspace.id, activeConversation?.id)
+              activeWorkspace &&
+              exportChatToTxt(activeWorkspace.id, activeConversation?.id)
             }
             disabled={!activeWorkspace || !activeConversation}
           >
@@ -387,7 +428,8 @@ export function ChatArea() {
             variant="outline"
             className="text-gray-300 border-gray-700 hover:bg-gray-800 transition-all"
             onClick={() =>
-              activeWorkspace && exportChatToPdf(activeWorkspace.id, activeConversation?.id)
+              activeWorkspace &&
+              exportChatToPdf(activeWorkspace.id, activeConversation?.id)
             }
             disabled={!activeWorkspace || !activeConversation}
           >
@@ -409,7 +451,9 @@ export function ChatArea() {
                   Bienvenido al Asistente Inteligente Tivit
                 </h2>
                 <p className="text-muted-foreground max-w-md">
-                  Seleccione un espacio de trabajo en el panel lateral para comenzar a interactuar con sus documentos corporativos mediante IA conversacional.
+                  Seleccione un espacio de trabajo en el panel lateral para
+                  comenzar a interactuar con sus documentos corporativos
+                  mediante IA conversacional.
                 </p>
               </div>
             ) : chatHistory.length === 0 ? (
@@ -419,7 +463,8 @@ export function ChatArea() {
                     {activeWorkspace.name}
                   </h3>
                   <p className="text-muted-foreground">
-                    Sistema listo para analizar y consultar su documentación empresarial.
+                    Sistema listo para analizar y consultar su documentación
+                    empresarial.
                   </p>
                 </div>
 
@@ -432,21 +477,35 @@ export function ChatArea() {
                       <FileText className="h-6 w-6 text-primary" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-foreground">Cargar Documentos</h4>
-                      <p className="text-sm text-muted-foreground mt-1">Agregue archivos PDF, DOCX, XLSX o TXT al contexto de análisis.</p>
+                      <h4 className="font-semibold text-foreground">
+                        Cargar Documentos
+                      </h4>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Agregue archivos PDF, DOCX, XLSX o TXT al contexto de
+                        análisis.
+                      </p>
                     </div>
                   </button>
 
                   <button
-                    onClick={() => handleQuickPrompt("Genera un resumen ejecutivo completo de todos los documentos disponibles en este espacio de trabajo, destacando los puntos clave, conclusiones principales y recomendaciones.")}
+                    onClick={() =>
+                      handleQuickPrompt(
+                        "Genera un resumen ejecutivo completo de todos los documentos disponibles en este espacio de trabajo, destacando los puntos clave, conclusiones principales y recomendaciones.",
+                      )
+                    }
                     className="p-6 bg-card hover:bg-accent border border-border rounded-xl text-left transition-all hover:shadow-lg group flex flex-col gap-3"
                   >
                     <div className="p-2 bg-success/10 w-fit rounded-lg group-hover:bg-success/20 transition-colors">
                       <FileText className="h-6 w-6 text-success" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-foreground">Resumen Ejecutivo del Workspace</h4>
-                      <p className="text-sm text-muted-foreground mt-1">Obtenga una síntesis inteligente de toda la documentación disponible.</p>
+                      <h4 className="font-semibold text-foreground">
+                        Resumen Ejecutivo del Workspace
+                      </h4>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Obtenga una síntesis inteligente de toda la
+                        documentación disponible.
+                      </p>
                     </div>
                   </button>
                 </div>
@@ -460,14 +519,16 @@ export function ChatArea() {
                 {chatHistory.map((msg, index) => (
                   <div
                     key={index}
-                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"
-                      }`}
+                    className={`flex ${
+                      msg.role === "user" ? "justify-end" : "justify-start"
+                    }`}
                   >
                     <div
-                      className={`max-w-[85%] break-words ${msg.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-card text-card-foreground border border-border"
-                        } rounded-2xl p-5 relative group shadow-sm`}
+                      className={`max-w-[85%] break-words ${
+                        msg.role === "user"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-card text-card-foreground border border-border"
+                      } rounded-2xl p-5 relative group shadow-sm`}
                     >
                       {/* Botón de copiar (solo para mensajes del asistente) */}
                       {msg.role === "assistant" && (
@@ -478,7 +539,10 @@ export function ChatArea() {
                           onClick={() => {
                             navigator.clipboard.writeText(msg.content);
                             setCopiedMessageId(`${index}`);
-                            showToast('Respuesta copiada al portapapeles', 'success');
+                            showToast(
+                              "Respuesta copiada al portapapeles",
+                              "success",
+                            );
                             setTimeout(() => setCopiedMessageId(null), 2000);
                           }}
                           title="Copiar respuesta"
@@ -528,7 +592,9 @@ export function ChatArea() {
                                 <p className="font-semibold mb-1 text-foreground truncate">
                                   Score: {chunk.score.toFixed(2)}
                                 </p>
-                                <p className="line-clamp-3 text-muted-foreground">{chunk.chunk_text}</p>
+                                <p className="line-clamp-3 text-muted-foreground">
+                                  {chunk.chunk_text}
+                                </p>
                               </div>
                             ))}
                           </div>
@@ -551,29 +617,50 @@ export function ChatArea() {
                 <div ref={messagesEndRef} />
               </div>
             )}
+
+            {/* Documentos de la conversación */}
+            {activeConversation && (
+              <div className="border-t border-gray-800/50 pt-4">
+                <ConversationDocumentList
+                  conversationId={activeConversation.id}
+                  documents={conversationDocuments || []}
+                  onDocumentsChange={() => refetchConversationDocuments()}
+                />
+              </div>
+            )}
           </div>
         </ScrollArea>
       </div>
 
       {/* Input Area Fija en el bottom */}
-      <div className="flex-shrink-0 border-t border-gray-800/50 p-4" style={{ backgroundColor: '#1B1C1D' }}>
+      <div
+        className="flex-shrink-0 border-t border-gray-800/50 p-4"
+        style={{ backgroundColor: "#1B1C1D" }}
+      >
         <div className="max-w-4xl mx-auto">
           {/* Model Badge */}
           {activeWorkspace && (
             <div className="flex justify-center mb-2">
               <span
                 className="bg-gray-800/90 border border-gray-700 px-3 py-1 rounded-full text-xs text-gray-400 flex items-center gap-2 cursor-pointer hover:border-gray-600 hover:bg-gray-800 transition-all"
-                onClick={() => router.push('/')}
+                onClick={() => router.push("/")}
                 title="Ir al Dashboard"
               >
                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                Using: <span className="font-semibold text-gray-200">{selectedModel === "gpt-4o-mini" ? "GPT-4o Mini" : selectedModel}</span>
+                Using:{" "}
+                <span className="font-semibold text-gray-200">
+                  {selectedModel === "gpt-4o-mini"
+                    ? "GPT-4o Mini"
+                    : selectedModel}
+                </span>
               </span>
             </div>
           )}
 
           {/* Input Container */}
-          <div className={`bg-[#2B2B2E] border border-gray-700 rounded-3xl flex flex-col  overflow-hidden transition-all duration-200 ${activeWorkspace ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+          <div
+            className={`bg-[#2B2B2E] border border-gray-700 rounded-3xl flex flex-col  overflow-hidden transition-all duration-200 ${activeWorkspace ? "opacity-100" : "opacity-50 pointer-events-none"}`}
+          >
             {/* Attached Files */}
             {attachedFiles.length > 0 && (
               <div className="px-4 pt-3 flex flex-wrap gap-2 bg-muted/30 pb-2">
@@ -609,7 +696,7 @@ export function ChatArea() {
                 variant="ghost"
                 size="icon"
                 className="text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-xl h-10 w-10"
-                onClick={() => document.getElementById('file-attach')?.click()}
+                onClick={() => document.getElementById("file-attach")?.click()}
                 title="Adjuntar archivos al contexto"
               >
                 <Plus />
@@ -624,24 +711,25 @@ export function ChatArea() {
                 onChange={(e) => {
                   setMessage(e.target.value);
                   const target = e.target as HTMLTextAreaElement;
-                  target.style.height = 'auto';
-                  target.style.height = Math.min(target.scrollHeight, 160) + 'px';
+                  target.style.height = "auto";
+                  target.style.height =
+                    Math.min(target.scrollHeight, 160) + "px";
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
+                  if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
                     handleSendMessage();
                   }
                 }}
                 rows={1}
-                style={{ height: 'auto', minHeight: '2.5rem' }}
+                style={{ height: "auto", minHeight: "2.5rem" }}
               />
 
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className={`${listening ? 'text-destructive animate-pulse' : 'text-muted-foreground hover:text-foreground hover:bg-white/5'} rounded-xl h-10 w-10`}
+                  className={`${listening ? "text-destructive animate-pulse" : "text-muted-foreground hover:text-foreground hover:bg-white/5"} rounded-xl h-10 w-10`}
                   onClick={listening ? stopListening : startListening}
                   title="Entrada por voz (reconocimiento de audio)"
                 >
@@ -654,13 +742,18 @@ export function ChatArea() {
                   onClick={() => handleSendMessage()}
                   disabled={!activeWorkspace || !message.trim() || isStreaming}
                 >
-                  {isStreaming ? <Loader2 className="h-5 w-5 animate-spin" /> : <SendHorizontal />}
+                  {isStreaming ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <SendHorizontal />
+                  )}
                 </Button>
               </div>
             </div>
           </div>
           <div className="text-center mt-2 text-xs text-gray-500">
-            La IA puede cometer errores. Por favor, verifique la información crítica para decisiones empresariales.
+            La IA puede cometer errores. Por favor, verifique la información
+            crítica para decisiones empresariales.
           </div>
         </div>
       </div>

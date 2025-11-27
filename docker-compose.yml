@@ -18,6 +18,7 @@ services:
       - RAG_SERVICE_URL=http://rag-service:8080
       - RAG_SERVICE_API_KEY=${RAG_SERVICE_API_KEY:-}
       - RAG_SERVICE_ENABLED=true
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
       - mysql
       - redis
@@ -95,6 +96,7 @@ services:
       - ./backend/.env
     environment:
       - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
       - redis
     volumes:
