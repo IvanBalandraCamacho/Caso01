@@ -35,6 +35,7 @@ class SearchResult(BaseModel):
 class SearchRequest(BaseModel):
     query: str
     workspace_id: Optional[str] = None
+    conversation_id: Optional[str] = None
     limit: int = 5
     threshold: float = 0.7
 
@@ -133,6 +134,7 @@ class RAGClient:
         self,
         query: str,
         workspace_id: Optional[str] = None,
+        conversation_id: Optional[str] = None,
         limit: int = 5,
         threshold: float = 0.7
     ) -> List[SearchResult]:
@@ -142,6 +144,7 @@ class RAGClient:
         Args:
             query: Texto de búsqueda
             workspace_id: ID del workspace (opcional, para filtrar)
+            conversation_id: ID de la conversación (opcional, para filtrar documentos específicos)
             limit: Número máximo de resultados
             threshold: Umbral mínimo de similitud
 
@@ -156,6 +159,8 @@ class RAGClient:
             }
             if workspace_id:
                 payload["workspace_id"] = workspace_id
+            if conversation_id:
+                payload["conversation_id"] = conversation_id
 
             response_data = await self._make_request("POST", "/search", json=payload)
 
