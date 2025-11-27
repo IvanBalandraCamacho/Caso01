@@ -22,6 +22,8 @@ from core.config import settings
 
 # DEPRECADO: from processing import vector_store (eliminado - usar rag_client)
 from core.rag_client import rag_client
+from core import llm_service
+from routes import task
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse, StreamingResponse
 from models import database, schemas
@@ -307,12 +309,14 @@ def create_workspace(
 
     - **name**: El nombre del workspace (requerido).
     - **description**: Descripción opcional.
+    - **instructions**: Instrucciones opcionales para el asistente AI.
     """
 
     # Crear la nueva instancia del modelo SQLAlchemy
     db_workspace = workspace_model.Workspace(
         name=workspace_in.name,
         description=workspace_in.description,
+        instructions=workspace_in.instructions,
         owner_id=current_user.id,  # Asignar al usuario actual
     )
 
@@ -671,6 +675,12 @@ async def chat_with_workspace(
         .filter(workspace_model.Workspace.id == workspace_id)
         .first()
     )
+    
+    if db_workspace.instructions:
+        workspace_instructions = db_workspace.instructions
+        print(f"Instrucciones del workspace: {db_workspace.instructions}")
+    else:
+        workspace_instructions = ""
 
     if not db_workspace:
         raise HTTPException(status_code=404, detail="Workspace no encontrado.")
@@ -713,7 +723,7 @@ async def chat_with_workspace(
     db.commit()
 
     # -------------------------------------------------------------
-    # 5. Retrieval dinámico
+    # 4. Retrieval dinámico
     # -------------------------------------------------------------
     query_length = len(chat_request.query.split())
     top_k = 15 if query_length > 20 else 10
@@ -740,6 +750,13 @@ async def chat_with_workspace(
             ]
         except Exception as e:
             print(f"ERROR RAG: {e}")
+            
+    # -------------------------------------------------------------
+    # 5. Identificar intención de consulta de usuario
+    # -------------------------------------------------------------  
+
+    intent = llm_service.classify_intent(chat_request.query)
+    print(f"Intención detectada: {intent}")
 
     # -------------------------------------------------------------
     # 6. Streaming de respuesta del modelo
@@ -762,11 +779,14 @@ async def chat_with_workspace(
         )
 
         full_response_text = ""
+        
+        if intent == "GENERATE_PROPOSAL":
+            response_stream = task.analyze_document(chat_request.query, relevant_chunks, chat_request.model, workspace_instructions)
+        elif intent == "GENERAL_QUERY":
+            response_stream = task.respond_chat(chat_request.query, relevant_chunks, chat_request.model, workspace_instructions)
 
         try:
-            for token in llm_service.generate_response_stream(
-                chat_request.query, relevant_chunks, chat_request.model
-            ):
+            for token in response_stream:
                 full_response_text += token
                 yield json.dumps({"type": "content", "text": token}) + "\n"
 
