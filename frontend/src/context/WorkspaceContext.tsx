@@ -23,7 +23,9 @@ import {
   exportChatToPdfApi,
   deleteChatHistoryApi,
   fulltextSearchApi,
-} from '@/lib/api';
+  fetchConversationDocuments,
+  uploadDocumentToConversation,
+} from "@/lib/api";
 
 // 1. Exportamos las interfaces para que otros archivos las usen
 export interface Workspace {
@@ -92,10 +94,20 @@ interface WorkspaceContextType {
   activeConversation: Conversation | null;
   setActiveConversation: (conversation: Conversation | null) => void;
   fetchConversations: (workspaceId: string) => Promise<void>;
-  createConversation: (workspaceId: string, title: string) => Promise<Conversation>;
+  createConversation: (
+    workspaceId: string,
+    title: string,
+  ) => Promise<Conversation>;
   deleteConversation: (conversationId: string) => Promise<void>;
   fetchConversationMessages: (conversationId: string) => Promise<Message[]>;
-  
+
+  // Conversation documents
+  fetchConversationDocuments: (conversationId: string) => Promise<Document[]>;
+  uploadDocumentToConversation: (
+    conversationId: string,
+    formData: FormData,
+  ) => Promise<Document>;
+
   // Model selection
   selectedModel: string;
   setSelectedModel: (model: string) => void;
@@ -104,20 +116,26 @@ interface WorkspaceContextType {
   fetchWorkspaces: () => Promise<void>;
   updateWorkspace: (
     workspaceId: string,
-    data: Partial<Workspace>
+    data: Partial<Workspace>,
   ) => Promise<void>;
   deleteWorkspace: (workspaceId: string) => Promise<void>;
   deleteDocument: (documentId: string) => Promise<void>;
   exportDocumentsToCsv: (workspaceId: string) => Promise<void>;
-  exportChatToTxt: (workspaceId: string, conversationId?: string) => Promise<void>;
-  exportChatToPdf: (workspaceId: string, conversationId?: string) => Promise<void>;
+  exportChatToTxt: (
+    workspaceId: string,
+    conversationId?: string,
+  ) => Promise<void>;
+  exportChatToPdf: (
+    workspaceId: string,
+    conversationId?: string,
+  ) => Promise<void>;
   deleteChatHistory: (workspaceId: string) => Promise<void>;
   fulltextSearch: (query: string) => Promise<unknown[]>;
 }
 
 // 3. Creamos el Contexto
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(
-  undefined
+  undefined,
 );
 
 // 4. Creamos el "Proveedor"
@@ -126,7 +144,7 @@ export function WorkspaceProvider({
 }: Readonly<{ children: ReactNode }>) {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [activeWorkspace, setActiveWorkspace] = useState<Workspace | null>(
-    null
+    null,
   );
 
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -134,11 +152,12 @@ export function WorkspaceProvider({
   const [errorDocs, setErrorDocs] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [searchResults, setSearchResults] = useState<unknown[]>([]);
-  
+
   // Estados para conversaciones
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
-  
+  const [activeConversation, setActiveConversation] =
+    useState<Conversation | null>(null);
+
   // Estado para el modelo LLM seleccionado
   const [selectedModel, setSelectedModel] = useState<string>("gpt-4o-mini");
 
@@ -159,39 +178,37 @@ export function WorkspaceProvider({
   }, []);
 
   // --- Función para cargar documentos ---
-  const fetchDocuments = useCallback(
-    async (workspaceId: string) => {
-      setIsLoadingDocs(true);
-      setErrorDocs(null);
-      try {
-        const data: Document[] = await fetchWorkspaceDocumentsApi(workspaceId);
-        setDocuments(data);
-      } catch (error) {
-        console.error("Error al cargar documentos:", error);
-        const errorMessage = error instanceof Error ? error.message : "Error desconocido";
-        setErrorDocs(errorMessage);
-        setDocuments([]);
-      } finally {
-        setIsLoadingDocs(false);
-      }
-    },
-    []
-  );
+  const fetchDocuments = useCallback(async (workspaceId: string) => {
+    setIsLoadingDocs(true);
+    setErrorDocs(null);
+    try {
+      const data: Document[] = await fetchWorkspaceDocumentsApi(workspaceId);
+      setDocuments(data);
+    } catch (error) {
+      console.error("Error al cargar documentos:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Error desconocido";
+      setErrorDocs(errorMessage);
+      setDocuments([]);
+    } finally {
+      setIsLoadingDocs(false);
+    }
+  }, []);
 
   // --- Polling automático para documentos en procesamiento ---
   useEffect(() => {
     if (!activeWorkspace) return;
-    
+
     // Verificar si hay documentos en estado PROCESSING o PENDING
     const hasProcessingDocuments = documents.some(
-      doc => doc.status === "PROCESSING" || doc.status === "PENDING"
+      (doc) => doc.status === "PROCESSING" || doc.status === "PENDING",
     );
-    
+
     if (hasProcessingDocuments) {
       const intervalId = setInterval(() => {
         fetchDocuments(activeWorkspace.id);
       }, 3000); // Refrescar cada 3 segundos
-      
+
       return () => {
         clearInterval(intervalId);
       };
@@ -217,7 +234,7 @@ export function WorkspaceProvider({
         throw error; // Lanzar error para que el modal lo sepa
       }
     },
-    [fetchWorkspaces, activeWorkspace]
+    [fetchWorkspaces, activeWorkspace],
   );
 
   // --- Función para borrar workspace ---
@@ -235,39 +252,39 @@ export function WorkspaceProvider({
         throw error; // Lanzar error
       }
     },
-    [fetchWorkspaces, activeWorkspace]
+    [fetchWorkspaces, activeWorkspace],
   );
 
   // --- Función para cargar conversaciones ---
-  const fetchConversations = useCallback(
-    async (workspaceId: string) => {
-      try {
-        const data: Conversation[] = await fetchConversationsApi(workspaceId);
-        setConversations(data);
-      } catch (error) {
-        console.error("Error al cargar conversaciones:", error);
-        setConversations([]);
-      }
-    },
-    []
-  );
+  const fetchConversations = useCallback(async (workspaceId: string) => {
+    try {
+      const data: Conversation[] = await fetchConversationsApi(workspaceId);
+      setConversations(data);
+    } catch (error) {
+      console.error("Error al cargar conversaciones:", error);
+      setConversations([]);
+    }
+  }, []);
 
   // --- Función para crear conversación ---
   const createConversation = useCallback(
     async (workspaceId: string, title: string): Promise<Conversation> => {
       try {
-        const newConversation: Conversation = await createConversationApi(workspaceId, title);
-        
+        const newConversation: Conversation = await createConversationApi(
+          workspaceId,
+          title,
+        );
+
         // Refrescar lista de conversaciones
         await fetchConversations(workspaceId);
-        
+
         return newConversation;
       } catch (error) {
         console.error("Error al crear conversación:", error);
         throw error;
       }
     },
-    [fetchConversations]
+    [fetchConversations],
   );
 
   // --- Función para eliminar conversación ---
@@ -276,7 +293,7 @@ export function WorkspaceProvider({
       if (!activeWorkspace) return;
       try {
         await deleteConversationApi(activeWorkspace.id, conversationId);
-        
+
         if (activeConversation?.id === conversationId) {
           setActiveConversation(null);
         }
@@ -286,7 +303,7 @@ export function WorkspaceProvider({
         throw error;
       }
     },
-    [activeWorkspace, activeConversation, fetchConversations]
+    [activeWorkspace, activeConversation, fetchConversations],
   );
 
   // --- Función para cargar mensajes de una conversación ---
@@ -294,57 +311,96 @@ export function WorkspaceProvider({
     async (conversationId: string): Promise<Message[]> => {
       if (!activeWorkspace) return [];
       try {
-        const data: ConversationWithMessages = await fetchConversationMessagesApi(activeWorkspace.id, conversationId);
+        const data: ConversationWithMessages =
+          await fetchConversationMessagesApi(
+            activeWorkspace.id,
+            conversationId,
+          );
         return data.messages;
       } catch (error) {
         console.error("Error al cargar mensajes:", error);
         return [];
       }
     },
-    [activeWorkspace]
+    [activeWorkspace],
   );
 
-  // --- Función para exportar a CSV ---
-  const exportDocumentsToCsv = useCallback(
-    async (workspaceId: string) => {
+  // --- Función para cargar documentos de una conversación ---
+  const fetchConversationDocumentsCallback = useCallback(
+    async (conversationId: string): Promise<Document[]> => {
+      if (!activeWorkspace) return [];
       try {
-        const blob = await exportDocumentsToCsvApi(workspaceId);
-        
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `documents_${workspaceId}.csv`;
-        document.body.appendChild(link);
-        link.click();
-        
-        // Cleanup
-        setTimeout(() => {
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(url);
-        }, 100);
+        const data: Document[] = await fetchConversationDocuments(
+          activeWorkspace.id,
+          conversationId,
+        );
+        return data;
       } catch (error) {
-        console.error("Error al exportar a CSV:", error);
-        const errorMessage = error instanceof Error ? error.message : "Error desconocido";
-        alert(`Error al exportar CSV: ${errorMessage}`);
+        console.error("Error al cargar documentos de conversación:", error);
+        return [];
+      }
+    },
+    [activeWorkspace],
+  );
+
+  // --- Función para subir documento a una conversación ---
+  const uploadDocumentToConversationCallback = useCallback(
+    async (conversationId: string, formData: FormData): Promise<Document> => {
+      if (!activeWorkspace) throw new Error("No active workspace");
+      try {
+        const data: Document = await uploadDocumentToConversation(
+          activeWorkspace.id,
+          conversationId,
+          formData,
+        );
+        return data;
+      } catch (error) {
+        console.error("Error al subir documento a conversación:", error);
         throw error;
       }
     },
-    []
+    [activeWorkspace],
   );
+
+  // --- Función para exportar a CSV ---
+  const exportDocumentsToCsv = useCallback(async (workspaceId: string) => {
+    try {
+      const blob = await exportDocumentsToCsvApi(workspaceId);
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `documents_${workspaceId}.csv`;
+      document.body.appendChild(link);
+      link.click();
+
+      // Cleanup
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+    } catch (error) {
+      console.error("Error al exportar a CSV:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Error desconocido";
+      alert(`Error al exportar CSV: ${errorMessage}`);
+      throw error;
+    }
+  }, []);
 
   // --- Función para exportar a TXT ---
   const exportChatToTxt = useCallback(
     async (workspaceId: string, conversationId?: string) => {
       try {
         const blob = await exportChatToTxtApi(workspaceId, conversationId);
-        
+
         const downloadUrl = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = downloadUrl;
         a.download = `chat_${conversationId || workspaceId}_${new Date().getTime()}.txt`;
         document.body.appendChild(a);
         a.click();
-        
+
         // Cleanup
         setTimeout(() => {
           document.body.removeChild(a);
@@ -352,12 +408,13 @@ export function WorkspaceProvider({
         }, 100);
       } catch (error) {
         console.error("Error al exportar a TXT:", error);
-        const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+        const errorMessage =
+          error instanceof Error ? error.message : "Error desconocido";
         alert(`Error al exportar TXT: ${errorMessage}`);
         throw error;
       }
     },
-    []
+    [],
   );
 
   // --- Función para exportar a PDF ---
@@ -365,14 +422,14 @@ export function WorkspaceProvider({
     async (workspaceId: string, conversationId?: string) => {
       try {
         const blob = await exportChatToPdfApi(workspaceId, conversationId);
-        
+
         const downloadUrl = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = downloadUrl;
         a.download = `chat_${conversationId || workspaceId}_${new Date().getTime()}.pdf`;
         document.body.appendChild(a);
         a.click();
-        
+
         // Cleanup
         setTimeout(() => {
           document.body.removeChild(a);
@@ -380,41 +437,36 @@ export function WorkspaceProvider({
         }, 100);
       } catch (error) {
         console.error("Error al exportar a PDF:", error);
-        const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+        const errorMessage =
+          error instanceof Error ? error.message : "Error desconocido";
         alert(`Error al exportar PDF: ${errorMessage}`);
         throw error;
       }
     },
-    []
+    [],
   );
 
   // --- Función para borrar historial de chat ---
-  const deleteChatHistory = useCallback(
-    async (workspaceId: string) => {
-      try {
-        await deleteChatHistoryApi(workspaceId);
-      } catch (error) {
-        console.error("Error al borrar el historial de chat:", error);
-        throw error;
-      }
-    },
-    []
-  );
+  const deleteChatHistory = useCallback(async (workspaceId: string) => {
+    try {
+      await deleteChatHistoryApi(workspaceId);
+    } catch (error) {
+      console.error("Error al borrar el historial de chat:", error);
+      throw error;
+    }
+  }, []);
 
   // --- Función para búsqueda de texto completo ---
-  const fulltextSearch = useCallback(
-    async (query: string) => {
-      try {
-        const data = await fulltextSearchApi(query);
-        setSearchResults(data);
-        return data;
-      } catch (error) {
-        console.error("Error en la búsqueda de texto completo:", error);
-        throw error;
-      }
-    },
-    []
-  );
+  const fulltextSearch = useCallback(async (query: string) => {
+    try {
+      const data = await fulltextSearchApi(query);
+      setSearchResults(data);
+      return data;
+    } catch (error) {
+      console.error("Error en la búsqueda de texto completo:", error);
+      throw error;
+    }
+  }, []);
 
   // --- Función para borrar documento ---
   const deleteDocument = useCallback(
@@ -430,13 +482,13 @@ export function WorkspaceProvider({
         throw error; // Lanzar error
       }
     },
-    [activeWorkspace, fetchDocuments]
+    [activeWorkspace, fetchDocuments],
   );
 
   // Cargar workspaces al inicio solo si el usuario está autenticado
   useEffect(() => {
     // Solo cargar si hay token (usuario autenticado)
-    if (typeof window !== 'undefined' && localStorage.getItem('access_token')) {
+    if (typeof window !== "undefined" && localStorage.getItem("access_token")) {
       fetchWorkspaces();
     }
   }, [fetchWorkspaces]);
@@ -455,12 +507,12 @@ export function WorkspaceProvider({
       setDocuments([]);
     };
 
-    window.addEventListener('loginSuccess', handleLoginSuccess);
-    window.addEventListener('logout', handleLogout);
-    
+    window.addEventListener("loginSuccess", handleLoginSuccess);
+    window.addEventListener("logout", handleLogout);
+
     return () => {
-      window.removeEventListener('loginSuccess', handleLoginSuccess);
-      window.removeEventListener('logout', handleLogout);
+      window.removeEventListener("loginSuccess", handleLoginSuccess);
+      window.removeEventListener("logout", handleLogout);
     };
   }, [fetchWorkspaces]);
 
@@ -487,6 +539,8 @@ export function WorkspaceProvider({
       createConversation,
       deleteConversation,
       fetchConversationMessages,
+      fetchConversationDocuments: fetchConversationDocumentsCallback,
+      uploadDocumentToConversation: uploadDocumentToConversationCallback,
       fetchWorkspaces,
       updateWorkspace,
       deleteWorkspace,
@@ -501,19 +555,26 @@ export function WorkspaceProvider({
     }),
     [
       workspaces,
+      setWorkspaces,
       activeWorkspace,
+      setActiveWorkspace,
       documents,
       isLoadingDocs,
       errorDocs,
       fetchDocuments,
       notifications,
+      addNotification,
       searchResults,
+      setSearchResults,
       conversations,
       activeConversation,
+      setActiveConversation,
       fetchConversations,
       createConversation,
       deleteConversation,
       fetchConversationMessages,
+      fetchConversationDocumentsCallback,
+      uploadDocumentToConversationCallback,
       fetchWorkspaces,
       updateWorkspace,
       deleteWorkspace,
@@ -525,7 +586,7 @@ export function WorkspaceProvider({
       fulltextSearch,
       selectedModel,
       setSelectedModel,
-    ]
+    ],
   );
 
   return (
@@ -540,9 +601,8 @@ export function useWorkspaces() {
   const context = useContext(WorkspaceContext);
   if (context === undefined) {
     throw new Error(
-      "useWorkspaces debe ser usado dentro de un WorkspaceProvider"
+      "useWorkspaces debe ser usado dentro de un WorkspaceProvider",
     );
   }
   return context;
 }
-

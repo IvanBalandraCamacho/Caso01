@@ -27,12 +27,10 @@ class Workspace(Base):
         "Document",
         back_populates="workspace",
         cascade="all, delete-orphan",
-        passive_deletes=True,
     )
     
     conversations = relationship(
         "Conversation",
         back_populates="workspace",
         cascade="all, delete-orphan",
-        passive_deletes=True,
     )
