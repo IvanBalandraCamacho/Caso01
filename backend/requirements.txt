@@ -21,6 +21,8 @@ cryptography  # Requerido por PyMySQL
 sqlalchemy
 redis
 celery
+# --- Async Utilities ---
+nest_asyncio
 
 # --- IA y LLM ---
 openai>=1.54.0  # Cliente requerido para OpenAI

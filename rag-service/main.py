@@ -13,7 +13,7 @@ from pathlib import Path
 
 import redis
 import numpy as np
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, validator
 import openai
@@ -64,6 +64,7 @@ class DocumentMetadata(BaseModel):
 class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=1000)
     workspace_id: Optional[str] = None
+    conversation_id: Optional[str] = None  # Nuevo: filtro por conversación
     limit: int = Field(5, ge=1, le=50)  # Max 50 results
     threshold: float = Field(0.7, ge=0.0, le=1.0)
     offset: int = Field(0, ge=0)
@@ -202,13 +203,14 @@ def extract_text_from_file(file: UploadFile) -> str:
 # Endpoints
 @app.post("/ingest_text", response_model=IngestResponse)
 async def ingest_text_content(
-    request: RAGIngestRequest
+    request: Request,
+    rag_request: RAGIngestRequest
 ):
     """Index text content"""
     try:
         document_id = str(uuid.uuid4())
 
-        text_content = request.content
+        text_content = rag_request.content
 
         if not text_content.strip():
             raise HTTPException(status_code=400, detail="Empty content")
@@ -222,12 +224,12 @@ async def ingest_text_content(
             embedding = get_embedding(chunk)
 
             metadata_dict = {
-                **request.metadata,
-                "workspace_id": request.workspace_id,
+                **rag_request.metadata,
+                "workspace_id": rag_request.workspace_id,
                 "chunk_index": i
             }
-            if request.user_id is not None:
-                metadata_dict["user_id"] = request.user_id
+            if rag_request.user_id is not None:
+                metadata_dict["user_id"] = rag_request.user_id
             
             chunk_data = {
                 "document_id": document_id,
@@ -242,13 +244,13 @@ async def ingest_text_content(
 
         doc_metadata = {
             "document_id": document_id,
-            "workspace_id": request.workspace_id,
+            "workspace_id": rag_request.workspace_id,
             "total_chunks": len(chunks),
             "chunk_ids": json.dumps(chunk_ids),
-            **request.metadata
+            **rag_request.metadata
         }
-        if request.user_id is not None:
-            doc_metadata["user_id"] = request.user_id
+        if rag_request.user_id is not None:
+            doc_metadata["user_id"] = rag_request.user_id
         
         redis_client.hset(f"document:{document_id}", mapping=doc_metadata)
 
@@ -265,13 +267,13 @@ async def ingest_text_content(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/ingest_batch", response_model=BatchIngestResponse)
-async def ingest_batch(request: BatchIngestRequest):
+async def ingest_batch(request: Request, batch_request: BatchIngestRequest):
     """Batch index documents"""
     try:
         results = []
         total_chunks = 0
         
-        for doc_request in request.documents:
+        for doc_request in batch_request.documents:
             document_id = str(uuid.uuid4())
             text_content = doc_request.content
             
@@ -340,22 +342,22 @@ async def ingest_batch(request: BatchIngestRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/search", response_model=List[SearchResult])
-async def search_documents(request: SearchRequest):
+async def search_documents(request: Request, search_request: SearchRequest):
     """Search documents"""
     try:
-        logger.info(f"Search: '{request.query}' | WS: {request.workspace_id} | Thresh: {request.threshold}")
+        logger.info(f"Search: '{search_request.query}' | WS: {search_request.workspace_id} | Conv: {search_request.conversation_id} | Thresh: {search_request.threshold}")
         
-        query_embedding = get_embedding(request.query)
+        query_embedding = get_embedding(search_request.query)
 
         search_pattern = "chunk:*"
-        if request.workspace_id:
+        if search_request.workspace_id:
             relevant_chunks = []
 
             for doc_key in redis_client.scan_iter("document:*"):
                 doc_data = redis_client.hgetall(doc_key)
                 workspace_id = doc_data.get("workspace_id")
                 
-                if workspace_id == request.workspace_id:
+                if workspace_id == search_request.workspace_id:
                     chunk_ids_str = doc_data.get("chunk_ids")
                     chunk_ids = json.loads(chunk_ids_str)
                     relevant_chunks.extend(chunk_ids)
@@ -376,10 +378,18 @@ async def search_documents(request: SearchRequest):
 
             embedding = json.loads(zlib.decompress(bytes.fromhex(embedding_str)).decode('utf-8'))
             content = zlib.decompress(bytes.fromhex(content_str)).decode('utf-8')
+            metadata = json.loads(metadata_str)
+            
+            # Filtrar por conversation_id si se especifica
+            if search_request.conversation_id:
+                chunk_conversation_id = metadata.get("conversation_id")
+                # Solo incluir chunks sin conversation_id (workspace-level) o con el conversation_id exacto
+                if chunk_conversation_id and chunk_conversation_id != search_request.conversation_id:
+                    continue
+            
             similarity = cosine_similarity(query_embedding, embedding)
 
-            if similarity >= request.threshold:
-                metadata = json.loads(metadata_str)
+            if similarity >= search_request.threshold:
                 results.append(SearchResult(
                     document_id=document_id_str,
                     content=content,
@@ -388,10 +398,10 @@ async def search_documents(request: SearchRequest):
                 ))
 
         results.sort(key=lambda x: x.score, reverse=True)
-        initial_results = results[:request.limit * 2]
+        initial_results = results[:search_request.limit * 2]
 
         if initial_results:
-            query_content_pairs = [[request.query, result.content] for result in initial_results]
+            query_content_pairs = [[search_request.query, result.content] for result in initial_results]
             rerank_scores = cross_encoder.predict(query_content_pairs)
             
             for i, result in enumerate(initial_results):
@@ -399,7 +409,7 @@ async def search_documents(request: SearchRequest):
             
             initial_results.sort(key=lambda x: x.score, reverse=True)
 
-        results = initial_results[request.offset:request.offset + request.limit]
+        results = initial_results[search_request.offset:search_request.offset + search_request.limit]
 
         logger.info(f"Search done: {len(results)} results")
 
@@ -410,7 +420,7 @@ async def search_documents(request: SearchRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/delete/{document_id}")
-async def delete_document(document_id: str):
+async def delete_document(request: Request, document_id: str):
     """Delete document"""
     try:
         doc_key = f"document:{document_id}"
@@ -434,7 +444,7 @@ async def delete_document(document_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")
-async def health_check():
+async def health_check(request: Request):
     """Health check"""
     try:
         redis_client.ping()

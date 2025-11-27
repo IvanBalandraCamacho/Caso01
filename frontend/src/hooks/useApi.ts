@@ -1,5 +1,11 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, ingestText, searchRAG, deleteRAGDocument, ragHealthCheck } from '@/lib/api';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  api,
+  ingestText,
+  searchRAG,
+  deleteRAGDocument,
+  ragHealthCheck,
+} from "@/lib/api";
 import {
   WorkspacePublic,
   WorkspaceCreate,
@@ -14,15 +20,15 @@ import {
   IngestResponse,
   SearchRequest,
   SearchResult,
-} from '@/types/api';
+} from "@/types/api";
 
 // ============================================
 // QUERY KEYS
 // ============================================
-const WORKSPACES_QUERY_KEY = 'workspaces';
-const DOCUMENTS_QUERY_KEY = 'documents';
-const CONVERSATIONS_QUERY_KEY = 'conversations';
-const CONVERSATION_DETAILS_QUERY_KEY = 'conversation-details';
+const WORKSPACES_QUERY_KEY = "workspaces";
+const DOCUMENTS_QUERY_KEY = "documents";
+const CONVERSATIONS_QUERY_KEY = "conversations";
+const CONVERSATION_DETAILS_QUERY_KEY = "conversation-details";
 
 // ============================================
 // API FUNCTIONS - WORKSPACES
@@ -33,7 +39,7 @@ const CONVERSATION_DETAILS_QUERY_KEY = 'conversation-details';
  * GET /workspaces
  */
 const fetchWorkspaces = async (): Promise<WorkspacePublic[]> => {
-  const { data } = await api.get<WorkspacePublic[]>('/workspaces');
+  const { data } = await api.get<WorkspacePublic[]>("/workspaces");
   return data;
 };
 
@@ -50,8 +56,10 @@ const fetchWorkspaceById = async (id: string): Promise<WorkspacePublic> => {
  * Crear un nuevo workspace
  * POST /workspaces
  */
-const createWorkspace = async (newWorkspace: WorkspaceCreate): Promise<WorkspacePublic> => {
-  const { data } = await api.post<WorkspacePublic>('/workspaces', newWorkspace);
+const createWorkspace = async (
+  newWorkspace: WorkspaceCreate,
+): Promise<WorkspacePublic> => {
+  const { data } = await api.post<WorkspacePublic>("/workspaces", newWorkspace);
   return data;
 };
 
@@ -86,8 +94,12 @@ const deleteWorkspace = async (id: string): Promise<void> => {
  * Obtener documentos de un workspace
  * GET /workspaces/{id}/documents
  */
-const fetchWorkspaceDocuments = async (workspaceId: string): Promise<DocumentPublic[]> => {
-  const { data } = await api.get<DocumentPublic[]>(`/workspaces/${workspaceId}/documents`);
+const fetchWorkspaceDocuments = async (
+  workspaceId: string,
+): Promise<DocumentPublic[]> => {
+  const { data } = await api.get<DocumentPublic[]>(
+    `/workspaces/${workspaceId}/documents`,
+  );
   return data;
 };
 
@@ -95,18 +107,66 @@ const fetchWorkspaceDocuments = async (workspaceId: string): Promise<DocumentPub
  * Subir un documento a un workspace
  * POST /workspaces/{id}/upload
  */
-const uploadDocument = async ({ workspaceId, file }: UploadDocumentParams): Promise<DocumentPublic> => {
+const uploadDocument = async ({
+  workspaceId,
+  file,
+}: UploadDocumentParams): Promise<DocumentPublic> => {
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append("file", file);
 
   const { data } = await api.post<DocumentPublic>(
     `/workspaces/${workspaceId}/upload`,
     formData,
     {
       headers: {
-        'Content-Type': 'multipart/form-data',
+        "Content-Type": "multipart/form-data",
       },
-    }
+    },
+  );
+  return data;
+};
+
+/**
+ * Obtener documentos de una conversación
+ * GET /workspaces/{workspace_id}/conversations/{conversation_id}/documents
+ */
+const fetchConversationDocuments = async ({
+  workspaceId,
+  conversationId,
+}: {
+  workspaceId: string;
+  conversationId: string;
+}): Promise<DocumentPublic[]> => {
+  const { data } = await api.get<DocumentPublic[]>(
+    `/workspaces/${workspaceId}/conversations/${conversationId}/documents`,
+  );
+  return data;
+};
+
+/**
+ * Subir un documento a una conversación
+ * POST /workspaces/{workspace_id}/conversations/{conversation_id}/upload
+ */
+const uploadDocumentToConversation = async ({
+  workspaceId,
+  conversationId,
+  file,
+}: {
+  workspaceId: string;
+  conversationId: string;
+  file: File;
+}): Promise<DocumentPublic> => {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const { data } = await api.post<DocumentPublic>(
+    `/workspaces/${workspaceId}/conversations/${conversationId}/upload`,
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    },
   );
   return data;
 };
@@ -115,7 +175,13 @@ const uploadDocument = async ({ workspaceId, file }: UploadDocumentParams): Prom
  * Eliminar un documento
  * DELETE /documents/{id}
  */
-const deleteDocument = async ({ documentId, workspaceId }: { documentId: string; workspaceId?: string }): Promise<{ workspaceId?: string }> => {
+const deleteDocument = async ({
+  documentId,
+  workspaceId,
+}: {
+  documentId: string;
+  workspaceId?: string;
+}): Promise<{ workspaceId?: string }> => {
   await api.delete(`/documents/${documentId}`);
   return { workspaceId };
 };
@@ -130,11 +196,11 @@ const deleteDocument = async ({ documentId, workspaceId }: { documentId: string;
  */
 const analyzeProposalFile = async (file: File): Promise<unknown> => {
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append("file", file);
 
-  const { data } = await api.post('/proposals/analyze', formData, {
+  const { data } = await api.post("/proposals/analyze", formData, {
     headers: {
-      'Content-Type': 'multipart/form-data',
+      "Content-Type": "multipart/form-data",
     },
   });
   return data;
@@ -145,8 +211,8 @@ const analyzeProposalFile = async (file: File): Promise<unknown> => {
  * POST /proposals/generate
  */
 const generateProposalDocx = async (proposalData: unknown): Promise<Blob> => {
-  const { data } = await api.post('/proposals/generate', proposalData, {
-    responseType: 'blob',
+  const { data } = await api.post("/proposals/generate", proposalData, {
+    responseType: "blob",
   });
   return data;
 };
@@ -175,7 +241,7 @@ const postChatQuery = async ({
 
   const { data } = await api.post<ChatResponse>(
     `/workspaces/${workspaceId}/chat`,
-    requestBody
+    requestBody,
   );
   return data;
 };
@@ -190,7 +256,7 @@ export const streamChatQuery = async ({
   model,
   onChunk,
   onError,
-  onFinish
+  onFinish,
 }: {
   workspaceId: string;
   query: string;
@@ -200,14 +266,15 @@ export const streamChatQuery = async ({
   onError: (error: unknown) => void;
   onFinish: () => void;
 }) => {
-  const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1';
+  const baseURL =
+    process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
 
   try {
     const token = localStorage.getItem("access_token");
     const response = await fetch(`${baseURL}/workspaces/${workspaceId}/chat`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
@@ -219,15 +286,17 @@ export const streamChatQuery = async ({
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Error ${response.status}: ${response.statusText}`);
+      throw new Error(
+        errorData.detail || `Error ${response.status}: ${response.statusText}`,
+      );
     }
 
     const reader = response.body?.getReader();
     const decoder = new TextDecoder();
 
-    if (!reader) throw new Error('No readable stream');
+    if (!reader) throw new Error("No readable stream");
 
-    let buffer = ''; // Buffer para acumular datos incompletos
+    let buffer = ""; // Buffer para acumular datos incompletos
 
     while (true) {
       const { done, value } = await reader.read();
@@ -237,10 +306,10 @@ export const streamChatQuery = async ({
       buffer += decoder.decode(value, { stream: true });
 
       // Procesar líneas completas
-      const lines = buffer.split('\n');
-      
+      const lines = buffer.split("\n");
+
       // Guardar la última línea incompleta en el buffer
-      buffer = lines.pop() || '';
+      buffer = lines.pop() || "";
 
       // Procesar líneas completas
       for (const line of lines) {
@@ -249,7 +318,7 @@ export const streamChatQuery = async ({
             const data = JSON.parse(line);
             onChunk(data);
           } catch (e) {
-            console.warn('Error parsing JSON chunk:', line, e);
+            console.warn("Error parsing JSON chunk:", line, e);
           }
         }
       }
@@ -261,7 +330,7 @@ export const streamChatQuery = async ({
         const data = JSON.parse(buffer);
         onChunk(data);
       } catch (e) {
-        console.warn('Error parsing final buffer:', buffer, e);
+        console.warn("Error parsing final buffer:", buffer, e);
       }
     }
 
@@ -322,7 +391,9 @@ export const useUpdateWorkspace = () => {
     onSuccess: (data) => {
       // Invalidar tanto la lista como el workspace específico
       queryClient.invalidateQueries({ queryKey: [WORKSPACES_QUERY_KEY] });
-      queryClient.invalidateQueries({ queryKey: [WORKSPACES_QUERY_KEY, data.id] });
+      queryClient.invalidateQueries({
+        queryKey: [WORKSPACES_QUERY_KEY, data.id],
+      });
     },
   });
 };
@@ -367,7 +438,48 @@ export const useUploadDocument = () => {
     mutationFn: uploadDocument,
     onSuccess: (data) => {
       // Invalidar los documentos de ese workspace
-      queryClient.invalidateQueries({ queryKey: [DOCUMENTS_QUERY_KEY, data.workspace_id] });
+      queryClient.invalidateQueries({
+        queryKey: [DOCUMENTS_QUERY_KEY, data.workspace_id],
+      });
+    },
+  });
+};
+
+/**
+ * Hook para obtener documentos de una conversación
+ */
+export const useConversationDocuments = (
+  workspaceId: string,
+  conversationId: string,
+) => {
+  return useQuery({
+    queryKey: [DOCUMENTS_QUERY_KEY, workspaceId, conversationId],
+    queryFn: () => fetchConversationDocuments({ workspaceId, conversationId }),
+    enabled: !!workspaceId && !!conversationId,
+  });
+};
+
+/**
+ * Hook para subir un documento a una conversación
+ */
+export const useUploadDocumentToConversation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: uploadDocumentToConversation,
+    onSuccess: (data, variables) => {
+      // Invalidar documentos de la conversación específica
+      queryClient.invalidateQueries({
+        queryKey: [
+          DOCUMENTS_QUERY_KEY,
+          variables.workspaceId,
+          variables.conversationId,
+        ],
+      });
+      // También invalidar documentos del workspace
+      queryClient.invalidateQueries({
+        queryKey: [DOCUMENTS_QUERY_KEY, variables.workspaceId],
+      });
     },
   });
 };
@@ -383,7 +495,9 @@ export const useDeleteDocument = () => {
     onSuccess: (result) => {
       // Invalidar documentos del workspace específico si está disponible
       if (result.workspaceId) {
-        queryClient.invalidateQueries({ queryKey: [DOCUMENTS_QUERY_KEY, result.workspaceId] });
+        queryClient.invalidateQueries({
+          queryKey: [DOCUMENTS_QUERY_KEY, result.workspaceId],
+        });
       }
       // También invalidar todos los documentos como fallback
       queryClient.invalidateQueries({ queryKey: [DOCUMENTS_QUERY_KEY] });
@@ -403,11 +517,18 @@ export const useChat = (workspaceId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ query, conversationId }: { query: string; conversationId?: string }) =>
-      postChatQuery({ workspaceId, query, conversationId }),
+    mutationFn: ({
+      query,
+      conversationId,
+    }: {
+      query: string;
+      conversationId?: string;
+    }) => postChatQuery({ workspaceId, query, conversationId }),
     onSuccess: () => {
       // Invalidar conversaciones para que se actualice la lista en el sidebar
-      queryClient.invalidateQueries({ queryKey: [CONVERSATIONS_QUERY_KEY, workspaceId] });
+      queryClient.invalidateQueries({
+        queryKey: [CONVERSATIONS_QUERY_KEY, workspaceId],
+      });
     },
   });
 };
@@ -428,7 +549,7 @@ const fetchConversationWithMessages = async ({
   conversationId: string;
 }): Promise<ConversationWithMessages> => {
   const { data } = await api.get<ConversationWithMessages>(
-    `/workspaces/${workspaceId}/conversations/${conversationId}`
+    `/workspaces/${workspaceId}/conversations/${conversationId}`,
   );
   return data;
 };
@@ -448,7 +569,7 @@ const updateConversation = async ({
 }): Promise<ConversationWithMessages> => {
   const { data } = await api.put<ConversationWithMessages>(
     `/workspaces/${workspaceId}/conversations/${conversationId}`,
-    updates
+    updates,
   );
   return data;
 };
@@ -465,7 +586,7 @@ const deleteConversation = async ({
   conversationId: string;
 }): Promise<void> => {
   await api.delete(
-    `/workspaces/${workspaceId}/conversations/${conversationId}`
+    `/workspaces/${workspaceId}/conversations/${conversationId}`,
   );
 };
 
@@ -485,7 +606,11 @@ export const useConversationWithMessages = ({
 }) => {
   return useQuery({
     queryKey: [CONVERSATION_DETAILS_QUERY_KEY, workspaceId, conversationId],
-    queryFn: () => fetchConversationWithMessages({ workspaceId, conversationId: conversationId! }),
+    queryFn: () =>
+      fetchConversationWithMessages({
+        workspaceId,
+        conversationId: conversationId!,
+      }),
     enabled: !!workspaceId && !!conversationId,
     retry: false, // No reintentar si falla (ej: 404)
     staleTime: 1000 * 60, // Cache por 1 minuto
@@ -501,9 +626,15 @@ export const useUpdateConversation = () => {
   return useMutation({
     mutationFn: updateConversation,
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: [CONVERSATIONS_QUERY_KEY, variables.workspaceId] });
       queryClient.invalidateQueries({
-        queryKey: [CONVERSATION_DETAILS_QUERY_KEY, variables.workspaceId, variables.conversationId]
+        queryKey: [CONVERSATIONS_QUERY_KEY, variables.workspaceId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [
+          CONVERSATION_DETAILS_QUERY_KEY,
+          variables.workspaceId,
+          variables.conversationId,
+        ],
       });
     },
   });
@@ -518,7 +649,9 @@ export const useDeleteConversation = () => {
   return useMutation({
     mutationFn: deleteConversation,
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: [CONVERSATIONS_QUERY_KEY, variables.workspaceId] });
+      queryClient.invalidateQueries({
+        queryKey: [CONVERSATIONS_QUERY_KEY, variables.workspaceId],
+      });
     },
   });
 };
@@ -581,10 +714,9 @@ export const useDeleteRAGDocument = () => {
  */
 export const useRAGHealthCheck = () => {
   return useQuery({
-    queryKey: ['rag-health'],
+    queryKey: ["rag-health"],
     queryFn: ragHealthCheck,
     refetchInterval: 30000, // Revalidar cada 30 segundos
     retry: 3,
   });
 };
-

@@ -3,8 +3,11 @@ from sqlalchemy.orm import Session, joinedload
 from models import database, schemas
 from models.conversation import Conversation, Message
 from models import workspace as workspace_model
+from models import document as document_model
 from core.auth import get_current_active_user
 from models.user import User
+from core.rag_client import rag_client
+from core.config import settings
 import json
 from datetime import datetime
 
@@ -295,6 +298,21 @@ def delete_conversation(
             detail=f"Conversación no encontrada."
         )
     
+    # Eliminar documentos asociados del servicio RAG antes de eliminar la conversación
+    documents = db.query(document_model.Document).filter(
+        document_model.Document.conversation_id == conversation_id
+    ).all()
+    
+    for document in documents:
+        if settings.RAG_SERVICE_ENABLED and rag_client:
+            try:
+                import asyncio
+                asyncio.run(rag_client.delete_document(document.id))
+                print(f"Documento {document.id} eliminado del servicio RAG")
+            except Exception as exc:
+                print(f"ERROR eliminando del RAG {document.id}: {exc}")
+    
+    # Eliminar conversación (documentos se eliminan en cascada por FK)
     db.delete(conversation)
     db.commit()
     

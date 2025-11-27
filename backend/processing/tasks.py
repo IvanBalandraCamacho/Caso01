@@ -6,9 +6,13 @@ from core.celery_app import celery_app
 from models import database, document as document_model
 from sqlalchemy.orm import Session
 from . import parser
-from core.rag_client import rag_client
+from core.rag_client import RAGClient  # Importar clase, no instancia
 from core.config import settings
 import asyncio
+import nest_asyncio
+
+# Permitir event loops anidados en Celery
+nest_asyncio.apply()
 
 # Checklist + chat
 from core.checklist_analyzer import analyze_document_for_suggestions
@@ -46,7 +50,7 @@ def process_document(self, document_id: str, temp_file_path_str: str):
 
         # 2) PROCESAR RAG
         chunk_count = 0
-        if settings.RAG_SERVICE_ENABLED and rag_client:
+        if settings.RAG_SERVICE_ENABLED:
             user_id = (
                 str(db_document.workspace.owner_id)
                 if db_document.workspace and db_document.workspace.owner_id
@@ -54,23 +58,38 @@ def process_document(self, document_id: str, temp_file_path_str: str):
             )
 
             try:
-                result = asyncio.run(
-                    rag_client.ingest_text_content(
-                        document_id=db_document.id,
-                        workspace_id=db_document.workspace_id,
-                        user_id=user_id,
-                        content=text_content,
-                        metadata={
-                            "filename": db_document.file_name,
-                            "file_type": db_document.file_type,
-                            "created_at": db_document.created_at.isoformat()
-                        }
-                    )
-                )
+                # Incluir conversation_id en metadatos para filtrado independiente
+                metadata = {
+                    "filename": db_document.file_name,
+                    "file_type": db_document.file_type,
+                    "created_at": db_document.created_at.isoformat()
+                }
+                
+                # Agregar conversation_id si existe (documento específico de conversación)
+                if db_document.conversation_id:
+                    metadata["conversation_id"] = db_document.conversation_id
+                
+                # Función auxiliar para ejecutar ingestión con cliente local
+                async def ingest_with_local_client():
+                    local_client = RAGClient()
+                    try:
+                        return await local_client.ingest_text_content(
+                            document_id=db_document.id,
+                            workspace_id=db_document.workspace_id,
+                            user_id=user_id,
+                            content=text_content,
+                            metadata=metadata
+                        )
+                    finally:
+                        await local_client.close()
+
+                result = asyncio.run(ingest_with_local_client())
                 chunk_count = result.chunks_count if result else 0
 
             except Exception as e:
-                raise self.retry(exc=e, countdown=60)
+                print(f"WORKER: Error RAG: {e}")
+                # No reintentar infinitamente si es error de conexión persistente
+                # raise self.retry(exc=e, countdown=60)
 
         # 3) ANALIZAR DOCUMENTO
         suggestion_short, suggestion_full = analyze_document_for_suggestions(
