@@ -1,9 +1,11 @@
 import os
 import time
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 # from starlette.middleware.gzip import GZIPMiddleware
 from api.routes import health, workspaces, conversations, document_generation, auth, proposals, tivit
 # from api.routes import users  # Comentado: módulo no existe aún
+from exceptions import ServiceException
 from core.config import settings
 from models import database
 from sqlalchemy.exc import OperationalError
@@ -103,6 +105,13 @@ def read_root(request: Request):
         "active_llm": settings.LLM_PROVIDER,
         "version": "1.0.0"
     }
+
+@app.exception_handler(ServiceException)
+async def service_exception_handler(request: Request, exc: ServiceException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail}
+    )
 
 # Log de inicio
 logger.info("=" * 80)

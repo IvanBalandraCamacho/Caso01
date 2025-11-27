@@ -39,10 +39,12 @@ class DocumentCreate(DocumentBase):
 class DocumentPublic(DocumentBase):
     id: str
     workspace_id: str
-    status: str
+    conversation_id: str | None = None  # ID de conversación si es documento específico
+    status: str  # PENDING, PROCESSING, COMPLETED, FAILED
     chunk_count: int
     created_at: datetime
-    suggestionAlert: str | None = None   # <-- NUEVO
+    suggestion_short: str | None = None  # Resumen corto generado
+    suggestion_full: str | None = None   # Análisis completo generado
     
     class Config:
         from_attributes = True
