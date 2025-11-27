@@ -466,6 +466,116 @@ def get_workspace_documents(
 
 
 @router.get(
+    "/documents/{document_id}/status",
+    response_model=schemas.DocumentPublic,
+    summary="Obtener el estado de procesamiento de un documento"
+)
+def get_document_status(
+    document_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(database.get_db),
+):
+    """
+    Endpoint para que el frontend consulte el estado de un documento.
+    
+    **Estados posibles:**
+    - `PENDING`: Documento en cola, esperando procesamiento
+    - `PROCESSING`: Celery está procesando el documento
+    - `COMPLETED`: Procesamiento exitoso, documento indexado en RAG
+    - `FAILED`: Error durante el procesamiento
+    
+    **Uso recomendado:**
+    ```javascript
+    // Frontend: Polling cada 2 segundos hasta que status === 'COMPLETED'
+    const checkStatus = async (docId) => {
+      const response = await fetch(`/api/v1/documents/${docId}/status`);
+      const doc = await response.json();
+      
+      if (doc.status === 'COMPLETED') {
+        showSuccessNotification('Documento procesado correctamente');
+      } else if (doc.status === 'FAILED') {
+        showErrorNotification('Error al procesar el documento');
+      } else {
+        setTimeout(() => checkStatus(docId), 2000);
+      }
+    };
+    ```
+    """
+    db_document = (
+        db.query(document_model.Document)
+        .filter(document_model.Document.id == document_id)
+        .first()
+    )
+
+    if not db_document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Documento con id {document_id} no encontrado.",
+        )
+
+    # Verificar ownership del workspace
+    db_workspace = (
+        db.query(workspace_model.Workspace)
+        .filter(workspace_model.Workspace.id == db_document.workspace_id)
+        .first()
+    )
+
+    if not db_workspace or db_workspace.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para ver este documento.",
+        )
+
+    return db_document
+
+
+@router.get(
+    "/workspaces/{workspace_id}/documents/pending",
+    response_model=list[schemas.DocumentPublic],
+    summary="Obtener documentos pendientes o en procesamiento"
+)
+def get_pending_documents(
+    workspace_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(database.get_db),
+):
+    """
+    Devuelve solo los documentos que están en estado PENDING o PROCESSING.
+    
+    Útil para que el frontend muestre un indicador de "X documentos procesándose".
+    """
+    db_workspace = (
+        db.query(workspace_model.Workspace)
+        .filter(workspace_model.Workspace.id == workspace_id)
+        .first()
+    )
+
+    if not db_workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workspace no encontrado.",
+        )
+
+    if db_workspace.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para ver documentos de este workspace.",
+        )
+
+    pending_docs = (
+        db.query(document_model.Document)
+        .filter(
+            document_model.Document.workspace_id == workspace_id,
+            document_model.Document.status.in_(["PENDING", "PROCESSING"])
+        )
+        .order_by(document_model.Document.created_at.desc())
+        .all()
+    )
+
+    return pending_docs
+
+
+@router.get(
     "/workspaces/{workspace_id}/conversations/{conversation_id}/documents",
     response_model=list[schemas.DocumentPublic],
     summary="Obtener todos los documentos de una Conversación específica",
