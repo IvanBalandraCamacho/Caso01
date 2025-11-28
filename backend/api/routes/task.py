@@ -129,6 +129,64 @@ async def respond_chat(
             detail=f"Error al generar la respuesta: {str(e)}"
         )
 
+
+@router.post(
+    "/task/analyze",
+    summary="Analizar documentos y generar propuestas con IA",
+    description="Analiza documentos y genera propuestas basadas en el contexto"
+)
+async def analyze_document(
+    query: str,
+    relevant_chunks: Dict[str, Any],
+    chat_model: str,
+    workspace_instructions: str,
+):
+    """
+    Analiza documentos y genera propuestas basadas en el contexto.
+    
+    Args:
+        query: Pregunta/solicitud del usuario
+        relevant_chunks: Chunks de contexto relevantes
+        chat_model: Modelo de chat a usar
+        workspace_instructions: Instrucciones del workspace
+        
+    Returns:
+        Stream de respuesta generada
+        
+    Raises:
+        HTTPException 500: Si hay error en la generación
+    """
+
+    # Construir prompt para análisis y propuestas
+    prompt = f"""
+    Eres un asistente especializado en análisis de documentos y generación de propuestas.
+    
+    Analiza la información proporcionada y genera una propuesta detallada y profesional.
+    Incluye:
+    - Análisis del alcance
+    - Recomendaciones técnicas
+    - Riesgos identificados
+    - Próximos pasos sugeridos
+    """
+    
+    # Construir prompt completo
+    full_prompt = f"""
+        prompt: {prompt}
+        pregunta: {query}
+        system_instructions: {workspace_instructions}
+    """
+
+    try:
+        # Generar respuesta usando LLM service
+        return llm_service.generate_response_stream(full_prompt, relevant_chunks, chat_model)
+    except Exception as e:
+        logger.error(f"Error al generar análisis de documento: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al generar el análisis: {str(e)}"
+        )
+
+
 # async def get_profiles()
 
 #  TOMAR EN CUENTA QUE EL ENDPOINT DE GENERAR DOCUMENTO
