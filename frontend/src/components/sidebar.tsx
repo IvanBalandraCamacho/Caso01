@@ -28,6 +28,8 @@ import Image from "next/image";
 import ProposalModal from "./ProposalModal";
 import { UserMenu } from "./UserMenu";
 import { updateConversationApi } from "@/lib/api";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { showToast } from "@/components/Toast";
 
 export function Sidebar() {
   const router = useRouter();
@@ -99,20 +101,24 @@ export function Sidebar() {
     setIsEditModalOpen(false);
   };
 
-  const handleDelete = async (workspaceId: string) => {
-    if (
-      confirm(
-        "¿Estás seguro de que quieres eliminar este workspace? Esta acción es irreversible."
-      )
-    ) {
-      try {
-        await deleteWorkspaceMutation.mutateAsync(workspaceId);
-        // Refrescar la lista después de eliminar
-        await fetchWorkspaces();
-      } catch (error) {
-        console.error("Error al eliminar workspace", error);
-        alert("Error al eliminar el workspace. Intenta nuevamente.");
-      }
+  const [deleteWorkspaceConfirm, setDeleteWorkspaceConfirm] = useState<string | null>(null);
+
+  const handleDeleteClick = (workspaceId: string) => {
+    setDeleteWorkspaceConfirm(workspaceId);
+  };
+
+  const handleConfirmDeleteWorkspace = async () => {
+    if (!deleteWorkspaceConfirm) return;
+    
+    try {
+      await deleteWorkspaceMutation.mutateAsync(deleteWorkspaceConfirm);
+      showToast("Workspace eliminado correctamente", "success");
+      await fetchWorkspaces();
+    } catch (error) {
+      console.error("Error al eliminar workspace", error);
+      showToast("Error al eliminar el workspace. Intenta nuevamente.", "error");
+    } finally {
+      setDeleteWorkspaceConfirm(null);
     }
   };
 
@@ -338,7 +344,7 @@ export function Sidebar() {
                                 <DropdownMenuItem onClick={() => openEditModal(ws)}>
                                   Edit
                                 </DropdownMenuItem>
-                                <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(ws.id)}>
+                                <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteClick(ws.id)}>
                                   Delete
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
@@ -470,6 +476,17 @@ export function Sidebar() {
       <ProposalModal
         open={showProposalModal}
         onClose={() => setShowProposalModal(false)}
+      />
+      
+      <ConfirmDialog
+        open={deleteWorkspaceConfirm !== null}
+        onOpenChange={(open) => !open && setDeleteWorkspaceConfirm(null)}
+        title="Eliminar Workspace"
+        description="¿Estás seguro de que quieres eliminar este workspace? Esta acción es irreversible y se eliminarán todos los documentos y conversaciones asociadas."
+        confirmText="Eliminar Workspace"
+        cancelText="Cancelar"
+        onConfirm={handleConfirmDeleteWorkspace}
+        variant="destructive"
       />
     </>
   );

@@ -1,10 +1,12 @@
 "use client";
-import React, { memo } from "react";
+import React, { memo, useState } from "react";
 import { Document } from "@/context/WorkspaceContext";
 import { useDeleteDocument } from "@/hooks/useApi";
 import { Trash2, Loader2, FileText, File, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useWorkspaces } from "@/context/WorkspaceContext";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { showToast } from "@/components/Toast";
 
 interface ConversationDocumentListProps {
   conversationId: string;
@@ -19,20 +21,28 @@ export const ConversationDocumentList = memo(({
 }: ConversationDocumentListProps) => {
   const { activeWorkspace } = useWorkspaces();
   const deleteDocumentMutation = useDeleteDocument();
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
 
-  const handleDelete = async (documentId: string, fileName: string) => {
-    if (confirm(`¿Estás seguro de que quieres eliminar "${fileName}"?`)) {
-      try {
-        await deleteDocumentMutation.mutateAsync({
-          documentId,
-          workspaceId: activeWorkspace?.id || ''
-        });
-        onDocumentsChange?.();
-      } catch (error) {
-        console.error("Error al eliminar documento:", error);
-        const errorMessage = error instanceof Error ? error.message : "Error desconocido";
-        alert(`Error al eliminar el documento: ${errorMessage}`);
-      }
+  const handleDeleteClick = (documentId: string, fileName: string) => {
+    setDeleteConfirm({ id: documentId, name: fileName });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirm) return;
+    
+    try {
+      await deleteDocumentMutation.mutateAsync({
+        documentId: deleteConfirm.id,
+        workspaceId: activeWorkspace?.id || ''
+      });
+      showToast(`Documento "${deleteConfirm.name}" eliminado correctamente`, "success");
+      onDocumentsChange?.();
+    } catch (error) {
+      console.error("Error al eliminar documento:", error);
+      const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+      showToast(`Error al eliminar el documento: ${errorMessage}`, "error");
+    } finally {
+      setDeleteConfirm(null);
     }
   };
 
@@ -98,7 +108,7 @@ export const ConversationDocumentList = memo(({
                     variant="ghost"
                     size="icon"
                     className="h-5 w-5 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => handleDelete(doc.id, doc.file_name)}
+                    onClick={() => handleDeleteClick(doc.id, doc.file_name)}
                     disabled={deleteDocumentMutation.isPending}
                   >
                     {deleteDocumentMutation.isPending ? (
@@ -119,6 +129,17 @@ export const ConversationDocumentList = memo(({
           <p className="text-xs">Sin documentos en esta conversación</p>
         </div>
       )}
+      
+      <ConfirmDialog
+        open={deleteConfirm !== null}
+        onOpenChange={(open) => !open && setDeleteConfirm(null)}
+        title="Eliminar documento"
+        description={`¿Estás seguro de que quieres eliminar "${deleteConfirm?.name}"? Esta acción no se puede deshacer.`}
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        onConfirm={handleConfirmDelete}
+        variant="destructive"
+      />
     </div>
   );
 });
