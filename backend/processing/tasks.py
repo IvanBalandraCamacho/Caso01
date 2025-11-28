@@ -106,12 +106,13 @@ def process_document(self, document_id: str, temp_file_path_str: str):
         db.commit()
 
         # 5) ENVIAR MENSAJE BREVE AL CHAT
-        send_ai_message_to_chat(
-            db,
-            workspace_id=str(db_document.workspace_id),
-            conversation_id=getattr(db_document, "conversation_id", None),
-            message=suggestion_full
-        )
+        
+        # send_ai_message_to_chat(
+         #   db,
+         #   workspace_id=str(db_document.workspace_id),
+         #   conversation_id=getattr(db_document, "conversation_id", None),
+         #   message=suggestion_full
+        #)
 
         # 6) LIMPIAR ARCHIVO TEMP
         if os.path.exists(temp_file_path):
