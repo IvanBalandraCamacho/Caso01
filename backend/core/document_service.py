@@ -5,6 +5,7 @@ from docx.oxml.ns import qn
 from datetime import datetime
 from fastapi.responses import FileResponse
 import tempfile
+from typing import Dict, Any
 
 def generate_document(proposal_data: Dict[str, Any]) -> str:
     """

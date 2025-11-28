@@ -32,14 +32,6 @@ def get_proposal_service() -> ProposalsService:
     return ProposalsServiceImpl()
 
 
-
-@router.post(
-    "/proposals/analyze",#CAMBIAR EL ENDPOINT DE PROPOSALS POR TASK
-    response_model=Dict[str, Any],
-    summary="Analizar RFP con IA",
-    description="Analiza un documento PDF de RFP y extrae información clave usando IA"
-)
-async def analyze_document(
 @router.post("/proposals/analyze", summary="Actualizado")
 async def analyze_proposal(
     file: UploadFile = File(...),
@@ -49,8 +41,6 @@ async def analyze_proposal(
     """Delega toda la lógica de validación, extracción y análisis al servicio."""
     return await service.analyze(file=file)
 
-
-    
 
 @router.post(
     "/task/generate",

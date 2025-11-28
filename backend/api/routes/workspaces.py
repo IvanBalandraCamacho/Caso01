@@ -23,7 +23,7 @@ from core.config import settings
 # DEPRECADO: from processing import vector_store (eliminado - usar rag_client)
 from core.rag_client import rag_client
 from core import llm_service
-from routes import task
+from api.routes import task
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse, StreamingResponse
 from models import database, schemas
