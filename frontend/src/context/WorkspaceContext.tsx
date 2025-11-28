@@ -34,13 +34,15 @@ export interface Workspace {
   description: string | null;
   // Añadido para el update
   instructions?: string | null;
+  // Conversación por defecto creada al crear un workspace
+  default_conversation_id?: string | null;
 }
 
 export interface Document {
   id: string;
   file_name: string;
   file_type: string;
-  status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+  status: string;
   chunk_count: number;
 }
 
@@ -51,6 +53,12 @@ export interface Message {
   content: string;
   chunk_references: string | null;
   created_at: string;
+}
+
+export interface SearchResult {
+  id: string;
+  file_name: string;
+  text: string;
 }
 
 export interface Conversation {
@@ -86,8 +94,8 @@ interface WorkspaceContextType {
   notifications: Notification[];
   addNotification: (notification: Notification) => void;
 
-  searchResults: unknown[];
-  setSearchResults: (results: unknown[]) => void;
+  searchResults: SearchResult[];
+  setSearchResults: (results: SearchResult[]) => void;
 
   // --- Conversations ---
   conversations: Conversation[];
@@ -151,7 +159,7 @@ export function WorkspaceProvider({
   const [isLoadingDocs, setIsLoadingDocs] = useState(false);
   const [errorDocs, setErrorDocs] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [searchResults, setSearchResults] = useState<unknown[]>([]);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
 
   // Estados para conversaciones
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -330,10 +338,10 @@ export function WorkspaceProvider({
     async (conversationId: string): Promise<Document[]> => {
       if (!activeWorkspace) return [];
       try {
-        const data: Document[] = await fetchConversationDocuments(
-          activeWorkspace.id,
+        const data: Document[] = await fetchConversationDocuments({
+          workspaceId: activeWorkspace.id,
           conversationId,
-        );
+        });
         return data;
       } catch (error) {
         console.error("Error al cargar documentos de conversación:", error);

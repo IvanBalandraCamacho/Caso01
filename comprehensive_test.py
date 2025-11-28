@@ -87,6 +87,15 @@ def main():
     ws_id = ws_data["id"]
     print(f"✅ Workspace created: {ws_id}")
 
+    # Verify that a default conversation was created automatically
+    res = requests.get(f"{BASE_URL}/workspaces/{ws_id}/conversations", headers=headers)
+    convs = check_response(res, 200, "Get Conversations After Workspace Creation")
+    if len(convs) < 1:
+        print("❌ No default conversation created for workspace")
+        sys.exit(1)
+    else:
+        print(f"✅ {len(convs)} conversation(s) found (default created)")
+
     # 3. Global Document
     print_step("3", "Global Document Upload")
     manual_content = """Este es un manual de la empresa.

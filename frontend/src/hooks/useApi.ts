@@ -20,6 +20,7 @@ import {
   IngestResponse,
   SearchRequest,
   SearchResult,
+  ProposalAnalysis,
 } from "@/types/api";
 
 // ============================================
@@ -194,7 +195,7 @@ const deleteDocument = async ({
  * Analizar un archivo RFP (PDF) con IA
  * POST /proposals/analyze
  */
-const analyzeProposalFile = async (file: File): Promise<unknown> => {
+const analyzeProposalFile = async (file: File): Promise<ProposalAnalysis> => {
   const formData = new FormData();
   formData.append("file", file);
 
@@ -210,8 +211,8 @@ const analyzeProposalFile = async (file: File): Promise<unknown> => {
  * Generar documento Word de propuesta
  * POST /proposals/generate
  */
-const generateProposalDocx = async (proposalData: unknown): Promise<Blob> => {
-  const { data } = await api.post("/proposals/generate", proposalData, {
+const generateProposalDocx = async (proposalData: ProposalAnalysis): Promise<Blob> => {
+  const { data } = await api.post("/task/generate", proposalData, {
     responseType: "blob",
   });
   return data;

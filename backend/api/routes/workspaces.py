@@ -325,7 +325,28 @@ def create_workspace(
     db.commit()
     db.refresh(db_workspace)
 
-    return db_workspace
+    # Crear una conversación inicial por defecto para el nuevo workspace
+    # Si el usuario provee instrucciones, podemos generar un título relevante, else 'General'
+    default_title = (
+        f"{db_workspace.name} - Chat" if db_workspace.name else "General"
+    )
+    from models.conversation import Conversation
+
+    db_conversation = Conversation(workspace_id=db_workspace.id, title=default_title)
+    db.add(db_conversation)
+    db.commit()
+    db.refresh(db_conversation)
+
+    # Devolver la información del workspace junto con el id de la conversación por defecto
+    return schemas.WorkspacePublic(
+        id=db_workspace.id,
+        name=db_workspace.name,
+        description=db_workspace.description,
+        instructions=db_workspace.instructions,
+        created_at=db_workspace.created_at,
+        is_active=db_workspace.is_active,
+        default_conversation_id=db_conversation.id,
+    )
 
 
 TEMP_UPLOAD_DIR = Path("temp_uploads")

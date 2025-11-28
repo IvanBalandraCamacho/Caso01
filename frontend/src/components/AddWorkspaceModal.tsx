@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateWorkspace } from "@/hooks/useApi";
+import { WorkspacePublic } from "@/types/api";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -44,7 +45,7 @@ export function AddWorkspaceModal({ isOpen, onClose, onSuccess }: AddWorkspaceMo
         instructions: instructions.trim() || null,
       });
 
-      console.log(workspace);
+      console.log(workspace),
 
 
       // Limpiar formulario
@@ -56,8 +57,13 @@ export function AddWorkspaceModal({ isOpen, onClose, onSuccess }: AddWorkspaceMo
       onClose();
       onSuccess?.();
 
-      // Redireccionar al workspace creado
-      router.push(`/p/${workspace.id}`);
+      // Redireccionar a la conversación creada por defecto si existe, si no al workspace
+      const ws = workspace as WorkspacePublic;
+      if (ws.default_conversation_id) {
+        router.push(`/p/${ws.id}/c/${ws.default_conversation_id}`);
+      } else {
+        router.push(`/p/${workspace.id}`);
+      }
     } catch (error: unknown) {
       console.error("Error al crear workspace:", error as Error);
       alert(`Error al crear workspace: ${error instanceof Error ? error.message : 'Error desconocido'}`);

@@ -19,6 +19,7 @@ export interface WorkspacePublic extends WorkspaceBase {
   id: string;
   created_at: string;
   is_active: boolean;
+  default_conversation_id?: string | null;
 }
 
 // --- Document Types ---
@@ -127,5 +128,24 @@ export interface ConversationWithMessages extends Conversation {
 
 export interface ConversationUpdate {
   title?: string;
+}
+
+// --- Proposal types ---
+export interface ProposalAnalysis {
+  cliente: string;
+  fecha_entrega: string;
+  alcance_economico: {
+    presupuesto: string;
+    moneda: string;
+  };
+  tecnologias_requeridas: string[];
+  riesgos_detectados: string[];
+  preguntas_sugeridas: string[];
+  equipo_sugerido: Array<{
+    nombre: string;
+    rol: string;
+    skills: string[];
+    experiencia: string;
+  }>;
 }
 
