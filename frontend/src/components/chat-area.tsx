@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,13 +21,13 @@ import {
 import { useWorkspaces } from "@/context/WorkspaceContext";
 import { UploadModal } from "./UploadModal";
 import { ConversationDocumentList } from "./conversation-document-list";
+import { DocumentUploadProgress } from "./DocumentUploadProgress";
 import {
   useChat,
   useConversationWithMessages,
   useConversationDocuments,
   streamChatQuery,
 } from "@/hooks/useApi";
-import { generateConversationTitle } from "@/lib/api";
 import SpeechRecognition, {
   useSpeechRecognition,
 } from "react-speech-recognition";
@@ -60,6 +60,7 @@ export function ChatArea() {
     deleteChatHistory,
     fetchDocuments,
     selectedModel,
+    uploadDocumentToConversation,
   } = useWorkspaces();
 
   const [isMounted, setIsMounted] = useState(false);
@@ -74,9 +75,16 @@ export function ChatArea() {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isUploadingToConversation, setIsUploadingToConversation] = useState(false);
+  const [uploadingDocuments, setUploadingDocuments] = useState<Array<{
+    id: string;
+    file_name: string;
+    status: string;
+  }>>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const activeStreamRef = useRef<string | null>(null);
+  const conversationFileInputRef = useRef<HTMLInputElement>(null);
 
   // Evitar error de hidratación
   useEffect(() => {
@@ -144,29 +152,51 @@ export function ChatArea() {
     setIsStreaming(false);
   }, [activeWorkspace?.id]);
 
-  // Usar activeConversation si está disponible
+  // Limpiar y preparar cuando cambia la conversación activa
   useEffect(() => {
-    if (activeConversation) {
-      // Cancelar stream activo si hay uno
-      activeStreamRef.current = null;
-      setIsStreaming(false);
-
-      setCurrentConversationId(activeConversation.id);
-      // Cargar mensajes de la conversación si están disponibles
-      if (conversationData?.messages) {
-        const loadedMessages: ChatMessage[] = conversationData.messages.map(
-          (msg) => ({
-            role: msg.role,
-            content: msg.content,
-            chunks: msg.chunk_references
-              ? JSON.parse(msg.chunk_references)
-              : undefined,
-          }),
-        );
-        setChatHistory(loadedMessages);
-      }
+    if (!activeConversation?.id) {
+      setChatHistory([]);
+      setCurrentConversationId(undefined);
+      return;
     }
-  }, [activeConversation, conversationData]);
+
+    // Solo resetear el estado cuando cambia de conversación
+    activeStreamRef.current = null;
+    setIsStreaming(false);
+    setCurrentConversationId(activeConversation.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeConversation?.id]);
+
+  // Cargar mensajes cuando llegan los datos - SOLO UNA VEZ por conversación
+  const prevConversationIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      !conversationData?.messages ||
+      !activeConversation?.id ||
+      conversationData.id !== activeConversation.id
+    ) {
+      return;
+    }
+
+    // Si ya cargamos esta conversación, no recargar
+    if (prevConversationIdRef.current === conversationData.id) {
+      return;
+    }
+
+    prevConversationIdRef.current = conversationData.id;
+    
+    const loadedMessages: ChatMessage[] = conversationData.messages.map(
+      (msg) => ({
+        role: msg.role,
+        content: msg.content,
+        chunks: msg.chunk_references
+          ? JSON.parse(msg.chunk_references)
+          : undefined,
+      }),
+    );
+    setChatHistory(loadedMessages);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationData, activeConversation?.id]);
 
   const handleQuickPrompt = (prompt: string) => {
     setMessage(prompt);
@@ -296,19 +326,8 @@ export function ChatArea() {
         activeStreamRef.current = null;
         setIsStreaming(false);
 
-        // Si es el primer mensaje y tenemos conversation_id, generar título automáticamente
-        if (isFirstMessage && currentConversationId && activeWorkspace) {
-          try {
-            await generateConversationTitle(
-              activeWorkspace.id,
-              currentConversationId,
-            );
-            // Actualizar lista de conversaciones
-            fetchConversations(activeWorkspace.id);
-          } catch (error) {
-            console.error("Error generando título:", error);
-          }
-        } else if (activeWorkspace) {
+        // Actualizar lista de conversaciones
+        if (activeWorkspace) {
           fetchConversations(activeWorkspace.id);
         }
       },
@@ -327,6 +346,60 @@ export function ChatArea() {
       setAttachedFiles((prev) => [...prev, ...newFiles]);
     }
   };
+
+  const handleConversationFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0 || !activeConversation || !activeWorkspace) return;
+
+    setIsUploadingToConversation(true);
+    const uploadedDocs: Array<{ id: string; file_name: string; status: string }> = [];
+    
+    try {
+      for (const file of Array.from(files)) {
+        const formData = new FormData();
+        formData.append("file", file);
+        const uploadedDoc = await uploadDocumentToConversation(activeWorkspace.id, activeConversation.id, formData);
+        
+        // Registrar el documento para hacer polling
+        uploadedDocs.push({
+          id: uploadedDoc.id,
+          file_name: uploadedDoc.file_name,
+          status: uploadedDoc.status || "PENDING",
+        });
+      }
+      
+      // Agregar documentos al estado para activar polling
+      setUploadingDocuments((prev) => [...prev, ...uploadedDocs]);
+      
+      showToast(`${files.length} archivo(s) subido(s), procesando...`, "success");
+      refetchConversationDocuments();
+    } catch (error) {
+      console.error("Error al subir documento:", error);
+      const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+      showToast(`Error: ${errorMessage}`, "error");
+    } finally {
+      setIsUploadingToConversation(false);
+      if (conversationFileInputRef.current) {
+        conversationFileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleDocumentStatusChange = useCallback((documentId: string, newStatus: string) => {
+    setUploadingDocuments((prev) =>
+      prev.map((doc) => (doc.id === documentId ? { ...doc, status: newStatus } : doc))
+    );
+  }, []);
+
+  const handleAllDocumentsCompleted = useCallback(() => {
+    // Refrescar lista de documentos cuando todos estén procesados
+    refetchConversationDocuments();
+    
+    // Limpiar la lista después de 3 segundos para que el usuario vea los estados finales
+    setTimeout(() => {
+      setUploadingDocuments([]);
+    }, 3000);
+  }, [refetchConversationDocuments]);
 
   const removeAttachedFile = (index: number) => {
     setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
@@ -443,7 +516,7 @@ export function ChatArea() {
         <ScrollArea className="h-full">
           <div className="p-4">
             {!activeWorkspace ? (
-              <div className="flex flex-col items-center justify-center h-full text-center space-y-6">
+              <div className="flex flex-col items-center justify-center min-h-[18rem] text-center space-y-6">
                 <div className="p-6 bg-card rounded-full shadow-2xl mb-4">
                   <span className="text-6xl">👋</span>
                 </div>
@@ -457,7 +530,7 @@ export function ChatArea() {
                 </p>
               </div>
             ) : chatHistory.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full max-w-3xl mx-auto px-4">
+              <div className="flex flex-col items-center justify-center min-h-[18rem] max-w-3xl mx-auto px-4">
                 <div className="mb-8 text-center">
                   <h3 className="text-2xl font-bold text-foreground mb-2">
                     {activeWorkspace.name}
@@ -576,30 +649,6 @@ export function ChatArea() {
                           </span>
                         </div>
                       )}
-
-                      {/* Mostrar chunks relevantes si existen */}
-                      {msg.chunks && msg.chunks.length > 0 && (
-                        <div className="mt-4 pt-4 border-t border-border/50">
-                          <p className="text-xs text-muted-foreground mb-2 font-medium uppercase tracking-wider">
-                            Sources ({msg.chunks.length})
-                          </p>
-                          <div className="flex gap-2 overflow-x-auto pb-2">
-                            {msg.chunks.slice(0, 3).map((chunk, idx) => (
-                              <div
-                                key={idx}
-                                className="min-w-[200px] max-w-[250px] text-xs bg-muted/50 p-3 rounded-lg border border-border/50"
-                              >
-                                <p className="font-semibold mb-1 text-foreground truncate">
-                                  Score: {chunk.score.toFixed(2)}
-                                </p>
-                                <p className="line-clamp-3 text-muted-foreground">
-                                  {chunk.chunk_text}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                 ))}
@@ -618,9 +667,9 @@ export function ChatArea() {
               </div>
             )}
 
-            {/* Documentos de la conversación */}
-            {activeConversation && (
-              <div className="border-t border-gray-800/50 pt-4">
+            {/* Documentos de la conversación - Compacto */}
+            {activeConversation && conversationDocuments && conversationDocuments.length > 0 && (
+              <div className="border-t border-gray-800/50 pt-2 mt-4">
                 <ConversationDocumentList
                   conversationId={activeConversation.id}
                   documents={conversationDocuments || []}
@@ -661,6 +710,17 @@ export function ChatArea() {
           <div
             className={`bg-[#2B2B2E] border border-gray-700 rounded-3xl flex flex-col  overflow-hidden transition-all duration-200 ${activeWorkspace ? "opacity-100" : "opacity-50 pointer-events-none"}`}
           >
+            {/* Document Upload Progress */}
+            {uploadingDocuments.length > 0 && (
+              <div className="px-4 pt-3">
+                <DocumentUploadProgress
+                  documents={uploadingDocuments}
+                  onDocumentStatusChange={handleDocumentStatusChange}
+                  onAllCompleted={handleAllDocumentsCompleted}
+                />
+              </div>
+            )}
+
             {/* Attached Files */}
             {attachedFiles.length > 0 && (
               <div className="px-4 pt-3 flex flex-wrap gap-2 bg-muted/30 pb-2">
@@ -692,14 +752,31 @@ export function ChatArea() {
                 onChange={handleFileAttach}
                 disabled={!activeWorkspace}
               />
+              <input
+                ref={conversationFileInputRef}
+                type="file"
+                id="conversation-file-upload"
+                className="hidden"
+                multiple
+                accept=".pdf,.docx,.xlsx,.txt,.csv"
+                onChange={handleConversationFileUpload}
+                disabled={!activeConversation || isUploadingToConversation}
+              />
               <Button
                 variant="ghost"
                 size="icon"
                 className="text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-xl h-10 w-10"
-                onClick={() => document.getElementById("file-attach")?.click()}
-                title="Adjuntar archivos al contexto"
+                onClick={() => {
+                  if (activeConversation) {
+                    conversationFileInputRef.current?.click();
+                  } else {
+                    showToast("Inicia una conversación para subir archivos", "error");
+                  }
+                }}
+                title={activeConversation ? "Subir archivos a esta conversación" : "Inicia una conversación primero"}
+                disabled={isUploadingToConversation}
               >
-                <Plus />
+                {isUploadingToConversation ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus />}
               </Button>
 
               <textarea

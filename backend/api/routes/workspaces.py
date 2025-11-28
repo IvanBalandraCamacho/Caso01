@@ -13,6 +13,7 @@ from typing import List, Optional
 # Cache y eficiencia
 import redis
 from core import llm_service
+from core.intent_detector import classify_intent
 
 # Autenticación
 from core.auth import get_current_active_user
@@ -886,13 +887,13 @@ async def chat_with_workspace(
     # 5. Identificar intención de consulta de usuario
     # -------------------------------------------------------------  
 
-    intent = llm_service.classify_intent(chat_request.query)
+    intent = classify_intent(chat_request.query)
     print(f"Intención detectada: {intent}")
 
     # -------------------------------------------------------------
     # 6. Streaming de respuesta del modelo
     # -------------------------------------------------------------
-    def stream_response_generator(conversation_id, relevant_chunks):
+    async def stream_response_generator(conversation_id, relevant_chunks):
         sources_data = [chunk.model_dump() for chunk in relevant_chunks]
 
         model_used = chat_request.model or "gpt-4o-mini"
@@ -912,9 +913,9 @@ async def chat_with_workspace(
         full_response_text = ""
         
         if intent == "GENERATE_PROPOSAL":
-            response_stream = task.analyze_document(chat_request.query, relevant_chunks, chat_request.model, workspace_instructions)
+            response_stream = await task.analyze_document(chat_request.query, relevant_chunks, chat_request.model, workspace_instructions)
         elif intent == "GENERAL_QUERY":
-            response_stream = task.respond_chat(chat_request.query, relevant_chunks, chat_request.model, workspace_instructions)
+            response_stream = await task.respond_chat(chat_request.query, relevant_chunks, chat_request.model, workspace_instructions)
 
         try:
             for token in response_stream:

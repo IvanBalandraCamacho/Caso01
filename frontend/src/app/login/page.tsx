@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Eye, EyeOff, Loader2, Sparkles } from "lucide-react";
 import { showToast } from "@/components/Toast";
+// MOCK AUTH: Remove this import and the fallback logic below to disable mock authentication
+import { getMockToken } from "@/lib/mockAuth";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -48,6 +50,17 @@ export default function LoginPage() {
       });
 
       if (!response.ok) {
+        // MOCK AUTH: Try mock authentication as fallback (remove these 8 lines to disable)
+        const mockResult = getMockToken(email, password);
+        if (mockResult) {
+          const data = mockResult;
+          localStorage.setItem('access_token', data.access_token);
+          window.dispatchEvent(new Event('loginSuccess'));
+          showToast(`¡Bienvenido ${data.full_name}! (Datos Mock)`, "welcome");
+          setTimeout(() => router.push('/'), 800);
+          return;
+        }
+
         const error = await response.json();
         throw new Error(error.detail || 'Error al iniciar sesión');
       }

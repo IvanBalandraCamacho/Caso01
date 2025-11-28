@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Sidebar } from "@/components/sidebar";
 import { ChatArea } from "@/components/chat-area";
@@ -21,24 +21,35 @@ export default function ConversationPage() {
     fetchConversations 
   } = useWorkspaces();
 
-  // Set active workspace
+  // Use refs to prevent infinite loops and track initialization
+  const initializedWorkspaceRef = useRef(false);
+  const initializedConversationRef = useRef(false);
+
+  // Set active workspace - only once on mount or when workspaceId changes
   useEffect(() => {
     const workspace = workspaces.find(ws => ws.id === workspaceId);
+    
     if (workspace && activeWorkspace?.id !== workspaceId) {
       setActiveWorkspace(workspace);
       fetchConversations(workspaceId);
+      initializedWorkspaceRef.current = true;
     }
-  }, [workspaceId, workspaces, activeWorkspace, setActiveWorkspace, fetchConversations]);
+    // Only depend on workspaceId and workspaces array, not the setters
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceId, workspaces]);
 
-  // Set active conversation
+  // Set active conversation - only once when conversation data is available
   useEffect(() => {
-    if (conversations.length > 0) {
+    if (conversations.length > 0 && activeConversation?.id !== conversationId) {
       const conversation = conversations.find(conv => conv.id === conversationId);
-      if (conversation && activeConversation?.id !== conversationId) {
+      if (conversation) {
         setActiveConversation(conversation);
+        initializedConversationRef.current = true;
       }
     }
-  }, [conversationId, conversations, activeConversation, setActiveConversation]);
+    // Only depend on conversationId and conversations array, not the setter
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId, conversations]);
 
   return (
     <div className="flex h-screen">

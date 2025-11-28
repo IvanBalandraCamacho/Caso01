@@ -13,8 +13,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateWorkspace } from "@/hooks/useApi";
 import { WorkspacePublic } from "@/types/api";
-import { Loader2 } from "lucide-react";
+import { Loader2, Upload, X } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { uploadDocumentApi } from "@/lib/api";
 
 interface AddWorkspaceModalProps {
   isOpen: boolean;
@@ -24,8 +25,9 @@ interface AddWorkspaceModalProps {
 
 export function AddWorkspaceModal({ isOpen, onClose, onSuccess }: AddWorkspaceModalProps) {
   const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
   const [instructions, setInstructions] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const router = useRouter();
 
   const createWorkspaceMutation = useCreateWorkspace();
@@ -41,17 +43,32 @@ export function AddWorkspaceModal({ isOpen, onClose, onSuccess }: AddWorkspaceMo
     try {
       const workspace = await createWorkspaceMutation.mutateAsync({
         name: name.trim(),
-        description: description.trim() || null,
+        description: null, // Siempre enviar null
         instructions: instructions.trim() || null,
       });
 
-      console.log(workspace),
+      console.log(workspace);
 
+      // Si hay un archivo seleccionado, subirlo al workspace
+      if (selectedFile) {
+        setIsUploading(true);
+        try {
+          const formData = new FormData();
+          formData.append("file", selectedFile);
+          await uploadDocumentApi((workspace as WorkspacePublic).id, formData);
+          console.log("Archivo subido correctamente");
+        } catch (uploadError) {
+          console.error("Error al subir archivo:", uploadError);
+          alert("Workspace creado, pero hubo un error al subir el archivo");
+        } finally {
+          setIsUploading(false);
+        }
+      }
 
       // Limpiar formulario
       setName("");
-      setDescription("");
       setInstructions("");
+      setSelectedFile(null);
 
       // Cerrar modal y notificar éxito
       onClose();
@@ -71,12 +88,23 @@ export function AddWorkspaceModal({ isOpen, onClose, onSuccess }: AddWorkspaceMo
   };
 
   const handleClose = () => {
-    if (!createWorkspaceMutation.isPending) {
+    if (!createWorkspaceMutation.isPending && !isUploading) {
       setName("");
-      setDescription("");
       setInstructions("");
+      setSelectedFile(null);
       onClose();
     }
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
+
+  const removeFile = () => {
+    setSelectedFile(null);
   };
 
   return (
@@ -103,24 +131,43 @@ export function AddWorkspaceModal({ isOpen, onClose, onSuccess }: AddWorkspaceMo
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Ej: Proyecto Marketing Q4"
                 className="bg-brand-dark border-gray-700 text-white focus-visible:ring-brand-red rounded-[8_!important]"
-                disabled={createWorkspaceMutation.isPending}
+                disabled={createWorkspaceMutation.isPending || isUploading}
                 required
               />
             </div>
 
-            {/* Descripción */}
+            {/* Archivo para subir */}
             <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-300 mb-2">
-                Descripción (Opcional)
+              <label htmlFor="file" className="block text-sm font-medium text-gray-300 mb-2">
+                Subir Archivo (Opcional)
               </label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Breve descripción del workspace..."
-                className="bg-brand-dark border-gray-700 text-white focus-visible:ring-brand-red min-h-[80px] resize-none rounded-[8_!important]"
-                disabled={createWorkspaceMutation.isPending}
-              />
+              <div className="space-y-2">
+                <Input
+                  id="file"
+                  type="file"
+                  onChange={handleFileChange}
+                  accept=".pdf,.docx,.xlsx,.txt,.csv"
+                  className="bg-brand-dark border-gray-700 text-white focus-visible:ring-brand-red rounded-[8_!important] file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-brand-red file:text-white hover:file:bg-red-700"
+                  disabled={createWorkspaceMutation.isPending || isUploading}
+                />
+                {selectedFile && (
+                  <div className="flex items-center gap-2 p-2 bg-gray-800 rounded-md border border-gray-700">
+                    <Upload className="h-4 w-4 text-gray-400" />
+                    <span className="text-sm text-gray-300 flex-1">{selectedFile.name}</span>
+                    <button
+                      type="button"
+                      onClick={removeFile}
+                      className="text-gray-400 hover:text-red-500 transition-colors"
+                      disabled={createWorkspaceMutation.isPending || isUploading}
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                PDF, DOCX, XLSX, CSV, TXT soportados
+              </p>
             </div>
 
             {/* Instrucciones para el LLM */}
@@ -134,7 +181,7 @@ export function AddWorkspaceModal({ isOpen, onClose, onSuccess }: AddWorkspaceMo
                 onChange={(e) => setInstructions(e.target.value)}
                 placeholder="Ej: Responde siempre en español formal. Enfócate en análisis de marketing..."
                 className="bg-brand-dark border-gray-700 text-white focus-visible:ring-brand-red min-h-[100px] resize-none rounded-[8_!important] "
-                disabled={createWorkspaceMutation.isPending}
+                disabled={createWorkspaceMutation.isPending || isUploading}
               />
               <p className="text-xs text-gray-500 mt-1">
                 Estas instrucciones guiarán el comportamiento del asistente en este workspace.
@@ -148,19 +195,19 @@ export function AddWorkspaceModal({ isOpen, onClose, onSuccess }: AddWorkspaceMo
               variant="outline"
               onClick={handleClose}
               className="border-gray-700 text-gray-300 hover:bg-gray-800 rounded-[8_!important] border-none"
-              disabled={createWorkspaceMutation.isPending}
+              disabled={createWorkspaceMutation.isPending || isUploading}
             >
               Cancelar
             </Button>
             <Button
               type="submit"
               className="bg-brand-red text-white hover:bg-red-700 rounded-[8_!important]"
-              disabled={createWorkspaceMutation.isPending || !name.trim()}
+              disabled={createWorkspaceMutation.isPending || isUploading || !name.trim()}
             >
-              {createWorkspaceMutation.isPending ? (
+              {createWorkspaceMutation.isPending || isUploading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creando...
+                  {isUploading ? "Subiendo archivo..." : "Creando..."}
                 </>
               ) : (
                 "Crear Workspace"
