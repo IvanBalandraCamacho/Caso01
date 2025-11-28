@@ -42,7 +42,7 @@ export interface Document {
   id: string;
   file_name: string;
   file_type: string;
-  status: string;
+  status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
   chunk_count: number;
 }
 
@@ -53,12 +53,6 @@ export interface Message {
   content: string;
   chunk_references: string | null;
   created_at: string;
-}
-
-export interface SearchResult {
-  id: string;
-  file_name: string;
-  text: string;
 }
 
 export interface Conversation {
@@ -94,8 +88,8 @@ interface WorkspaceContextType {
   notifications: Notification[];
   addNotification: (notification: Notification) => void;
 
-  searchResults: SearchResult[];
-  setSearchResults: (results: SearchResult[]) => void;
+  searchResults: unknown[];
+  setSearchResults: (results: unknown[]) => void;
 
   // --- Conversations ---
   conversations: Conversation[];
@@ -159,7 +153,7 @@ export function WorkspaceProvider({
   const [isLoadingDocs, setIsLoadingDocs] = useState(false);
   const [errorDocs, setErrorDocs] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchResults, setSearchResults] = useState<unknown[]>([]);
 
   // Estados para conversaciones
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -338,10 +332,10 @@ export function WorkspaceProvider({
     async (conversationId: string): Promise<Document[]> => {
       if (!activeWorkspace) return [];
       try {
-        const data: Document[] = await fetchConversationDocuments({
-          workspaceId: activeWorkspace.id,
+        const data: Document[] = await fetchConversationDocuments(
+          activeWorkspace.id,
           conversationId,
-        });
+        );
         return data;
       } catch (error) {
         console.error("Error al cargar documentos de conversación:", error);

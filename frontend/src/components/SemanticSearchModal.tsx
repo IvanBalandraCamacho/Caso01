@@ -116,7 +116,7 @@ export function SemanticSearchModal({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-foreground">
-                        {(result.metadata.filename as string) || "Documento"}
+                        {result.metadata.filename || "Documento"}
                       </span>
                       <span className="text-xs text-muted-foreground">
                         Relevancia: {(result.score * 100).toFixed(0)}%
@@ -126,8 +126,8 @@ export function SemanticSearchModal({
                       {result.content}
                     </p>
                     {result.metadata.chunk_index !== undefined && (
-                        <span className="text-xs text-muted-foreground mt-2 block">
-                        Fragmento #{(result.metadata.chunk_index as number)}
+                      <span className="text-xs text-muted-foreground mt-2 block">
+                        Fragmento #{result.metadata.chunk_index}
                       </span>
                     )}
                   </div>

@@ -39,13 +39,13 @@ export function AddWorkspaceModal({ isOpen, onClose, onSuccess }: AddWorkspaceMo
     }
 
     try {
-      const workspace = (await createWorkspaceMutation.mutateAsync({
+      const workspace = await createWorkspaceMutation.mutateAsync({
         name: name.trim(),
         description: description.trim() || null,
         instructions: instructions.trim() || null,
       });
 
-      console.log(workspace);
+      console.log(workspace),
 
 
       // Limpiar formulario
