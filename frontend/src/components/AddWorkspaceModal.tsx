@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateWorkspace } from "@/hooks/useApi";
 import { Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface AddWorkspaceModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ export function AddWorkspaceModal({ isOpen, onClose, onSuccess }: AddWorkspaceMo
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [instructions, setInstructions] = useState("");
+  const router = useRouter();
 
   const createWorkspaceMutation = useCreateWorkspace();
 
@@ -36,11 +38,14 @@ export function AddWorkspaceModal({ isOpen, onClose, onSuccess }: AddWorkspaceMo
     }
 
     try {
-      await createWorkspaceMutation.mutateAsync({
+      const workspace = await createWorkspaceMutation.mutateAsync({
         name: name.trim(),
         description: description.trim() || null,
         instructions: instructions.trim() || null,
       });
+
+      console.log(workspace);
+
 
       // Limpiar formulario
       setName("");
@@ -50,6 +55,9 @@ export function AddWorkspaceModal({ isOpen, onClose, onSuccess }: AddWorkspaceMo
       // Cerrar modal y notificar éxito
       onClose();
       onSuccess?.();
+
+      // Redireccionar al workspace creado
+      router.push(`/p/${workspace.id}`);
     } catch (error: unknown) {
       console.error("Error al crear workspace:", error as Error);
       alert(`Error al crear workspace: ${error instanceof Error ? error.message : 'Error desconocido'}`);
