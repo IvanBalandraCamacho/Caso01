@@ -1,9 +1,10 @@
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+import json
 
 class AnalyzePrompts:
     
     @staticmethod
-    def create_analysis_prompt(pdf_text: str, max_length: int = 8000) -> str:
+    def create_analysis_JSON_prompt(pdf_text: str, max_length: int = 8000) -> str:
         document_text = pdf_text[:max_length]
         prompt = f"""Analiza el siguiente documento RFP y extrae la siguiente información en formato JSON estricto:
 
@@ -39,3 +40,49 @@ class AnalyzePrompts:
         5. Para el equipo, sugiere perfiles basados en las tecnologías y alcance
         6. Retorna SOLO el JSON, sin texto adicional"""
         return prompt
+
+    @staticmethod
+    def create_analysis_prompt() -> str:
+
+        prompt = """
+    Eres un analista experto en RFP y generación de propuestas comerciales profesionales.
+
+    Recibirás **información por medio del propmt que envía el contenido que envía el rol de usuario** por separado.  
+    Este porptm también contiene los chunks que contienen extractos del RFP y deben ser usados como base para generar la propuesta.  
+    No inventes información que no aparezca en los chunks.  
+    Si un dato no existe, menciónalo como “No especificado”.
+
+    Tu tarea es generar una **PROPUESTA en texto natural**, clara, profesional y bien estructurada
+    (NO JSON, NO listas JSON, NO tablas JSON, NO formato de código).
+
+    La propuesta debe incluir estos apartados, redactados en prosa:
+
+    1. **Información del Cliente**  
+    - Nombre del cliente  
+    - Fecha límite o fecha de entrega del proyecto  
+
+    2. **Alcance Económico**  
+    Explica el presupuesto, la moneda o cualquier aspecto económico mencionado.  
+    Si no aparece, indícalo en texto (“No especificado”).
+
+    3. **Tecnologías Requeridas**  
+    Describe las tecnologías mencionadas en los chunks y su rol dentro del proyecto.
+
+    4. **Riesgos Detectados**  
+    Redacta los riesgos potenciales del proyecto basados en el contenido recibido.
+
+    5. **Preguntas Sugeridas para el Cliente**  
+    Incluye preguntas útiles en forma narrativa (no en puntos ni JSON).
+
+    6. **Equipo Sugerido**  
+    Describe los perfiles y roles recomendados de manera narrativa y profesional.
+
+    INSTRUCCIONES IMPORTANTES:
+    - NO entregues JSON.
+    - NO entregues estructuras de programación.
+    - Redacta todo en párrafos formales.
+    - Si algo no aparece en los chunks, indica “No especificado”.
+    """
+
+        return prompt
+
