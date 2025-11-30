@@ -34,6 +34,7 @@ import SpeechRecognition, {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { DocumentStatus } from "@/types/api";
 import rehypeRaw from "rehype-raw";
 import { QuickPrompts } from "./QuickPrompts";
 import { showToast } from "./Toast";
@@ -79,7 +80,7 @@ export function ChatArea() {
   const [uploadingDocuments, setUploadingDocuments] = useState<Array<{
     id: string;
     file_name: string;
-    status: string;
+    status: DocumentStatus;
   }>>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -112,15 +113,15 @@ export function ChatArea() {
     isLoading: isLoadingConversation,
     error: conversationError,
   } = useConversationWithMessages({
-    workspaceId: activeWorkspace?.id || "",
+    workspaceId: activeWorkspace?.id,
     conversationId: activeConversation?.id,
   });
 
   // Hook para cargar documentos de la conversación
   const { data: conversationDocuments, refetch: refetchConversationDocuments } =
     useConversationDocuments(
-      activeWorkspace?.id || "",
-      activeConversation?.id || "",
+      activeWorkspace?.id,
+      activeConversation?.id,
     );
 
   // Si hay error 404, la conversación no existe - limpiar el estado
@@ -352,7 +353,7 @@ export function ChatArea() {
     if (!files || files.length === 0 || !activeConversation || !activeWorkspace) return;
 
     setIsUploadingToConversation(true);
-    const uploadedDocs: Array<{ id: string; file_name: string; status: string }> = [];
+    const uploadedDocs: Array<{ id: string; file_name: string; status: DocumentStatus }> = [];
     
     try {
       for (const file of Array.from(files)) {
@@ -364,7 +365,7 @@ export function ChatArea() {
         uploadedDocs.push({
           id: uploadedDoc.id,
           file_name: uploadedDoc.file_name,
-          status: uploadedDoc.status || "PENDING",
+          status: (uploadedDoc.status as DocumentStatus) || "PENDING",
         });
       }
       
@@ -385,7 +386,7 @@ export function ChatArea() {
     }
   };
 
-  const handleDocumentStatusChange = useCallback((documentId: string, newStatus: string) => {
+  const handleDocumentStatusChange = useCallback((documentId: string, newStatus: DocumentStatus) => {
     setUploadingDocuments((prev) =>
       prev.map((doc) => (doc.id === documentId ? { ...doc, status: newStatus } : doc))
     );

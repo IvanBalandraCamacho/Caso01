@@ -1,9 +1,15 @@
-import axios, { AxiosInstance } from "axios";
+import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from "axios";
 import {
   RAGIngestRequest,
   IngestResponse,
   SearchRequest,
   SearchResult,
+  Token,
+  HTTPValidationError,
+  DocumentPublic,
+  WorkspacePublic,
+  ConversationPublic,
+  ConversationWithMessages,
 } from "@/types/api";
 
 // ============================================
@@ -19,6 +25,80 @@ export const api: AxiosInstance = axios.create({
   },
 });
 
+// ============================================
+// TOKEN REFRESH LOGIC
+// ============================================
+let isRefreshing = false;
+let failedQueue: Array<{
+  resolve: (value: unknown) => void;
+  reject: (error: unknown) => void;
+}> = [];
+
+const processQueue = (error: unknown, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
+/**
+ * Attempt to refresh the JWT token
+ * Uses /api/v1/auth/refresh endpoint per OpenAPI spec
+ */
+const refreshToken = async (): Promise<string | null> => {
+  const currentToken = localStorage.getItem("access_token");
+  if (!currentToken) return null;
+
+  try {
+    const response = await axios.post<Token>(
+      `${baseURL}/auth/refresh`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${currentToken}`,
+        },
+      }
+    );
+    const newToken = response.data.access_token;
+    localStorage.setItem("access_token", newToken);
+    return newToken;
+  } catch (error) {
+    console.error("Token refresh failed:", error);
+    return null;
+  }
+};
+
+/**
+ * Handle logout - clear token and redirect
+ */
+const handleLogout = () => {
+  localStorage.removeItem("access_token");
+  // Dispatch custom event for other components to react
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("logout"));
+    window.location.href = "/login";
+  }
+};
+
+/**
+ * Format validation errors for display
+ */
+export const formatValidationErrors = (error: HTTPValidationError): string => {
+  if (!error.detail || !Array.isArray(error.detail)) {
+    return "Error de validación desconocido";
+  }
+  return error.detail
+    .map((err) => {
+      const location = err.loc.join(" → ");
+      return `${location}: ${err.msg}`;
+    })
+    .join("\n");
+};
+
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
@@ -33,23 +113,81 @@ api.interceptors.request.use(
   },
 );
 
-// Response interceptor
+// Response interceptor with token refresh and validation error handling
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error: AxiosError<HTTPValidationError | { detail: string }>) => {
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+
     if (error.response) {
+      const status = error.response.status;
+
+      // Handle 401 Unauthorized - attempt token refresh first
+      if (status === 401 && !originalRequest._retry) {
+        if (isRefreshing) {
+          // Queue this request while refresh is in progress
+          return new Promise((resolve, reject) => {
+            failedQueue.push({ resolve, reject });
+          })
+            .then((token) => {
+              if (originalRequest.headers) {
+                originalRequest.headers.Authorization = `Bearer ${token}`;
+              }
+              return api(originalRequest);
+            })
+            .catch((err) => Promise.reject(err));
+        }
+
+        originalRequest._retry = true;
+        isRefreshing = true;
+
+        try {
+          const newToken = await refreshToken();
+          if (newToken) {
+            processQueue(null, newToken);
+            if (originalRequest.headers) {
+              originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            }
+            return api(originalRequest);
+          } else {
+            // Refresh failed - logout
+            processQueue(new Error("Token refresh failed"), null);
+            handleLogout();
+            return Promise.reject(error);
+          }
+        } catch (refreshError) {
+          processQueue(refreshError, null);
+          handleLogout();
+          return Promise.reject(refreshError);
+        } finally {
+          isRefreshing = false;
+        }
+      }
+
+      // Handle 422 Validation Error
+      if (status === 422) {
+        const validationError = error.response.data as HTTPValidationError;
+        console.error(
+          "Validation Error (422):",
+          formatValidationErrors(validationError)
+        );
+        // Re-throw with formatted message for UI handling
+        const formattedError = new Error(formatValidationErrors(validationError));
+        (formattedError as Error & { validationDetails: HTTPValidationError }).validationDetails = validationError;
+        return Promise.reject(formattedError);
+      }
+
+      // Handle 403 Forbidden
+      if (status === 403) {
+        console.error("Forbidden (403): No tienes permisos para realizar esta acción");
+      }
+
+      // Handle other errors
       console.error(
         "Error de respuesta:",
-        error.response.status,
+        status,
         error.response.data,
       );
-      if (error.response.status === 401) {
-        localStorage.removeItem("access_token");
-        window.location.href = "/login";
-      }
-      if (error.response.status === 403) {
-        console.error("No tienes permisos para realizar esta acción");
-      }
     } else if (error.request) {
       console.error("Error de red:", error.message);
     } else {
@@ -132,45 +270,57 @@ export const ragHealthCheck = async (): Promise<{ status: string }> => {
 // WORKSPACE API FUNCTIONS
 // ============================================
 
-export const fetchWorkspaces = async () => {
-  const { data } = await api.get("/workspaces");
+export const fetchWorkspaces = async (): Promise<WorkspacePublic[]> => {
+  const { data } = await api.get<WorkspacePublic[]>("/workspaces");
   return data;
 };
 
 export const updateWorkspaceApi = async (
   workspaceId: string,
   updates: Record<string, unknown>,
-) => {
-  const { data } = await api.put(`/workspaces/${workspaceId}`, updates);
+): Promise<WorkspacePublic> => {
+  const { data } = await api.put<WorkspacePublic>(`/workspaces/${workspaceId}`, updates);
   return data;
 };
 
-export const deleteWorkspaceApi = async (workspaceId: string) => {
-  const { data } = await api.delete(`/workspaces/${workspaceId}`);
+export const deleteWorkspaceApi = async (workspaceId: string): Promise<void> => {
+  await api.delete(`/workspaces/${workspaceId}`);
+};
+
+export const fetchWorkspaceDocuments = async (workspaceId: string): Promise<DocumentPublic[]> => {
+  const { data } = await api.get<DocumentPublic[]>(`/workspaces/${workspaceId}/documents`);
   return data;
 };
 
-export const fetchWorkspaceDocuments = async (workspaceId: string) => {
-  const { data } = await api.get(`/workspaces/${workspaceId}/documents`);
+export const fetchWorkspaceDetails = async (workspaceId: string): Promise<WorkspacePublic> => {
+  const { data } = await api.get<WorkspacePublic>(`/workspaces/${workspaceId}`);
   return data;
 };
 
-export const fetchWorkspaceDetails = async (workspaceId: string) => {
-  const { data } = await api.get(`/workspaces/${workspaceId}`);
-  return data;
-};
-
+/**
+ * Upload a document to a workspace
+ * Supports progress tracking via onProgress callback
+ */
 export const uploadDocumentApi = async (
   workspaceId: string,
   formData: FormData,
-) => {
-  const { data } = await api.post(
+  onProgress?: (progress: number) => void,
+): Promise<DocumentPublic> => {
+  const { data } = await api.post<DocumentPublic>(
     `/workspaces/${workspaceId}/upload`,
     formData,
     {
       headers: {
         "Content-Type": "multipart/form-data",
       },
+      onUploadProgress: onProgress
+        ? (progressEvent) => {
+            const total = progressEvent.total || 0;
+            const current = progressEvent.loaded;
+            const percentCompleted = total > 0 ? Math.round((current / total) * 100) : 0;
+            onProgress(percentCompleted);
+          }
+        : undefined,
     },
   );
   return data;
@@ -180,33 +330,32 @@ export const updateConversationApi = async (
   workspaceId: string,
   conversationId: string,
   updates: { title: string },
-) => {
-  const { data } = await api.put(
+): Promise<ConversationWithMessages> => {
+  const { data } = await api.put<ConversationWithMessages>(
     `/workspaces/${workspaceId}/conversations/${conversationId}`,
     updates,
   );
   return data;
 };
 
-export const deleteDocumentApi = async (documentId: string) => {
-  const { data } = await api.delete(`/documents/${documentId}`);
-  return data;
+export const deleteDocumentApi = async (documentId: string): Promise<void> => {
+  await api.delete(`/documents/${documentId}`);
 };
 
 // ============================================
 // CONVERSATION API FUNCTIONS
 // ============================================
 
-export const fetchConversations = async (workspaceId: string) => {
-  const { data } = await api.get(`/workspaces/${workspaceId}/conversations`);
+export const fetchConversations = async (workspaceId: string): Promise<ConversationPublic[]> => {
+  const { data } = await api.get<ConversationPublic[]>(`/workspaces/${workspaceId}/conversations`);
   return data;
 };
 
 export const createConversationApi = async (
   workspaceId: string,
   title: string,
-) => {
-  const { data } = await api.post(`/workspaces/${workspaceId}/conversations`, {
+): Promise<ConversationPublic> => {
+  const { data } = await api.post<ConversationPublic>(`/workspaces/${workspaceId}/conversations`, {
     title,
   });
   return data;
@@ -215,18 +364,17 @@ export const createConversationApi = async (
 export const deleteConversationApi = async (
   workspaceId: string,
   conversationId: string,
-) => {
-  const { data } = await api.delete(
+): Promise<void> => {
+  await api.delete(
     `/workspaces/${workspaceId}/conversations/${conversationId}`,
   );
-  return data;
 };
 
 export const fetchConversationMessages = async (
   workspaceId: string,
   conversationId: string,
-) => {
-  const { data } = await api.get(
+): Promise<ConversationWithMessages> => {
+  const { data } = await api.get<ConversationWithMessages>(
     `/workspaces/${workspaceId}/conversations/${conversationId}`,
   );
   return data;
@@ -236,8 +384,8 @@ export const fetchConversationMessages = async (
 // EXPORT API FUNCTIONS
 // ============================================
 
-export const exportDocumentsToCsvApi = async (workspaceId: string) => {
-  const { data } = await api.get(
+export const exportDocumentsToCsvApi = async (workspaceId: string): Promise<Blob> => {
+  const { data } = await api.get<Blob>(
     `/workspaces/${workspaceId}/documents/export-csv`,
     {
       responseType: "blob",
@@ -249,11 +397,11 @@ export const exportDocumentsToCsvApi = async (workspaceId: string) => {
 export const exportChatToTxtApi = async (
   workspaceId: string,
   conversationId?: string,
-) => {
+): Promise<Blob> => {
   const url = conversationId
     ? `/workspaces/${workspaceId}/chat/export/txt?conversation_id=${conversationId}`
     : `/workspaces/${workspaceId}/chat/export/txt`;
-  const { data } = await api.get(url, {
+  const { data } = await api.get<Blob>(url, {
     responseType: "blob",
   });
   return data;
@@ -262,23 +410,22 @@ export const exportChatToTxtApi = async (
 export const exportChatToPdfApi = async (
   workspaceId: string,
   conversationId?: string,
-) => {
+): Promise<Blob> => {
   const url = conversationId
     ? `/workspaces/${workspaceId}/chat/export/pdf?conversation_id=${conversationId}`
     : `/workspaces/${workspaceId}/chat/export/pdf`;
-  const { data } = await api.get(url, {
+  const { data } = await api.get<Blob>(url, {
     responseType: "blob",
   });
   return data;
 };
 
-export const deleteChatHistoryApi = async (workspaceId: string) => {
-  const { data } = await api.delete(`/workspaces/${workspaceId}/chat/history`);
-  return data;
+export const deleteChatHistoryApi = async (workspaceId: string): Promise<void> => {
+  await api.delete(`/workspaces/${workspaceId}/chat/history`);
 };
 
-export const fulltextSearchApi = async (query: string) => {
-  const { data } = await api.get(`/workspaces/fulltext-search?query=${query}`);
+export const fulltextSearchApi = async (query: string): Promise<SearchResult[]> => {
+  const { data } = await api.get<SearchResult[]>(`/workspaces/fulltext-search?query=${query}`);
   return data;
 };
 
@@ -286,8 +433,8 @@ export const fulltextSearchApi = async (query: string) => {
 // AUTH API FUNCTIONS
 // ============================================
 
-export const checkAuthMe = async () => {
-  const { data } = await api.get("/auth/me");
+export const checkAuthMe = async (): Promise<import("@/types/api").UserPublic> => {
+  const { data } = await api.get<import("@/types/api").UserPublic>("/auth/me");
   return data;
 };
 
@@ -298,9 +445,9 @@ export const checkAuthMe = async () => {
 export const generateDownloadableDocument = async (
   workspaceId: string,
   conversationId: string,
-  options: { format: string; document_type: string; include_metadata: boolean },
-) => {
-  const response = await api.post(
+  options: import("@/types/api").GenerateDownloadableDocRequest,
+): Promise<import("axios").AxiosResponse<Blob>> => {
+  const response = await api.post<Blob>(
     `/workspaces/${workspaceId}/conversations/${conversationId}/generate-downloadable`,
     options,
     {
@@ -313,8 +460,8 @@ export const generateDownloadableDocument = async (
 export const generateConversationTitle = async (
   workspaceId: string,
   conversationId: string,
-) => {
-  const { data } = await api.post(
+): Promise<{ title: string }> => {
+  const { data } = await api.post<{ title: string }>(
     `/workspaces/${workspaceId}/conversations/${conversationId}/generate-title`,
   );
   return data;
@@ -330,25 +477,38 @@ export const fetchConversationDocuments = async ({
 }: {
   workspaceId: string;
   conversationId: string;
-}) => {
-  const { data } = await api.get(
+}): Promise<DocumentPublic[]> => {
+  const { data } = await api.get<DocumentPublic[]>(
     `/workspaces/${workspaceId}/conversations/${conversationId}/documents`,
   );
   return data;
 };
 
+/**
+ * Upload a document to a specific conversation
+ * Supports progress tracking via onProgress callback
+ */
 export const uploadDocumentToConversation = async (
   workspaceId: string,
   conversationId: string,
   formData: FormData,
-) => {
-  const { data } = await api.post(
+  onProgress?: (progress: number) => void,
+): Promise<DocumentPublic> => {
+  const { data } = await api.post<DocumentPublic>(
     `/workspaces/${workspaceId}/conversations/${conversationId}/upload`,
     formData,
     {
       headers: {
         "Content-Type": "multipart/form-data",
       },
+      onUploadProgress: onProgress
+        ? (progressEvent) => {
+            const total = progressEvent.total || 0;
+            const current = progressEvent.loaded;
+            const percentCompleted = total > 0 ? Math.round((current / total) * 100) : 0;
+            onProgress(percentCompleted);
+          }
+        : undefined,
     },
   );
   return data;
@@ -358,13 +518,13 @@ export const uploadDocumentToConversation = async (
 // DOCUMENT STATUS POLLING API FUNCTIONS
 // ============================================
 
-export const getDocumentStatus = async (documentId: string) => {
-  const { data } = await api.get(`/documents/${documentId}/status`);
+export const getDocumentStatus = async (documentId: string): Promise<DocumentPublic> => {
+  const { data } = await api.get<DocumentPublic>(`/documents/${documentId}/status`);
   return data;
 };
 
-export const getPendingDocuments = async (workspaceId: string) => {
-  const { data } = await api.get(`/workspaces/${workspaceId}/documents/pending`);
+export const getPendingDocuments = async (workspaceId: string): Promise<DocumentPublic[]> => {
+  const { data } = await api.get<DocumentPublic[]>(`/workspaces/${workspaceId}/documents/pending`);
   return data;
 };
 

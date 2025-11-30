@@ -7,6 +7,7 @@ import {
   useMemo,
   useCallback,
   useEffect,
+  useRef,
 } from "react";
 import {
   fetchWorkspaces as fetchWorkspacesApi,
@@ -25,8 +26,9 @@ import {
   fulltextSearchApi,
   fetchConversationDocuments,
   uploadDocumentToConversation,
+  getPendingDocuments,
 } from "@/lib/api";
-import { SearchResult } from "@/types/api";
+import { SearchResult, DocumentStatus } from "@/types/api";
 
 // 1. Exportamos las interfaces para que otros archivos las usen
 export interface Workspace {
@@ -43,8 +45,11 @@ export interface Document {
   id: string;
   file_name: string;
   file_type: string;
-  status: string;
+  status: DocumentStatus;
   chunk_count: number;
+  conversation_id?: string | null;
+  suggestion_short?: string | null;
+  suggestion_full?: string | null;
 }
 
 export interface Message {
@@ -199,25 +204,99 @@ export function WorkspaceProvider({
     }
   }, []);
 
-  // --- Polling automático para documentos en procesamiento ---
-  useEffect(() => {
-    if (!activeWorkspace) return;
+  // --- Optimized polling for processing documents using dedicated endpoint ---
+  // Uses /api/v1/workspaces/{workspace_id}/documents/pending instead of fetching all documents
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingAttemptRef = useRef(0);
+  
+  // Exponential backoff configuration
+  const INITIAL_POLL_INTERVAL = 3000;  // 3 seconds
+  const MAX_POLL_INTERVAL = 30000;     // 30 seconds
+  const BACKOFF_MULTIPLIER = 1.5;
 
-    // Verificar si hay documentos en estado PROCESSING o PENDING
-    const hasProcessingDocuments = documents.some(
-      (doc) => doc.status === "PROCESSING" || doc.status === "PENDING",
+  useEffect(() => {
+    if (!activeWorkspace) {
+      // Clear polling when no workspace
+      if (pollingIntervalRef.current) {
+        clearTimeout(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      pollingAttemptRef.current = 0;
+      return;
+    }
+
+    // Check if there are any processing documents using the optimized flag
+    const hasProcessingDocs = documents.some(
+      (doc) => doc.status === "PROCESSING" || doc.status === "PENDING"
     );
 
-    if (hasProcessingDocuments) {
-      const intervalId = setInterval(() => {
-        fetchDocuments(activeWorkspace.id);
-      }, 3000); // Refrescar cada 3 segundos
-
-      return () => {
-        clearInterval(intervalId);
-      };
+    if (!hasProcessingDocs) {
+      // Reset polling when all documents are processed
+      if (pollingIntervalRef.current) {
+        clearTimeout(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      pollingAttemptRef.current = 0;
+      return;
     }
-  }, [activeWorkspace, documents, fetchDocuments]);
+
+    // Start polling with exponential backoff
+    const pollPendingDocuments = async () => {
+      try {
+        // Use dedicated pending documents endpoint (more efficient)
+        const pendingDocs = await getPendingDocuments(activeWorkspace.id);
+        
+        if (pendingDocs.length === 0) {
+          // All documents processed, refresh the full list once
+          await fetchDocuments(activeWorkspace.id);
+          pollingAttemptRef.current = 0;
+          return;
+        }
+
+        // Update only the changed documents in state
+        setDocuments((prevDocs) => {
+          const updatedDocs = [...prevDocs];
+          pendingDocs.forEach((pendingDoc) => {
+            const index = updatedDocs.findIndex((d) => d.id === pendingDoc.id);
+            if (index !== -1) {
+              updatedDocs[index] = pendingDoc as Document;
+            }
+          });
+          return updatedDocs;
+        });
+
+        // Schedule next poll with exponential backoff
+        const nextInterval = Math.min(
+          INITIAL_POLL_INTERVAL * Math.pow(BACKOFF_MULTIPLIER, pollingAttemptRef.current),
+          MAX_POLL_INTERVAL
+        );
+        pollingAttemptRef.current++;
+        
+        pollingIntervalRef.current = setTimeout(pollPendingDocuments, nextInterval);
+      } catch (error) {
+        console.error("Error polling pending documents:", error);
+        // Retry with backoff even on error
+        const nextInterval = Math.min(
+          INITIAL_POLL_INTERVAL * Math.pow(BACKOFF_MULTIPLIER, pollingAttemptRef.current),
+          MAX_POLL_INTERVAL
+        );
+        pollingAttemptRef.current++;
+        pollingIntervalRef.current = setTimeout(pollPendingDocuments, nextInterval);
+      }
+    };
+
+    // Initial poll after a short delay
+    pollingIntervalRef.current = setTimeout(pollPendingDocuments, INITIAL_POLL_INTERVAL);
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearTimeout(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  // Only depend on activeWorkspace.id and whether there are processing docs
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeWorkspace?.id, documents.some((d) => d.status === "PROCESSING" || d.status === "PENDING")]);
 
   // --- Función para actualizar workspace ---
   const updateWorkspace = useCallback(
@@ -587,22 +666,23 @@ export function WorkspaceProvider({
       selectedModel,
       setSelectedModel,
     }),
+    // Only include values that actually change and affect consumers
+    // State setters are stable and don't need to be included
+    // useCallback functions are stable unless their deps change
     [
       workspaces,
-      setWorkspaces,
       activeWorkspace,
-      setActiveWorkspace,
       documents,
       isLoadingDocs,
       errorDocs,
-      fetchDocuments,
       notifications,
-      addNotification,
       searchResults,
-      setSearchResults,
       conversations,
       activeConversation,
-      setActiveConversation,
+      selectedModel,
+      // Callback functions - include only those with changing dependencies
+      fetchDocuments,
+      addNotification,
       fetchConversations,
       createConversation,
       deleteConversation,
@@ -618,8 +698,6 @@ export function WorkspaceProvider({
       exportChatToPdf,
       deleteChatHistory,
       fulltextSearch,
-      selectedModel,
-      setSelectedModel,
     ],
   );
 

@@ -133,10 +133,14 @@ export function Sidebar() {
     // Activar el workspace
     setActiveWorkspace(workspace);
     
+    // Limpiar conversación activa
+    setActiveConversation(null);
+    
     // Cargar conversaciones del workspace
     await fetchConversations(workspace.id);
     
-    // No navegar automáticamente, dejar que el usuario seleccione un chat
+    // Navegar a la vista de lista de conversaciones del workspace
+    router.push(`/p/${workspace.id}`);
   };
 
   const handleNewConversation = async () => {
@@ -155,6 +159,16 @@ export function Sidebar() {
       console.error("Error al crear conversación:", error);
       alert("Error al crear la conversación");
     }
+  };
+
+  const handleConversationClick = (conv: Conversation) => {
+    if (!activeWorkspace) return;
+    
+    // Establecer la conversación activa antes de navegar
+    setActiveConversation(conv);
+    
+    // Navegar a la conversación
+    router.push(`/p/${activeWorkspace.id}/c/${conv.id}`);
   };
 
   const handleDeleteConversation = async (convId: string) => {
@@ -249,7 +263,7 @@ export function Sidebar() {
             title="Generar Propuesta"
           >
             <Sparkles className={cn("h-5 w-5", !isCollapsed && "mr-2")} />
-            {!isCollapsed && "🚀 Generar Propuesta"}
+            {!isCollapsed && "🚀 Análisis de RFP"}
           </Button>
         </div>
 
@@ -320,7 +334,7 @@ export function Sidebar() {
                           className={cn(
                             "w-full flex items-center gap-3 p-2 rounded-xl transition-all text-sm",
                             activeWorkspace?.id === ws.id
-                              ? "bg-primary/10 text-primary font-medium"
+                              ? "bg-red-500 text-white font-medium"
                               : "hover:bg-accent",
                             isCollapsed && "justify-center"
                           )}
@@ -415,7 +429,7 @@ export function Sidebar() {
                                 isCollapsed && "justify-center"
                               )}
                               style={activeConversation?.id === conv.id ? { color: '#ffffff' } : { color: '#D1D5DB' }}
-                              onClick={() => router.push(`/p/${activeWorkspace?.id}/c/${conv.id}`)}
+                              onClick={() => handleConversationClick(conv)}
                               title={conv.title}
                             >
                               <MessageSquare className="h-4 w-4 shrink-0" />

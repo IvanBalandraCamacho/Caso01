@@ -2,12 +2,13 @@
 import React, { useEffect, useCallback } from "react";
 import { Loader2, CheckCircle, XCircle, FileText } from "lucide-react";
 import { useIndividualDocumentPolling } from "@/hooks/useDocumentPolling";
+import { DocumentStatus } from "@/types/api";
 
 interface DocumentUploadProgressItemProps {
   documentId: string;
   fileName: string;
-  initialStatus: string;
-  onStatusChange: (status: string) => void;
+  initialStatus: DocumentStatus;
+  onStatusChange: (status: DocumentStatus) => void;
 }
 
 const DocumentUploadProgressItem: React.FC<DocumentUploadProgressItemProps> = React.memo(({
@@ -16,12 +17,12 @@ const DocumentUploadProgressItem: React.FC<DocumentUploadProgressItemProps> = Re
   initialStatus,
   onStatusChange,
 }) => {
-  const [currentStatus, setCurrentStatus] = React.useState(initialStatus);
+  const [currentStatus, setCurrentStatus] = React.useState<DocumentStatus>(initialStatus);
 
   // Solo hacer polling si no está COMPLETED o FAILED
   const shouldPoll = currentStatus !== "COMPLETED" && currentStatus !== "FAILED";
 
-  const handleStatusChange = useCallback((newStatus: string) => {
+  const handleStatusChange = useCallback((newStatus: DocumentStatus) => {
     setCurrentStatus(newStatus);
     onStatusChange(newStatus);
   }, [onStatusChange]);
@@ -93,9 +94,9 @@ interface DocumentUploadProgressProps {
   documents: Array<{
     id: string;
     file_name: string;
-    status: string;
+    status: DocumentStatus;
   }>;
-  onDocumentStatusChange: (documentId: string, status: string) => void;
+  onDocumentStatusChange: (documentId: string, status: DocumentStatus) => void;
   onAllCompleted?: () => void;
 }
 

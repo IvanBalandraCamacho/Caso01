@@ -13,6 +13,7 @@ import {
   WorkspaceCreate,
   WorkspaceUpdate,
   DocumentPublic,
+  DocumentStatus,
   ChatRequest,
   ChatResponse,
   UploadDocumentParams,
@@ -22,7 +23,9 @@ import {
   IngestResponse,
   SearchRequest,
   SearchResult,
+  ProposalAnalysis,
 } from "@/types/api";
+import { useRef, useCallback } from "react";
 
 // ============================================
 // QUERY KEYS
@@ -186,37 +189,6 @@ const deleteDocument = async ({
 }): Promise<{ workspaceId?: string }> => {
   await api.delete(`/documents/${documentId}`);
   return { workspaceId };
-};
-
-// ============================================
-// API FUNCTIONS - PROPOSALS
-// ============================================
-
-/**
- * Analizar un archivo RFP (PDF) con IA
- * POST /proposals/analyze
- */
-const analyzeProposalFile = async (file: File): Promise<unknown> => {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const { data } = await api.post("/proposals/analyze", formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
-  });
-  return data;
-};
-
-/**
- * Generar documento Word de propuesta
- * POST /proposals/generate
- */
-const generateProposalDocx = async (proposalData: unknown): Promise<Blob> => {
-  const { data } = await api.post("/task/generate", proposalData, {
-    responseType: "blob",
-  });
-  return data;
 };
 
 // ============================================
@@ -451,12 +423,12 @@ export const useUploadDocument = () => {
  * Hook para obtener documentos de una conversación
  */
 export const useConversationDocuments = (
-  workspaceId: string,
-  conversationId: string,
+  workspaceId?: string,
+  conversationId?: string,
 ) => {
   return useQuery({
     queryKey: [DOCUMENTS_QUERY_KEY, workspaceId, conversationId],
-    queryFn: () => fetchConversationDocuments({ workspaceId, conversationId }),
+    queryFn: () => fetchConversationDocuments({ workspaceId: workspaceId!, conversationId: conversationId! }),
     enabled: !!workspaceId && !!conversationId,
   });
 };
@@ -603,14 +575,14 @@ export const useConversationWithMessages = ({
   workspaceId,
   conversationId,
 }: {
-  workspaceId: string;
+  workspaceId?: string;
   conversationId?: string;
 }) => {
   return useQuery({
     queryKey: [CONVERSATION_DETAILS_QUERY_KEY, workspaceId, conversationId],
     queryFn: () =>
       fetchConversationWithMessages({
-        workspaceId,
+        workspaceId: workspaceId!,
         conversationId: conversationId!,
       }),
     enabled: !!workspaceId && !!conversationId,
@@ -666,6 +638,33 @@ export const useDeleteConversation = () => {
 // ============================================
 // HOOKS - PROPOSALS
 // ============================================
+
+/**
+ * Analizar un archivo RFP (PDF) con IA
+ * POST /proposals/analyze
+ */
+const analyzeProposalFile = async (file: File): Promise<ProposalAnalysis> => {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const { data } = await api.post<ProposalAnalysis>("/proposals/analyze", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return data;
+};
+
+/**
+ * Generar documento Word de propuesta
+ * POST /task/generate
+ */
+const generateProposalDocx = async (proposalData: ProposalAnalysis): Promise<Blob> => {
+  const { data } = await api.post<Blob>("/task/generate", proposalData, {
+    responseType: "blob",
+  });
+  return data;
+};
 
 /**
  * Hook para analizar un archivo RFP
@@ -729,44 +728,130 @@ export const useRAGHealthCheck = () => {
 };
 
 // ============================================
-// HOOKS - DOCUMENT STATUS POLLING
+// HOOKS - DOCUMENT STATUS POLLING WITH EXPONENTIAL BACKOFF
 // ============================================
 
 /**
- * Hook para obtener el estado de un documento con polling automático
- * Polling cada 2 segundos hasta que status === "COMPLETED" o "FAILED"
+ * Configuration for exponential backoff polling
+ */
+const POLLING_CONFIG = {
+  INITIAL_INTERVAL: 2000,  // Start with 2 seconds
+  MAX_INTERVAL: 30000,     // Max 30 seconds
+  BACKOFF_MULTIPLIER: 1.5, // Increase by 1.5x each time
+  MAX_RETRIES: 60,         // Stop after ~60 attempts (roughly 10-15 minutes)
+} as const;
+
+/**
+ * Calculate next polling interval using exponential backoff
+ */
+const calculateBackoffInterval = (attemptCount: number): number => {
+  const interval = Math.min(
+    POLLING_CONFIG.INITIAL_INTERVAL * Math.pow(POLLING_CONFIG.BACKOFF_MULTIPLIER, attemptCount),
+    POLLING_CONFIG.MAX_INTERVAL
+  );
+  return Math.round(interval);
+};
+
+/**
+ * Hook para obtener el estado de un documento con polling automático y exponential backoff
+ * 
+ * Features:
+ * - Starts polling at 2 seconds
+ * - Increases interval exponentially (2s → 3s → 4.5s → 6.75s → ... → max 30s)
+ * - Stops automatically when status is COMPLETED or FAILED
+ * - Stops after MAX_RETRIES attempts
+ * 
+ * @param documentId - The document ID to poll
+ * @param enabled - Whether polling is enabled (default: true)
  */
 export const useDocumentStatus = (documentId: string, enabled: boolean = true) => {
+  const attemptCountRef = useRef(0);
+  const lastStatusRef = useRef<DocumentStatus | null>(null);
+
   return useQuery({
     queryKey: ["document-status", documentId],
-    queryFn: () => getDocumentStatus(documentId),
+    queryFn: async () => {
+      const result = await getDocumentStatus(documentId);
+      
+      // Track status changes for backoff reset
+      if (result.status !== lastStatusRef.current) {
+        // Reset attempt count on status change (e.g., PENDING → PROCESSING)
+        if (lastStatusRef.current !== null) {
+          attemptCountRef.current = 0;
+        }
+        lastStatusRef.current = result.status as DocumentStatus;
+      }
+      
+      return result;
+    },
     enabled: !!documentId && enabled,
     refetchInterval: (query) => {
-      // Detener polling si el documento está COMPLETED o FAILED
-      const data = query.state.data as { status?: string } | undefined;
+      const data = query.state.data as DocumentPublic | undefined;
+      
+      // Stop polling if terminal state reached
       if (data?.status === "COMPLETED" || data?.status === "FAILED") {
+        attemptCountRef.current = 0;
         return false;
       }
-      // Continuar polling cada 2 segundos para PENDING o PROCESSING
-      return 2000;
+      
+      // Stop polling after max retries
+      if (attemptCountRef.current >= POLLING_CONFIG.MAX_RETRIES) {
+        console.warn(`Document ${documentId}: Max polling attempts reached`);
+        return false;
+      }
+      
+      // Calculate next interval with exponential backoff
+      const nextInterval = calculateBackoffInterval(attemptCountRef.current);
+      attemptCountRef.current++;
+      
+      return nextInterval;
     },
-    retry: false,
-    staleTime: 0, // Datos siempre frescos durante polling
-    gcTime: 1000 * 60 * 5, // Mantener en cache 5 minutos
-    refetchOnWindowFocus: false, // No refetch al cambiar foco
-    refetchOnMount: false, // No refetch al montar si ya hay datos
-    structuralSharing: true, // Solo re-render si los datos cambiaron estructuralmente
+    retry: 3, // Retry failed requests up to 3 times
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+    staleTime: 0, // Data is always considered stale during polling
+    gcTime: 1000 * 60 * 5, // Keep in cache for 5 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    structuralSharing: true,
   });
 };
 
 /**
- * Hook para obtener documentos pendientes de un workspace
+ * Hook para obtener documentos pendientes de un workspace con exponential backoff
  */
 export const usePendingDocuments = (workspaceId: string, enabled: boolean = true) => {
+  const attemptCountRef = useRef(0);
+
   return useQuery({
     queryKey: ["pending-documents", workspaceId],
-    queryFn: () => getPendingDocuments(workspaceId),
+    queryFn: async () => {
+      const result = await getPendingDocuments(workspaceId);
+      return result;
+    },
     enabled: !!workspaceId && enabled,
-    refetchInterval: 5000, // Verificar cada 5 segundos
+    refetchInterval: (query) => {
+      const data = query.state.data as DocumentPublic[] | undefined;
+      
+      // Stop polling if no pending documents
+      if (!data || data.length === 0) {
+        attemptCountRef.current = 0;
+        return false;
+      }
+      
+      // Stop after max retries
+      if (attemptCountRef.current >= POLLING_CONFIG.MAX_RETRIES) {
+        return false;
+      }
+      
+      // Use slower backoff for batch polling (starts at 5 seconds)
+      const nextInterval = calculateBackoffInterval(attemptCountRef.current) + 3000;
+      attemptCountRef.current++;
+      
+      return nextInterval;
+    },
+    retry: 2,
+    staleTime: 0,
+    gcTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
   });
 };

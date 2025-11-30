@@ -2,7 +2,7 @@
 import { useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Sidebar } from "@/components/sidebar";
-import { ChatArea } from "@/components/chat-area";
+import { ConversationsListView } from "@/components/conversations-list-view";
 import { useWorkspaces } from "@/context/WorkspaceContext";
 
 export default function WorkspacePage() {
@@ -35,7 +35,7 @@ export default function WorkspacePage() {
   return (
     <div className="flex h-screen">
       <Sidebar />
-      <ChatArea />
+      <ConversationsListView />
     </div>
   );
 }

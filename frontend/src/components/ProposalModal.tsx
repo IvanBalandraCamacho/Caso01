@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAnalyzeProposal, useGenerateProposal } from "@/hooks/useApi";
+import { ProposalAnalysis } from "@/types/api";
 import { Upload, Loader2, FileText, AlertCircle, Users, DollarSign, Calendar } from "lucide-react";
 
 interface ProposalModalProps {
@@ -13,24 +14,6 @@ interface ProposalModalProps {
 }
 
 type ModalState = "upload" | "analyzing" | "review";
-
-interface ProposalAnalysis {
-  cliente: string;
-  fecha_entrega: string;
-  alcance_economico: {
-    presupuesto: string;
-    moneda: string;
-  };
-  tecnologias_requeridas: string[];
-  riesgos_detectados: string[];
-  preguntas_sugeridas: string[];
-  equipo_sugerido: Array<{
-    nombre: string;
-    rol: string;
-    skills: string[];
-    experiencia: string;
-  }>;
-}
 
 export default function ProposalModal({ open, onClose }: ProposalModalProps) {
   const [state, setState] = useState<ModalState>("upload");
@@ -97,7 +80,7 @@ export default function ProposalModal({ open, onClose }: ProposalModalProps) {
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-brand-dark-secondary !rounded-[20]">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">
-            🚀 Generar Propuesta Inteligente
+            🚀 Análisis de RFP
           </DialogTitle>
         </DialogHeader>
 

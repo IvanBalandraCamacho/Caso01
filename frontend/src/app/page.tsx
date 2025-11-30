@@ -46,7 +46,7 @@ export default function Home() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Tarjeta: Auditar RFP */}
+              {/* Tarjeta: Análisis de RFP */}
               <div
                 className="bg-[#262629]/90 rounded-xl shadow-lg p-6 hover:shadow-xl transition-all cursor-pointer border-2 border-[#262629] hover:border-blue-500"
                 onClick={() => setShowProposalModal(true)}
@@ -57,7 +57,7 @@ export default function Home() {
                   </div>
                   <div className="flex-1">
                     <h2 className="text-xl font-bold text-white mb-2">
-                      🚀 Auditar RFP
+                      🚀 Análisis de RFP
                     </h2>
                     <p className="text-gray-300 mb-4 text-sm">
                       Sube un documento PDF y obtén análisis automático con IA:
