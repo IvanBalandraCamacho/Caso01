@@ -13,6 +13,7 @@ from typing import List, Optional
 # Cache y eficiencia
 import redis
 from core import llm_service
+from core.intent_detector import classify_intent
 
 # Autenticación
 from core.auth import get_current_active_user
@@ -325,7 +326,28 @@ def create_workspace(
     db.commit()
     db.refresh(db_workspace)
 
-    return db_workspace
+    # Crear una conversación inicial por defecto para el nuevo workspace
+    # Si el usuario provee instrucciones, podemos generar un título relevante, else 'General'
+    default_title = (
+        f"{db_workspace.name} - Chat" if db_workspace.name else "General"
+    )
+    from models.conversation import Conversation
+
+    db_conversation = Conversation(workspace_id=db_workspace.id, title=default_title)
+    db.add(db_conversation)
+    db.commit()
+    db.refresh(db_conversation)
+
+    # Devolver la información del workspace junto con el id de la conversación por defecto
+    return schemas.WorkspacePublic(
+        id=db_workspace.id,
+        name=db_workspace.name,
+        description=db_workspace.description,
+        instructions=db_workspace.instructions,
+        created_at=db_workspace.created_at,
+        is_active=db_workspace.is_active,
+        default_conversation_id=db_conversation.id,
+    )
 
 
 TEMP_UPLOAD_DIR = Path("temp_uploads")
@@ -871,7 +893,7 @@ async def chat_with_workspace(
     # -------------------------------------------------------------
     # 6. Streaming de respuesta del modelo
     # -------------------------------------------------------------
-    def stream_response_generator(conversation_id, relevant_chunks):
+    async def stream_response_generator(conversation_id, relevant_chunks):
         sources_data = [chunk.model_dump() for chunk in relevant_chunks]
 
         model_used = chat_request.model or "gpt-4o-mini"

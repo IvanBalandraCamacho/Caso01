@@ -28,6 +28,8 @@ import Image from "next/image";
 import ProposalModal from "./ProposalModal";
 import { UserMenu } from "./UserMenu";
 import { updateConversationApi } from "@/lib/api";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { showToast } from "@/components/Toast";
 
 export function Sidebar() {
   const router = useRouter();
@@ -61,6 +63,8 @@ export function Sidebar() {
   const [workspaceSearchQuery, setWorkspaceSearchQuery] = useState("");
   const [editingConversationId, setEditingConversationId] = useState<string | null>(null);
   const [editingConversationTitle, setEditingConversationTitle] = useState("");
+  const [isWorkspacesMinimized, setIsWorkspacesMinimized] = useState(false);
+  const [isHistoryMinimized, setIsHistoryMinimized] = useState(false);
 
   // React Query delete mutation
   const deleteWorkspaceMutation = useDeleteWorkspace();
@@ -97,20 +101,24 @@ export function Sidebar() {
     setIsEditModalOpen(false);
   };
 
-  const handleDelete = async (workspaceId: string) => {
-    if (
-      confirm(
-        "¿Estás seguro de que quieres eliminar este workspace? Esta acción es irreversible."
-      )
-    ) {
-      try {
-        await deleteWorkspaceMutation.mutateAsync(workspaceId);
-        // Refrescar la lista después de eliminar
-        await fetchWorkspaces();
-      } catch (error) {
-        console.error("Error al eliminar workspace", error);
-        alert("Error al eliminar el workspace. Intenta nuevamente.");
-      }
+  const [deleteWorkspaceConfirm, setDeleteWorkspaceConfirm] = useState<string | null>(null);
+
+  const handleDeleteClick = (workspaceId: string) => {
+    setDeleteWorkspaceConfirm(workspaceId);
+  };
+
+  const handleConfirmDeleteWorkspace = async () => {
+    if (!deleteWorkspaceConfirm) return;
+    
+    try {
+      await deleteWorkspaceMutation.mutateAsync(deleteWorkspaceConfirm);
+      showToast("Workspace eliminado correctamente", "success");
+      await fetchWorkspaces();
+    } catch (error) {
+      console.error("Error al eliminar workspace", error);
+      showToast("Error al eliminar el workspace. Intenta nuevamente.", "error");
+    } finally {
+      setDeleteWorkspaceConfirm(null);
     }
   };
 
@@ -119,6 +127,16 @@ export function Sidebar() {
       const results = await fulltextSearch(searchQuery);
       setSearchResults(results);
     }
+  };
+
+  const handleWorkspaceClick = async (workspace: Workspace) => {
+    // Activar el workspace
+    setActiveWorkspace(workspace);
+    
+    // Cargar conversaciones del workspace
+    await fetchConversations(workspace.id);
+    
+    // No navegar automáticamente, dejar que el usuario seleccione un chat
   };
 
   const handleNewConversation = async () => {
@@ -275,8 +293,12 @@ export function Sidebar() {
             <div>
               {!isCollapsed && (
                 <div className="flex items-center justify-between mb-2 px-2">
-                  <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#B0B5BA' }}>
-                    Workspaces
+                  <h2 
+                    className="text-xs font-semibold uppercase tracking-wider cursor-pointer hover:text-primary transition-colors" 
+                    style={{ color: '#B0B5BA' }}
+                    onClick={() => setIsWorkspacesMinimized(!isWorkspacesMinimized)}
+                  >
+                    Workspaces {isWorkspacesMinimized ? '<' : ''}
                   </h2>
                   <button
                     className="h-5 w-5 rounded-md hover:bg-primary/20 flex justify-center items-center transition-colors duration-300"
@@ -289,135 +311,143 @@ export function Sidebar() {
                 </div>
               )}
 
-              <ScrollArea className="min-h-[100px]">
-                <div className="space-y-1 pr-2">
-                  {filteredWorkspaces.map((ws) => (
-                    <div key={ws.id} className="group relative">
-                      <button
-                        className={cn(
-                          "w-full flex items-center gap-3 p-2 rounded-xl transition-all text-sm",
-                          activeWorkspace?.id === ws.id
-                            ? "bg-primary/10 text-primary font-medium"
-                            : "hover:bg-accent",
-                          isCollapsed && "justify-center"
-                        )}
-                        style={activeWorkspace?.id !== ws.id ? { color: '#D1D5DB' } : undefined}
-                        onClick={() => router.push(`/p/${ws.id}`)}
-                        title={ws.name}
-                      >
-                        <LayoutGrid className="h-4 w-4 shrink-0" />
-                        {!isCollapsed && <span className="truncate max-w-[180px]">{ws.name}</span>}
-                      </button>
+              {!isWorkspacesMinimized && (
+                <ScrollArea className="min-h-[100px]">
+                  <div className="space-y-1 pr-2">
+                    {filteredWorkspaces.map((ws) => (
+                      <div key={ws.id} className="group relative">
+                        <button
+                          className={cn(
+                            "w-full flex items-center gap-3 p-2 rounded-xl transition-all text-sm",
+                            activeWorkspace?.id === ws.id
+                              ? "bg-primary/10 text-primary font-medium"
+                              : "hover:bg-accent",
+                            isCollapsed && "justify-center"
+                          )}
+                          style={activeWorkspace?.id !== ws.id ? { color: '#D1D5DB' } : undefined}
+                          onClick={() => handleWorkspaceClick(ws)}
+                          title={ws.name}
+                        >
+                          <LayoutGrid className="h-4 w-4 shrink-0" />
+                          {!isCollapsed && <span className="truncate max-w-[180px]">{ws.name}</span>}
+                        </button>
 
-                      {!isCollapsed && (
-                        <div className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-6 w-6">
-                                <MoreVertical className="h-3 w-3" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => openEditModal(ws)}>
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(ws.id)}>
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
+                        {!isCollapsed && (
+                          <div className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-6 w-6">
+                                  <MoreVertical className="h-3 w-3" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => openEditModal(ws)}>
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteClick(ws.id)}>
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
             </div>
 
             {/* Conversations */}
             <div>
               {!isCollapsed && (
-                <h2 className="text-xs font-semibold uppercase tracking-wider mb-2 px-2" style={{ color: '#B0B5BA' }}>
-                  History
+                <h2 
+                  className="text-xs font-semibold uppercase tracking-wider mb-2 px-2 cursor-pointer hover:text-primary transition-colors" 
+                  style={{ color: '#B0B5BA' }}
+                  onClick={() => setIsHistoryMinimized(!isHistoryMinimized)}
+                >
+                  History {isHistoryMinimized ? '<' : ''}
                 </h2>
               )}
-              <ScrollArea className="min-h-[100px]">
-                <div className="space-y-1 pr-2">
-                  {conversations.map((conv) => (
-                    <div key={conv.id} className="group relative">
-                      {editingConversationId === conv.id ? (
-                        <div className="flex items-center gap-1 p-2">
-                          <input
-                            type="text"
-                            value={editingConversationTitle}
-                            onChange={(e) => setEditingConversationTitle(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') saveConversationTitle(conv.id);
-                              if (e.key === 'Escape') cancelEditingConversation();
-                            }}
-                            className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-blue-500"
-                            autoFocus
-                          />
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-green-500 hover:text-green-400"
-                            onClick={() => saveConversationTitle(conv.id)}
-                          >
-                            ✓
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-red-500 hover:text-red-400"
-                            onClick={cancelEditingConversation}
-                          >
-                            ✕
-                          </Button>
-                        </div>
-                      ) : (
-                        <>
-                          <button
-                            className={cn(
-                              "w-full flex items-center gap-3 p-2 rounded-xl transition-all text-sm pr-8",
-                              activeConversation?.id === conv.id
-                                ? "bg-accent font-medium"
-                                : "hover:bg-accent/50",
-                              isCollapsed && "justify-center"
-                            )}
-                            style={activeConversation?.id === conv.id ? { color: '#ffffff' } : { color: '#D1D5DB' }}
-                            onClick={() => router.push(`/p/${activeWorkspace?.id}/c/${conv.id}`)}
-                            title={conv.title}
-                          >
-                            <MessageSquare className="h-4 w-4 shrink-0" />
-                            {!isCollapsed && <span className="truncate max-w-[150px]">{conv.title}</span>}
-                          </button>
+              {!isHistoryMinimized && (
+                <ScrollArea className="min-h-[100px]">
+                  <div className="space-y-1 pr-2">
+                    {conversations.map((conv) => (
+                      <div key={conv.id} className="group relative">
+                        {editingConversationId === conv.id ? (
+                          <div className="flex items-center gap-1 p-2">
+                            <input
+                              type="text"
+                              value={editingConversationTitle}
+                              onChange={(e) => setEditingConversationTitle(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') saveConversationTitle(conv.id);
+                                if (e.key === 'Escape') cancelEditingConversation();
+                              }}
+                              className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-blue-500"
+                              autoFocus
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-green-500 hover:text-green-400"
+                              onClick={() => saveConversationTitle(conv.id)}
+                            >
+                              ✓
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-red-500 hover:text-red-400"
+                              onClick={cancelEditingConversation}
+                            >
+                              ✕
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <button
+                              className={cn(
+                                "w-full flex items-center gap-3 p-2 rounded-xl transition-all text-sm pr-8",
+                                activeConversation?.id === conv.id
+                                  ? "bg-accent font-medium"
+                                  : "hover:bg-accent/50",
+                                isCollapsed && "justify-center"
+                              )}
+                              style={activeConversation?.id === conv.id ? { color: '#ffffff' } : { color: '#D1D5DB' }}
+                              onClick={() => router.push(`/p/${activeWorkspace?.id}/c/${conv.id}`)}
+                              title={conv.title}
+                            >
+                              <MessageSquare className="h-4 w-4 shrink-0" />
+                              {!isCollapsed && <span className="truncate max-w-[150px]">{conv.title}</span>}
+                            </button>
 
-                          {!isCollapsed && (
-                            <div className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-6 w-6">
-                                    <MoreVertical className="h-3 w-3" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => startEditingConversation(conv)}>
-                                    Editar nombre
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteConversation(conv.id)}>
-                                    Eliminar
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
+                            {!isCollapsed && (
+                              <div className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6">
+                                      <MoreVertical className="h-3 w-3" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => startEditingConversation(conv)}>
+                                      Editar nombre
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteConversation(conv.id)}>
+                                      Eliminar
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
             </div>
           </div>
         </ScrollArea>
@@ -446,6 +476,17 @@ export function Sidebar() {
       <ProposalModal
         open={showProposalModal}
         onClose={() => setShowProposalModal(false)}
+      />
+      
+      <ConfirmDialog
+        open={deleteWorkspaceConfirm !== null}
+        onOpenChange={(open) => !open && setDeleteWorkspaceConfirm(null)}
+        title="Eliminar Workspace"
+        description="¿Estás seguro de que quieres eliminar este workspace? Esta acción es irreversible y se eliminarán todos los documentos y conversaciones asociadas."
+        confirmText="Eliminar Workspace"
+        cancelText="Cancelar"
+        onConfirm={handleConfirmDeleteWorkspace}
+        variant="destructive"
       />
     </>
   );

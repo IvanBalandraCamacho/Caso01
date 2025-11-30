@@ -26,6 +26,7 @@ import {
   fetchConversationDocuments,
   uploadDocumentToConversation,
 } from "@/lib/api";
+import { SearchResult } from "@/types/api";
 
 // 1. Exportamos las interfaces para que otros archivos las usen
 export interface Workspace {
@@ -34,13 +35,15 @@ export interface Workspace {
   description: string | null;
   // Añadido para el update
   instructions?: string | null;
+  // Conversación por defecto creada al crear un workspace
+  default_conversation_id?: string | null;
 }
 
 export interface Document {
   id: string;
   file_name: string;
   file_type: string;
-  status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+  status: string;
   chunk_count: number;
 }
 
@@ -86,8 +89,8 @@ interface WorkspaceContextType {
   notifications: Notification[];
   addNotification: (notification: Notification) => void;
 
-  searchResults: unknown[];
-  setSearchResults: (results: unknown[]) => void;
+  searchResults: SearchResult[];
+  setSearchResults: (results: SearchResult[]) => void;
 
   // --- Conversations ---
   conversations: Conversation[];
@@ -99,11 +102,12 @@ interface WorkspaceContextType {
     title: string,
   ) => Promise<Conversation>;
   deleteConversation: (conversationId: string) => Promise<void>;
-  fetchConversationMessages: (conversationId: string) => Promise<Message[]>;
+  fetchConversationMessages: (workspaceId: string, conversationId: string) => Promise<Message[]>;
 
   // Conversation documents
-  fetchConversationDocuments: (conversationId: string) => Promise<Document[]>;
+  fetchConversationDocuments: (workspaceId: string, conversationId: string) => Promise<Document[]>;
   uploadDocumentToConversation: (
+    workspaceId: string,
     conversationId: string,
     formData: FormData,
   ) => Promise<Document>;
@@ -130,7 +134,7 @@ interface WorkspaceContextType {
     conversationId?: string,
   ) => Promise<void>;
   deleteChatHistory: (workspaceId: string) => Promise<void>;
-  fulltextSearch: (query: string) => Promise<unknown[]>;
+  fulltextSearch: (query: string) => Promise<SearchResult[]>;
 }
 
 // 3. Creamos el Contexto
@@ -151,7 +155,7 @@ export function WorkspaceProvider({
   const [isLoadingDocs, setIsLoadingDocs] = useState(false);
   const [errorDocs, setErrorDocs] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [searchResults, setSearchResults] = useState<unknown[]>([]);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
 
   // Estados para conversaciones
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -163,9 +167,9 @@ export function WorkspaceProvider({
 
   const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-  const addNotification = (notification: Notification) => {
+  const addNotification = useCallback((notification: Notification) => {
     setNotifications((prev) => [...prev, notification]);
-  };
+  }, []);
 
   // --- Función para cargar workspaces ---
   const fetchWorkspaces = useCallback(async () => {
@@ -219,22 +223,24 @@ export function WorkspaceProvider({
   const updateWorkspace = useCallback(
     async (workspaceId: string, data: Partial<Workspace>) => {
       try {
-        await updateWorkspaceApi(workspaceId, data);
+        const updatedWorkspace = await updateWorkspaceApi(workspaceId, data);
 
         // Refrescar la lista de workspaces
         await fetchWorkspaces();
 
         // Actualizar el workspace activo si es el que se editó
-        if (activeWorkspace?.id === workspaceId) {
-          const updatedWorkspace = await updateWorkspaceApi(workspaceId, data);
-          setActiveWorkspace(updatedWorkspace);
-        }
+        setActiveWorkspace((current) => {
+          if (current?.id === workspaceId) {
+            return updatedWorkspace;
+          }
+          return current;
+        });
       } catch (error) {
         console.error("Error al actualizar:", error);
         throw error; // Lanzar error para que el modal lo sepa
       }
     },
-    [fetchWorkspaces, activeWorkspace],
+    [fetchWorkspaces],
   );
 
   // --- Función para borrar workspace ---
@@ -243,16 +249,27 @@ export function WorkspaceProvider({
       try {
         await deleteWorkspaceApi(workspaceId);
 
-        if (activeWorkspace?.id === workspaceId) {
-          setActiveWorkspace(null);
-        }
+        setActiveWorkspace((current) => {
+          if (current?.id === workspaceId) {
+            setActiveConversation(null);
+            setConversations([]);
+            setDocuments([]);
+            
+            // Redirigir al landing
+            if (typeof window !== "undefined") {
+              window.location.href = "/";
+            }
+            return null;
+          }
+          return current;
+        });
         await fetchWorkspaces();
       } catch (error) {
         console.error("Error al eliminar:", error);
         throw error; // Lanzar error
       }
     },
-    [fetchWorkspaces, activeWorkspace],
+    [fetchWorkspaces],
   );
 
   // --- Función para cargar conversaciones ---
@@ -290,30 +307,44 @@ export function WorkspaceProvider({
   // --- Función para eliminar conversación ---
   const deleteConversation = useCallback(
     async (conversationId: string) => {
-      if (!activeWorkspace) return;
-      try {
-        await deleteConversationApi(activeWorkspace.id, conversationId);
-
-        if (activeConversation?.id === conversationId) {
-          setActiveConversation(null);
+      let workspaceId: string | null = null;
+      
+      setActiveWorkspace((current) => {
+        if (current) {
+          workspaceId = current.id;
         }
-        await fetchConversations(activeWorkspace.id);
+        return current;
+      });
+      
+      if (!workspaceId) return;
+      
+      try {
+        await deleteConversationApi(workspaceId, conversationId);
+
+        setActiveConversation((current) => {
+          if (current?.id === conversationId) {
+            return null;
+          }
+          return current;
+        });
+        
+        await fetchConversations(workspaceId);
       } catch (error) {
         console.error("Error al eliminar conversación:", error);
         throw error;
       }
     },
-    [activeWorkspace, activeConversation, fetchConversations],
+    [fetchConversations],
   );
 
   // --- Función para cargar mensajes de una conversación ---
   const fetchConversationMessages = useCallback(
-    async (conversationId: string): Promise<Message[]> => {
-      if (!activeWorkspace) return [];
+    async (workspaceId: string, conversationId: string): Promise<Message[]> => {
+      if (!workspaceId) return [];
       try {
         const data: ConversationWithMessages =
           await fetchConversationMessagesApi(
-            activeWorkspace.id,
+            workspaceId,
             conversationId,
           );
         return data.messages;
@@ -322,34 +353,34 @@ export function WorkspaceProvider({
         return [];
       }
     },
-    [activeWorkspace],
+    [],
   );
 
   // --- Función para cargar documentos de una conversación ---
   const fetchConversationDocumentsCallback = useCallback(
-    async (conversationId: string): Promise<Document[]> => {
-      if (!activeWorkspace) return [];
+    async (workspaceId: string, conversationId: string): Promise<Document[]> => {
+      if (!workspaceId) return [];
       try {
-        const data: Document[] = await fetchConversationDocuments(
-          activeWorkspace.id,
+        const data: Document[] = await fetchConversationDocuments({
+          workspaceId,
           conversationId,
-        );
+        });
         return data;
       } catch (error) {
         console.error("Error al cargar documentos de conversación:", error);
         return [];
       }
     },
-    [activeWorkspace],
+    [],
   );
 
   // --- Función para subir documento a una conversación ---
   const uploadDocumentToConversationCallback = useCallback(
-    async (conversationId: string, formData: FormData): Promise<Document> => {
-      if (!activeWorkspace) throw new Error("No active workspace");
+    async (workspaceId: string, conversationId: string, formData: FormData): Promise<Document> => {
+      if (!workspaceId) throw new Error("No workspace ID provided");
       try {
         const data: Document = await uploadDocumentToConversation(
-          activeWorkspace.id,
+          workspaceId,
           conversationId,
           formData,
         );
@@ -359,7 +390,7 @@ export function WorkspaceProvider({
         throw error;
       }
     },
-    [activeWorkspace],
+    [],
   );
 
   // --- Función para exportar a CSV ---
@@ -474,15 +505,18 @@ export function WorkspaceProvider({
       try {
         await deleteDocumentApi(documentId);
 
-        if (activeWorkspace) {
-          await fetchDocuments(activeWorkspace.id); // Refrescar lista de docs
-        }
+        setActiveWorkspace((current) => {
+          if (current) {
+            fetchDocuments(current.id); // Refrescar lista de docs
+          }
+          return current;
+        });
       } catch (error) {
         console.error("Error al eliminar:", error);
         throw error; // Lanzar error
       }
     },
-    [activeWorkspace, fetchDocuments],
+    [fetchDocuments],
   );
 
   // Cargar workspaces al inicio solo si el usuario está autenticado

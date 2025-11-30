@@ -35,8 +35,8 @@ class AnalyzePrompts:
         INSTRUCCIONES:
         1. Extrae ÚNICAMENTE la información presente en el documento
         2. Si algo no está especificado, usa "No especificado" o arrays vacíos
-        3. Para riesgos, identifica problemas potenciales del proyecto
-        4. Para preguntas, sugiere clarificaciones necesarias para el cliente
+        3. Para riesgos, identifica problemas potenciales del proyecto, y no te limites, genera todas las que desees
+        4. Para preguntas, sugiere clarificaciones necesarias para el cliente, y no te limites, genera todas las que desees
         5. Para el equipo, sugiere perfiles basados en las tecnologías y alcance
         6. Retorna SOLO el JSON, sin texto adicional"""
         return prompt

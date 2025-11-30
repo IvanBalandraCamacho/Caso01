@@ -21,6 +21,7 @@ class WorkspacePublic(WorkspaceBase):
     id: str
     created_at: datetime
     is_active: bool
+    default_conversation_id: str | None = None
 
     class Config:
         from_attributes = True 

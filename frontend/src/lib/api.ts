@@ -354,4 +354,18 @@ export const uploadDocumentToConversation = async (
   return data;
 };
 
+// ============================================
+// DOCUMENT STATUS POLLING API FUNCTIONS
+// ============================================
+
+export const getDocumentStatus = async (documentId: string) => {
+  const { data } = await api.get(`/documents/${documentId}/status`);
+  return data;
+};
+
+export const getPendingDocuments = async (workspaceId: string) => {
+  const { data } = await api.get(`/workspaces/${workspaceId}/documents/pending`);
+  return data;
+};
+
 export default api;

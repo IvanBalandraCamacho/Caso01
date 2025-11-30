@@ -37,3 +37,5 @@ frontend/.vercel/
 *.swp
 *.swo
 .DS_Store
+
+.config/

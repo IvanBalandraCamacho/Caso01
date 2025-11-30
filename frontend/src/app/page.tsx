@@ -1,21 +1,23 @@
 "use client";
 import { useEffect, useState } from "react";
 import dynamic from 'next/dynamic';
-const Sidebar = dynamic<React.ComponentType>(() => import('@/components/sidebar').then((mod) => mod.Sidebar), { ssr: false, loading: () => <div className="w-20 h-full bg-gray-900 animate-pulse" /> });
-const ChatArea = dynamic<React.ComponentType>(() => import('@/components/chat-area').then((mod) => mod.ChatArea), { ssr: false, loading: () => <div className="flex-1 bg-gray-900 animate-pulse" /> });
+const Sidebar = dynamic(() => import('@/components/sidebar').then((mod) => mod.Sidebar), { ssr: false, loading: () => <div className="w-20 h-full bg-gray-900 animate-pulse" /> });
+const ChatArea = dynamic(() => import('@/components/chat-area').then((mod) => mod.ChatArea), { ssr: false, loading: () => <div className="flex-1 bg-gray-900 animate-pulse" /> });
 import { useWorkspaces } from "@/context/WorkspaceContext";
 import { SearchResults } from "@/components/search-results";
 import ProposalModal from "@/components/ProposalModal";
+import { AddWorkspaceModal } from "@/components/AddWorkspaceModal";
 import { Button } from "@/components/ui/button";
-import { FileText, MessageSquare, Sparkles } from "lucide-react";
+import { FileText, MessageSquare, Sparkles, FolderPlus } from "lucide-react";
 
 type ViewMode = "dashboard" | "chat";
 
 export default function Home() {
-  const { searchResults, workspaces } = useWorkspaces();
+  const { searchResults, workspaces, fetchWorkspaces } = useWorkspaces();
   const [isMounted, setIsMounted] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("dashboard");
   const [showProposalModal, setShowProposalModal] = useState(false);
+  const [showWorkspaceModal, setShowWorkspaceModal] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -74,52 +76,34 @@ export default function Home() {
                 </Button>
               </div>
 
-              {/* Tarjeta: Chat RAG */}
+              {/* Tarjeta: Crear Workspace */}
               <div
-                className="bg-[#262629]/90 rounded-xl shadow-lg p-6 hover:shadow-xl transition-all cursor-pointer border-2 border-[#262629] hover:border-green-500"
-                onClick={() => setViewMode("chat")}
+                className="bg-[#262629]/90 rounded-xl shadow-lg p-6 hover:shadow-xl transition-all cursor-pointer border-2 border-[#262629] hover:border-purple-500"
+                onClick={() => setShowWorkspaceModal(true)}
               >
                 <div className="flex items-start gap-4">
-                  <div className="bg-green-500/20 p-2 rounded-lg">
-                    <MessageSquare className="h-5 w-5 text-green-400" />
+                  <div className="bg-purple-500/20 p-2 rounded-lg">
+                    <FolderPlus className="h-5 w-5 text-purple-400" />
                   </div>
                   <div className="flex-1">
                     <h2 className="text-xl font-bold text-white mb-2">
-                      💬 Chat RAG
+                      📁 Crear Workspace
                     </h2>
                     <p className="text-gray-300 mb-4 text-sm">
-                      Consulta tus documentos corporativos usando IA conversacional.
-                      Busca información precisa en segundos.
+                      Crea un nuevo espacio de trabajo para organizar tus documentos
+                      y conversaciones.
                     </p>
                     <ul className="space-y-2 text-xs text-gray-400">
-                      <li>✓ Búsqueda semántica en documentos</li>
-                      <li>✓ Respuestas con fuentes citadas</li>
-                      <li>✓ Multi-modelo (OpenAI GPT-4o-mini)</li>
+                      <li>✓ Organiza documentos por proyecto</li>
+                      <li>✓ Chat conversacional con IA</li>
+                      <li>✓ Gestión de múltiples conversaciones</li>
                     </ul>
                   </div>
                 </div>
                 <Button className="w-full mt-6 !rounded-[8] bg-[#343438]" size="lg" variant="outline">
-                  <MessageSquare className="mr-2 h-4 w-4" />
-                  Abrir Chat
+                  <FolderPlus className="mr-2 h-4 w-4" />
+                  Nuevo Workspace
                 </Button>
-              </div>
-            </div>
-
-            <div className="bg-[#262629]/90 rounded-lg p-6 shadow-md border border-[#262629]">
-              <h3 className="font-semibold text-lg text-white mb-2">💡 Características Destacadas</h3>
-              <div className="grid grid-cols-3 gap-4 text-center text-sm text-gray-300">
-                <div>
-                  <div className="text-xl font-bold text-blue-400">100%</div>
-                  <div className="text-xs">Automatizado</div>
-                </div>
-                <div>
-                  <div className="text-xl font-bold text-green-400">5 min</div>
-                  <div className="text-xs">Tiempo de análisis</div>
-                </div>
-                <div>
-                  <div className="text-xl font-bold text-purple-400">3+ IAs</div>
-                  <div className="text-xs">Modelos disponibles</div>
-                </div>
               </div>
             </div>
           </div>
@@ -136,6 +120,16 @@ export default function Home() {
       <ProposalModal
         open={showProposalModal}
         onClose={() => setShowProposalModal(false)}
+      />
+
+      {/* Modal de Crear Workspace */}
+      <AddWorkspaceModal
+        isOpen={showWorkspaceModal}
+        onClose={() => setShowWorkspaceModal(false)}
+        onSuccess={() => {
+          setShowWorkspaceModal(false);
+          fetchWorkspaces();
+        }}
       />
     </div>
   );

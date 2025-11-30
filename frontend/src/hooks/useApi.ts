@@ -5,6 +5,8 @@ import {
   searchRAG,
   deleteRAGDocument,
   ragHealthCheck,
+  getDocumentStatus,
+  getPendingDocuments,
 } from "@/lib/api";
 import {
   WorkspacePublic,
@@ -619,7 +621,12 @@ export const useConversationWithMessages = ({
       }),
     enabled: !!workspaceId && !!conversationId,
     retry: false, // No reintentar si falla (ej: 404)
-    staleTime: 1000 * 60, // Cache por 1 minuto
+    staleTime: Infinity, // Nunca se vuelve stale automáticamente
+    gcTime: 1000 * 60 * 10, // Garbage collection después de 10 minutos
+    refetchOnWindowFocus: false, // No refetch al cambiar foco
+    refetchOnMount: false, // No refetch al montar
+    refetchOnReconnect: false, // No refetch al reconectar
+    structuralSharing: true, // Compartir estructura si el contenido es igual
   });
 };
 
@@ -724,5 +731,48 @@ export const useRAGHealthCheck = () => {
     queryFn: ragHealthCheck,
     refetchInterval: 30000, // Revalidar cada 30 segundos
     retry: 3,
+  });
+};
+
+// ============================================
+// HOOKS - DOCUMENT STATUS POLLING
+// ============================================
+
+/**
+ * Hook para obtener el estado de un documento con polling automático
+ * Polling cada 2 segundos hasta que status === "COMPLETED" o "FAILED"
+ */
+export const useDocumentStatus = (documentId: string, enabled: boolean = true) => {
+  return useQuery({
+    queryKey: ["document-status", documentId],
+    queryFn: () => getDocumentStatus(documentId),
+    enabled: !!documentId && enabled,
+    refetchInterval: (query) => {
+      // Detener polling si el documento está COMPLETED o FAILED
+      const data = query.state.data as { status?: string } | undefined;
+      if (data?.status === "COMPLETED" || data?.status === "FAILED") {
+        return false;
+      }
+      // Continuar polling cada 2 segundos para PENDING o PROCESSING
+      return 2000;
+    },
+    retry: false,
+    staleTime: 0, // Datos siempre frescos durante polling
+    gcTime: 1000 * 60 * 5, // Mantener en cache 5 minutos
+    refetchOnWindowFocus: false, // No refetch al cambiar foco
+    refetchOnMount: false, // No refetch al montar si ya hay datos
+    structuralSharing: true, // Solo re-render si los datos cambiaron estructuralmente
+  });
+};
+
+/**
+ * Hook para obtener documentos pendientes de un workspace
+ */
+export const usePendingDocuments = (workspaceId: string, enabled: boolean = true) => {
+  return useQuery({
+    queryKey: ["pending-documents", workspaceId],
+    queryFn: () => getPendingDocuments(workspaceId),
+    enabled: !!workspaceId && enabled,
+    refetchInterval: 5000, // Verificar cada 5 segundos
   });
 };

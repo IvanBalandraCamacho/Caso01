@@ -259,7 +259,7 @@ def update_conversation(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Eliminar una conversación"
 )
-def delete_conversation(
+async def delete_conversation(
     workspace_id: str,
     conversation_id: str,
     current_user: User = Depends(get_current_active_user),
@@ -298,21 +298,27 @@ def delete_conversation(
             detail=f"Conversación no encontrada."
         )
     
-    # Eliminar documentos asociados del servicio RAG antes de eliminar la conversación
+    # Obtener documentos asociados y eliminarlos del servicio RAG y de la BD antes de eliminar la conversación
     documents = db.query(document_model.Document).filter(
         document_model.Document.conversation_id == conversation_id
     ).all()
-    
+
     for document in documents:
+        # Eliminar del servicio RAG externo (si está habilitado)
         if settings.RAG_SERVICE_ENABLED and rag_client:
             try:
-                import asyncio
-                asyncio.run(rag_client.delete_document(document.id))
+                await rag_client.delete_document(document.id)
                 print(f"Documento {document.id} eliminado del servicio RAG")
             except Exception as exc:
                 print(f"ERROR eliminando del RAG {document.id}: {exc}")
+
+        # Eliminar de la BD explícitamente (no confiar en cascada)
+        try:
+            db.delete(document)
+        except Exception as exc:
+            print(f"ERROR eliminando documento DB {document.id}: {exc}")
     
-    # Eliminar conversación (documentos se eliminan en cascada por FK)
+    # Eliminar conversación (mensajes y documentos ya manejados)
     db.delete(conversation)
     db.commit()
     
