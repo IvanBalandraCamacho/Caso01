@@ -898,6 +898,17 @@ async def chat_with_workspace(
 
         model_used = chat_request.model or "gpt-4o-mini"
 
+        # Enviar el intent detectado al frontend para que pueda reaccionar
+        yield (
+            json.dumps(
+                {
+                    "type": "intent",
+                    "intent": intent,
+                }
+            )
+            + "\n"
+        )
+
         yield (
             json.dumps(
                 {

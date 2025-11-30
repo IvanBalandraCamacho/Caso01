@@ -2,7 +2,7 @@
 
 import { useWorkspaces } from "@/context/WorkspaceContext";
 import { useRouter } from "next/navigation";
-import { MessageSquare, Plus, Calendar, Trash2 } from "lucide-react";
+import { MessageSquare, Plus, Calendar, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState } from "react";
@@ -11,7 +11,8 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 export function ConversationsListView() {
   const { 
     activeWorkspace, 
-    conversations, 
+    conversations,
+    isLoadingConversations,
     createConversation,
     deleteConversation,
     setActiveConversation 
@@ -78,19 +79,28 @@ export function ConversationsListView() {
       <div className="border-b border-border p-6">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-3xl font-bold">{activeWorkspace.name}</h1>
-          <Button onClick={handleNewConversation} className="gap-2">
+          <Button onClick={handleNewConversation} className="gap-2" disabled={isLoadingConversations}>
             <Plus className="h-4 w-4" />
             Nueva Conversación
           </Button>
         </div>
         <p className="text-muted-foreground">
-          {conversations.length} {conversations.length === 1 ? 'conversación' : 'conversaciones'}
+          {isLoadingConversations 
+            ? "Cargando conversaciones..." 
+            : `${conversations.length} ${conversations.length === 1 ? 'conversación' : 'conversaciones'}`
+          }
         </p>
       </div>
 
       {/* Conversations Grid */}
       <ScrollArea className="flex-1 p-6">
-        {conversations.length === 0 ? (
+        {/* Loading State - Priority over empty state */}
+        {isLoadingConversations ? (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <Loader2 className="h-12 w-12 mb-4 text-primary animate-spin" />
+            <p className="text-muted-foreground">Cargando conversaciones...</p>
+          </div>
+        ) : conversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <MessageSquare className="h-16 w-16 mb-4 text-muted-foreground" />
             <h3 className="text-xl font-semibold mb-2">No hay conversaciones</h3>

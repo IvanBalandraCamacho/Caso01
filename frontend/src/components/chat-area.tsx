@@ -17,6 +17,7 @@ import {
   Check,
   SendHorizontal,
   Plus,
+  Download,
 } from "lucide-react";
 import { useWorkspaces } from "@/context/WorkspaceContext";
 import { UploadModal } from "./UploadModal";
@@ -27,6 +28,8 @@ import {
   useConversationWithMessages,
   useConversationDocuments,
   streamChatQuery,
+  useGenerateProposalFromChat,
+  GenerateProposalFromChatRequest,
 } from "@/hooks/useApi";
 import SpeechRecognition, {
   useSpeechRecognition,
@@ -34,7 +37,7 @@ import SpeechRecognition, {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { DocumentStatus } from "@/types/api";
+import { DocumentStatus, ProposalAnalysis } from "@/types/api";
 import rehypeRaw from "rehype-raw";
 import { QuickPrompts } from "./QuickPrompts";
 import { showToast } from "./Toast";
@@ -48,6 +51,8 @@ interface ChatMessage {
     score: number;
   }>;
   modelUsed?: string;
+  /** Extracted proposal data if this message contains a proposal analysis */
+  proposalData?: ProposalAnalysis;
 }
 
 export function ChatArea() {
@@ -77,6 +82,7 @@ export function ChatArea() {
   const [isDragging, setIsDragging] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isUploadingToConversation, setIsUploadingToConversation] = useState(false);
+  const [isGeneratingProposal, setIsGeneratingProposal] = useState(false);
   const [uploadingDocuments, setUploadingDocuments] = useState<Array<{
     id: string;
     file_name: string;
@@ -86,6 +92,8 @@ export function ChatArea() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const activeStreamRef = useRef<string | null>(null);
   const conversationFileInputRef = useRef<HTMLInputElement>(null);
+  // Ref to track detected intent during streaming (for auto-generating proposal)
+  const detectedIntentRef = useRef<string | null>(null);
 
   // Evitar error de hidratación
   useEffect(() => {
@@ -103,6 +111,9 @@ export function ChatArea() {
     resetTranscript,
     browserSupportsSpeechRecognition,
   } = useSpeechRecognition();
+
+  // Hook para generar propuesta Word desde chat
+  const generateProposalMutation = useGenerateProposalFromChat();
 
   // Hook de chat - solo se activa si hay workspace activo
   // const chatMutation = useChat(activeWorkspace?.id || ''); // Deprecated for streaming
@@ -236,6 +247,8 @@ export function ChatArea() {
     // Generar ID único para este stream
     const streamId = Date.now().toString();
     activeStreamRef.current = streamId;
+    // Reset detected intent for this new stream
+    detectedIntentRef.current = null;
 
     // Enviar consulta con streaming
     streamChatQuery({
@@ -252,12 +265,20 @@ export function ChatArea() {
 
         const chunk = data as {
           type?: string;
+          intent?: string;
           relevant_chunks?: unknown[];
           model_used?: string;
           conversation_id?: string;
           text?: string;
           detail?: string;
         };
+
+        // Capturar el intent detectado por el backend
+        if (chunk.type === "intent") {
+          detectedIntentRef.current = chunk.intent || null;
+          console.log("ChatArea: Intent detectado:", chunk.intent);
+          return;
+        }
 
         if (chunk.type === "sources") {
           setChatHistory((prev) => {
@@ -331,6 +352,28 @@ export function ChatArea() {
         if (activeWorkspace) {
           fetchConversations(activeWorkspace.id);
         }
+
+        // Si el intent fue GENERATE_PROPOSAL, auto-generar el documento Word
+        if (detectedIntentRef.current === "GENERATE_PROPOSAL") {
+          console.log("ChatArea: Auto-generando documento Word para propuesta...");
+          
+          // Obtener el último mensaje del asistente para extraer datos de propuesta
+          setChatHistory((prevHistory) => {
+            const lastMessage = prevHistory[prevHistory.length - 1];
+            if (lastMessage && lastMessage.role === "assistant") {
+              const proposalData = detectProposalInMessage(lastMessage.content);
+              if (proposalData) {
+                // Ejecutar generación de propuesta de forma asíncrona
+                setTimeout(async () => {
+                  await handleAutoGenerateProposal(proposalData);
+                }, 100);
+              } else {
+                console.warn("ChatArea: No se pudo extraer datos de propuesta del mensaje");
+              }
+            }
+            return prevHistory;
+          });
+        }
       },
     });
 
@@ -401,6 +444,225 @@ export function ChatArea() {
       setUploadingDocuments([]);
     }, 3000);
   }, [refetchConversationDocuments]);
+
+  /**
+   * Detect if a message content contains a proposal/analysis response.
+   * Looks for key markers that indicate it's a structured proposal.
+   */
+  const detectProposalInMessage = useCallback((content: string): ProposalAnalysis | null => {
+    // Look for proposal indicators in the message
+    const proposalIndicators = [
+      "cliente:",
+      "presupuesto:",
+      "fecha de entrega:",
+      "tecnologías requeridas:",
+      "riesgos detectados:",
+      "equipo sugerido:",
+      "alcance económico:",
+    ];
+    
+    const lowerContent = content.toLowerCase();
+    const matchCount = proposalIndicators.filter(indicator => 
+      lowerContent.includes(indicator)
+    ).length;
+    
+    // If at least 3 indicators are present, try to extract proposal data
+    if (matchCount >= 3) {
+      try {
+        // Try to extract structured data from the message
+        // This is a best-effort extraction - the backend should send structured data
+        const proposal: ProposalAnalysis = {
+          cliente: extractField(content, "cliente") || "Cliente no especificado",
+          fecha_entrega: extractField(content, "fecha de entrega") || extractField(content, "fecha entrega") || "No especificada",
+          alcance_economico: {
+            presupuesto: extractField(content, "presupuesto") || "No especificado",
+            moneda: content.toLowerCase().includes("usd") ? "USD" : "CLP",
+          },
+          tecnologias_requeridas: extractListField(content, "tecnologías requeridas") || extractListField(content, "tecnologias requeridas") || [],
+          riesgos_detectados: extractListField(content, "riesgos detectados") || extractListField(content, "riesgos") || [],
+          preguntas_sugeridas: extractListField(content, "preguntas sugeridas") || extractListField(content, "preguntas") || [],
+          equipo_sugerido: [], // Complex to extract, leave empty
+        };
+        
+        return proposal;
+      } catch {
+        console.warn("Could not extract proposal data from message");
+        return null;
+      }
+    }
+    
+    return null;
+  }, []);
+
+  /**
+   * Extract a single field value from text
+   */
+  const extractField = (text: string, fieldName: string): string | null => {
+    const regex = new RegExp(`${fieldName}[:\\s]+([^\\n]+)`, 'i');
+    const match = text.match(regex);
+    return match ? match[1].trim() : null;
+  };
+
+  /**
+   * Extract a list field from text (items separated by commas or newlines with bullets)
+   */
+  const extractListField = (text: string, fieldName: string): string[] | null => {
+    const regex = new RegExp(`${fieldName}[:\\s]+([\\s\\S]*?)(?=\\n\\n|\\n[A-Z]|$)`, 'i');
+    const match = text.match(regex);
+    if (!match) return null;
+    
+    const listContent = match[1];
+    // Try to split by bullets, numbers, or commas
+    const items = listContent
+      .split(/[•\-\*\n,]/)
+      .map(item => item.trim())
+      .filter(item => item.length > 2 && !item.includes(':'));
+    
+    return items.length > 0 ? items : null;
+  };
+
+  /**
+   * Handle generating Word document from a proposal in chat
+   * Ensures explicit context (conversation_id, document_id) is passed to backend
+   */
+  const handleGenerateProposalWord = useCallback(async (proposalData: ProposalAnalysis, messageIndex: number) => {
+    if (!currentConversationId && !activeConversation?.id) {
+      showToast("Error: No hay conversación activa para generar el documento", "error");
+      return;
+    }
+
+    const conversationId = currentConversationId || activeConversation?.id;
+    if (!conversationId) {
+      showToast("Error: ID de conversación no disponible", "error");
+      return;
+    }
+
+    // Get the most recent document ID from conversation if available
+    const lastDocumentId = conversationDocuments && conversationDocuments.length > 0
+      ? conversationDocuments[conversationDocuments.length - 1].id
+      : undefined;
+
+    setIsGeneratingProposal(true);
+    
+    try {
+      const request: GenerateProposalFromChatRequest = {
+        proposal_data: proposalData,
+        conversation_id: conversationId,
+        document_id: lastDocumentId, // Pass explicit document context
+      };
+
+      const blob = await generateProposalMutation.mutateAsync(request);
+
+      // Download the file
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Propuesta_${proposalData.cliente.replace(/\s+/g, "_")}_${new Date().toISOString().split('T')[0]}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      showToast("✅ Documento Word generado exitosamente", "success");
+    } catch (error) {
+      console.error("Error generating proposal document:", error);
+      showToast("Error al generar el documento Word", "error");
+    } finally {
+      setIsGeneratingProposal(false);
+    }
+  }, [currentConversationId, activeConversation?.id, conversationDocuments, generateProposalMutation]);
+
+  /**
+   * Auto-generate Word document when GENERATE_PROPOSAL intent is detected
+   * Called automatically after streaming completes
+   */
+  const handleAutoGenerateProposal = useCallback(async (proposalData: ProposalAnalysis) => {
+    // Use currentConversationId which should be set from the stream's "sources" chunk
+    const conversationId = currentConversationId || activeConversation?.id;
+    
+    if (!conversationId) {
+      console.warn("ChatArea: No conversation ID available for auto-generating proposal");
+      showToast("⚠️ No se pudo generar documento automáticamente: falta ID de conversación", "error");
+      return;
+    }
+
+    // Get the most recent document ID from conversation if available
+    const lastDocumentId = conversationDocuments && conversationDocuments.length > 0
+      ? conversationDocuments[conversationDocuments.length - 1].id
+      : undefined;
+
+    console.log("ChatArea: Auto-generando propuesta Word con:", {
+      conversationId,
+      documentId: lastDocumentId,
+      cliente: proposalData.cliente,
+    });
+
+    setIsGeneratingProposal(true);
+    
+    // Add a message indicating generation is in progress
+    setChatHistory((prev) => [
+      ...prev,
+      {
+        role: "assistant",
+        content: "⏳ Generando documento Word de la propuesta...",
+      },
+    ]);
+
+    try {
+      const request: GenerateProposalFromChatRequest = {
+        proposal_data: proposalData,
+        conversation_id: conversationId,
+        document_id: lastDocumentId,
+      };
+
+      const blob = await generateProposalMutation.mutateAsync(request);
+
+      // Download the file automatically
+      const url = window.URL.createObjectURL(blob);
+      const fileName = `Propuesta_${proposalData.cliente.replace(/\s+/g, "_")}_${new Date().toISOString().split('T')[0]}.docx`;
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      // Update the last message to show success with download link
+      setChatHistory((prev) => {
+        const newHistory = [...prev];
+        const lastIdx = newHistory.length - 1;
+        if (lastIdx >= 0 && newHistory[lastIdx].content.includes("Generando documento")) {
+          newHistory[lastIdx] = {
+            ...newHistory[lastIdx],
+            content: `✅ **Documento Word generado exitosamente**\n\n📄 Archivo descargado: \`${fileName}\`\n\nEl documento contiene la propuesta comercial completa basada en el análisis realizado.`,
+          };
+        }
+        return newHistory;
+      });
+
+      showToast("✅ Propuesta Word generada y descargada automáticamente", "success");
+    } catch (error) {
+      console.error("Error auto-generating proposal document:", error);
+      
+      // Update message to show error
+      setChatHistory((prev) => {
+        const newHistory = [...prev];
+        const lastIdx = newHistory.length - 1;
+        if (lastIdx >= 0 && newHistory[lastIdx].content.includes("Generando documento")) {
+          newHistory[lastIdx] = {
+            ...newHistory[lastIdx],
+            content: `❌ **Error al generar documento Word**\n\nPuedes intentar descargarlo manualmente usando el botón de descarga en el mensaje anterior.`,
+          };
+        }
+        return newHistory;
+      });
+      
+      showToast("Error al generar el documento Word automáticamente", "error");
+    } finally {
+      setIsGeneratingProposal(false);
+    }
+  }, [currentConversationId, activeConversation?.id, conversationDocuments, generateProposalMutation]);
 
   const removeAttachedFile = (index: number) => {
     setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
@@ -642,12 +904,43 @@ export function ChatArea() {
                         </div>
                       )}
 
-                      {/* Model used badge for assistant messages */}
-                      {msg.role === "assistant" && msg.modelUsed && (
-                        <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-2">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground font-medium">
-                            🤖 {msg.modelUsed}
-                          </span>
+                      {/* Model used badge and Proposal Download button for assistant messages */}
+                      {msg.role === "assistant" && (
+                        <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between gap-2 flex-wrap">
+                          {msg.modelUsed && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground font-medium">
+                              🤖 {msg.modelUsed}
+                            </span>
+                          )}
+                          
+                          {/* Proposal Download Button - shows if message contains proposal-like content */}
+                          {(() => {
+                            const proposalData = msg.proposalData || detectProposalInMessage(msg.content);
+                            if (proposalData && msg.content.length > 200) {
+                              return (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-2 text-xs bg-green-500/10 border-green-500/30 hover:bg-green-500/20 text-green-400"
+                                  onClick={() => handleGenerateProposalWord(proposalData, index)}
+                                  disabled={isGeneratingProposal}
+                                >
+                                  {isGeneratingProposal ? (
+                                    <>
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                      Generando...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Download className="h-3 w-3" />
+                                      Descargar Propuesta (Word)
+                                    </>
+                                  )}
+                                </Button>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                       )}
                     </div>

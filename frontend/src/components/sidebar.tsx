@@ -38,6 +38,7 @@ export function Sidebar() {
     activeWorkspace,
     setActiveWorkspace,
     conversations,
+    isLoadingConversations,
     activeConversation,
     setActiveConversation,
     fetchConversations,
@@ -386,7 +387,14 @@ export function Sidebar() {
               {!isHistoryMinimized && (
                 <ScrollArea className="min-h-[100px]">
                   <div className="space-y-1 pr-2">
-                    {conversations.map((conv) => (
+                    {/* Loading indicator for conversations */}
+                    {isLoadingConversations && (
+                      <div className="flex items-center justify-center py-4">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+                      </div>
+                    )}
+                    {/* Show conversations only when not loading */}
+                    {!isLoadingConversations && conversations.map((conv) => (
                       <div key={conv.id} className="group relative">
                         {editingConversationId === conv.id ? (
                           <div className="flex items-center gap-1 p-2">

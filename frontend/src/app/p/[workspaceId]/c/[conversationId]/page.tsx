@@ -15,6 +15,7 @@ export default function ConversationPage() {
   const { 
     workspaces, 
     conversations,
+    isLoadingConversations,
     activeWorkspace, 
     setActiveWorkspace,
     activeConversation,
@@ -73,8 +74,15 @@ export default function ConversationPage() {
       return; // Esperar a que se carguen las conversaciones
     }
 
-    // Si ya tenemos el workspace correcto pero no hay conversaciones, esperar
+    // Si ya tenemos el workspace correcto pero las conversaciones están cargando, esperar
+    if (isLoadingConversations) {
+      setIsLoading(true);
+      return;
+    }
+
+    // Si ya tenemos el workspace correcto pero no hay conversaciones (empty state real), mostrar not found
     if (conversations.length === 0) {
+      // Wait a bit more - conversations might still be loading
       setIsLoading(true);
       return;
     }

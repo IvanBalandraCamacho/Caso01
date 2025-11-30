@@ -192,41 +192,10 @@ const deleteDocument = async ({
 };
 
 // ============================================
-// API FUNCTIONS - TASK INTENTIONS
+// API FUNCTIONS - INTENTION TASK (formerly "task")
 // ============================================
 
-/**
- * Analizar un archivo RFP (PDF) con IA
- * POST /task/analyze
- */
-const analyzeProposalFile = async (file: File): Promise<unknown> => {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  // ⬇️ Esto imprime TODO lo que se manda
-  for (const [key, value] of formData.entries()) {
-    console.log("FormData:", key, value);
-  }
-
-  const { data } = await api.post("/task/analyze", formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
-  });
-  console.log("Este devuelvo el endpoint de analizar", data);
-  return data;
-};
-
-/**
- * Generar documento Word de propuesta
- * POST /task/generate
- */
-const generateProposalDocx = async (proposalData: unknown): Promise<Blob> => {
-  const { data } = await api.post("/task/generate", proposalData, {
-    responseType: "blob",
-  });
-  return data;
-};
+// NOTE: Functions moved to HOOKS section below to avoid duplicates
 
 // ============================================
 // API FUNCTIONS - CHAT
@@ -673,18 +642,21 @@ export const useDeleteConversation = () => {
 };
 
 // ============================================
-// HOOKS - TASK INTENTIONS
+// HOOKS - INTENTION TASK (Proposal Analysis & Generation)
 // ============================================
 
 /**
  * Analizar un archivo RFP (PDF) con IA
- * POST /proposals/analyze
+ * POST /task/analyze
+ * 
+ * Endpoint renamed from "task" to "intention_task" in backend module,
+ * but URL path remains /task/analyze per backend router configuration.
  */
 const analyzeProposalFile = async (file: File): Promise<ProposalAnalysis> => {
   const formData = new FormData();
   formData.append("file", file);
 
-  const { data } = await api.post<ProposalAnalysis>("/proposals/analyze", formData, {
+  const { data } = await api.post<ProposalAnalysis>("/task/analyze", formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
@@ -693,11 +665,60 @@ const analyzeProposalFile = async (file: File): Promise<ProposalAnalysis> => {
 };
 
 /**
- * Generar documento Word de propuesta
+ * Generar documento Word de propuesta desde análisis directo
  * POST /task/generate
+ * 
+ * @param proposalData - Datos del análisis de la propuesta
  */
 const generateProposalDocx = async (proposalData: ProposalAnalysis): Promise<Blob> => {
   const { data } = await api.post<Blob>("/task/generate", proposalData, {
+    responseType: "blob",
+  });
+  return data;
+};
+
+/**
+ * Request payload for generating proposal from chat context
+ */
+export interface GenerateProposalFromChatRequest {
+  /** The proposal analysis data extracted from chat */
+  proposal_data: ProposalAnalysis;
+  /** Explicit conversation ID for context verification */
+  conversation_id: string;
+  /** Optional: Specific document ID if proposal was based on a document */
+  document_id?: string;
+}
+
+/**
+ * Generar documento Word de propuesta desde contexto de chat
+ * POST /task/generate
+ * 
+ * This function ensures explicit context is sent to the backend:
+ * - conversation_id: Required - identifies the chat context
+ * - document_id: Optional - if proposal was based on a specific uploaded document
+ * 
+ * The backend will NOT guess the context; frontend must provide it explicitly.
+ * 
+ * @param request - Request with proposal data and explicit context IDs
+ */
+const generateProposalFromChat = async (
+  request: GenerateProposalFromChatRequest
+): Promise<Blob> => {
+  // Validate that required context is provided
+  if (!request.conversation_id) {
+    throw new Error("conversation_id is required for proposal generation");
+  }
+  
+  // Build payload with explicit context
+  const payload = {
+    ...request.proposal_data,
+    _context: {
+      conversation_id: request.conversation_id,
+      document_id: request.document_id || null,
+    },
+  };
+  
+  const { data } = await api.post<Blob>("/task/generate", payload, {
     responseType: "blob",
   });
   return data;
@@ -713,11 +734,21 @@ export const useAnalyzeProposal = () => {
 };
 
 /**
- * Hook para generar documento Word de propuesta
+ * Hook para generar documento Word de propuesta (análisis directo)
  */
 export const useGenerateProposal = () => {
   return useMutation({
     mutationFn: generateProposalDocx,
+  });
+};
+
+/**
+ * Hook para generar documento Word desde contexto de chat
+ * Ensures explicit document_id/conversation_id is passed to backend
+ */
+export const useGenerateProposalFromChat = () => {
+  return useMutation({
+    mutationFn: generateProposalFromChat,
   });
 };
 

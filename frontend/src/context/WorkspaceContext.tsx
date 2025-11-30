@@ -99,6 +99,7 @@ interface WorkspaceContextType {
 
   // --- Conversations ---
   conversations: Conversation[];
+  isLoadingConversations: boolean;
   activeConversation: Conversation | null;
   setActiveConversation: (conversation: Conversation | null) => void;
   fetchConversations: (workspaceId: string) => Promise<void>;
@@ -164,6 +165,7 @@ export function WorkspaceProvider({
 
   // Estados para conversaciones
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [activeConversation, setActiveConversation] =
     useState<Conversation | null>(null);
 
@@ -353,12 +355,17 @@ export function WorkspaceProvider({
 
   // --- Función para cargar conversaciones ---
   const fetchConversations = useCallback(async (workspaceId: string) => {
+    // Set loading state immediately to prevent flash of empty state
+    setIsLoadingConversations(true);
     try {
       const data: Conversation[] = await fetchConversationsApi(workspaceId);
+      // Only update conversations after data is fetched (stale data retention)
       setConversations(data);
     } catch (error) {
       console.error("Error al cargar conversaciones:", error);
       setConversations([]);
+    } finally {
+      setIsLoadingConversations(false);
     }
   }, []);
 
@@ -646,6 +653,7 @@ export function WorkspaceProvider({
       searchResults,
       setSearchResults,
       conversations,
+      isLoadingConversations,
       activeConversation,
       setActiveConversation,
       fetchConversations,
@@ -678,6 +686,7 @@ export function WorkspaceProvider({
       notifications,
       searchResults,
       conversations,
+      isLoadingConversations,
       activeConversation,
       selectedModel,
       // Callback functions - include only those with changing dependencies
