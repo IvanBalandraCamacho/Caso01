@@ -22,8 +22,8 @@ from core.config import settings
 
 # DEPRECADO: from processing import vector_store (eliminado - usar rag_client)
 from core.rag_client import rag_client
-from core import llm_service
-from routes import task
+from core import llm_service, intent_detector
+from api.routes import intention_task
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse, StreamingResponse
 from models import database, schemas
@@ -865,7 +865,7 @@ async def chat_with_workspace(
     # 5. Identificar intención de consulta de usuario
     # -------------------------------------------------------------  
 
-    intent = llm_service.classify_intent(chat_request.query)
+    intent = intent_detector.classify_intent(chat_request.query)
     print(f"Intención detectada: {intent}")
 
     # -------------------------------------------------------------
@@ -891,9 +891,9 @@ async def chat_with_workspace(
         full_response_text = ""
         
         if intent == "GENERATE_PROPOSAL":
-            response_stream = task.analyze_document(chat_request.query, relevant_chunks, chat_request.model, workspace_instructions)
+            response_stream = intention_task.get_analyze_stream(query=chat_request.query,relevant_chunks=relevant_chunks,chat_model= chat_request.model, workspace_instructions= workspace_instructions)
         elif intent == "GENERAL_QUERY":
-            response_stream = task.respond_chat(chat_request.query, relevant_chunks, chat_request.model, workspace_instructions)
+            response_stream = intention_task.respond_chat(chat_request.query, relevant_chunks, chat_request.model, workspace_instructions)
 
         try:
             for token in response_stream:

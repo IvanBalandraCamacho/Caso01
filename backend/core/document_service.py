@@ -2,6 +2,7 @@ from docx import Document
 from docx.shared import Pt, RGBColor
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from docx.oxml.ns import qn
+from typing import Dict, Any
 from datetime import datetime
 from fastapi.responses import FileResponse
 import tempfile

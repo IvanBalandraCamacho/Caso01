@@ -14,17 +14,19 @@ services:
       - DATABASE_URL=mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
       - REDIS_URL=redis://redis:6379
       - QDRANT_URL=http://qdrant:6333
-      # RAG External Service (ahora disponible)
       - RAG_SERVICE_URL=http://rag-service:8080
       - RAG_SERVICE_API_KEY=${RAG_SERVICE_API_KEY:-}
       - RAG_SERVICE_ENABLED=true
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
-      - mysql
-      - redis
-      - qdrant
-      - rag-service
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      qdrant:
+        condition: service_started
+      rag-service:
+        condition: service_started
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
 
   # 2. Frontend (Next.js)
   frontend:
@@ -35,7 +37,6 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      # Monta solo las carpetas de código fuente y archivos de config
       - ./frontend/src:/app/src
       - ./frontend/public:/app/public
       - ./frontend/components.json:/app/components.json
@@ -45,8 +46,6 @@ services:
       - ./frontend/tsconfig.json:/app/tsconfig.json
       - ./frontend/package.json:/app/package.json
       - ./frontend/package-lock.json:/app/package-lock.json
-      
-      # Mantenemos un volumen para el caché de build de Next.js
       - /app/.next
     environment:
       - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
@@ -68,6 +67,12 @@ services:
       - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
 
   # 4. Cache y Message Broker (Redis)
   redis:
@@ -96,13 +101,12 @@ services:
       - ./backend/.env
     environment:
       - REDIS_URL=redis://redis:6379
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
       - redis
     volumes:
       - rag_data:/app/data
 
-  # 6. Worker Asíncrono (Celery)
+  # 7. Worker Asíncrono (Celery)
   celery_worker:
     build: ./backend
     container_name: ia_celery_worker
@@ -116,18 +120,21 @@ services:
       - DATABASE_URL=mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
       - REDIS_URL=redis://redis:6379
       - QDRANT_URL=http://qdrant:6333
-      # RAG External Service
       - RAG_SERVICE_URL=http://rag-service:8080
       - RAG_SERVICE_API_KEY=${RAG_SERVICE_API_KEY:-}
       - RAG_SERVICE_ENABLED=true
-      # OpenAI API Key
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
-      - backend
-      - redis
-      - mysql
-      - qdrant
-      - rag-service
+      mysql:
+        condition: service_healthy
+      backend:
+        condition: service_started
+      redis:
+        condition: service_started
+      qdrant:
+        condition: service_started
+      rag-service:
+        condition: service_started
 
 volumes:
   mysql_data:

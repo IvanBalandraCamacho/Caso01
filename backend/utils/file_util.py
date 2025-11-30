@@ -1,26 +1,32 @@
-from fastapi import UploadFile
+from fastapi import UploadFile, HTTPException
 import os
 import tempfile
 import pdfplumber
+from typing import Optional
 from exceptions import ExternalServiceError, InvalidFileError 
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class FileUtil:
     
     @staticmethod
-    def is_pdf(file: UploadFile) -> None:
+    def is_pdf(file: Optional[UploadFile] = None) -> None:
         """
         Valida que el archivo subido sea un PDF y que no esté vacío (tamaño > 0).
         Lanza InvalidFileError si la validación falla.
         """
-        if not file.filename or not file.filename.lower().endswith('.pdf'):
-            raise InvalidFileError(detail="Solo se aceptan archivos PDF.") 
+        
+        if not file.filename.lower().endswith(".pdf"):
+            raise HTTPException(status_code=400, detail="El archivo debe ser un PDF")
+
 
         if file.size is None or file.size == 0:
             raise InvalidFileError(detail="El archivo PDF no puede estar vacío.") 
 
     @staticmethod
-    async def extract_text_from_pdf(file: UploadFile) -> str:
+    async def extract_text_from_pdf(file: Optional[UploadFile] = None) -> str:
         """
         Guarda el UploadFile temporalmente, extrae el texto del PDF y limpia el archivo.
         """
@@ -30,7 +36,9 @@ class FileUtil:
         try:
             with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
                 content = await file.read() 
+                logger.info(content)
                 tmp_file.write(content)
+                logger.info(tmp_file)
                 tmp_path = tmp_file.name
             try:
                 with pdfplumber.open(tmp_path) as pdf:

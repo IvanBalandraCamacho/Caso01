@@ -1,0 +1,174 @@
+"""
+Endpoints para análisis,generación, respouesta general y retorno de perfiles según la intención del usuario.
+
+Este módulo proporciona endpoints para:
+- Analizar documentos RFP con IA
+- Generar propuestas en formato Word
+- Responder consultas generales usando IA
+- Retornar perfiles de las APIS de Tivit según la intención del usuario
+"""
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, Form
+from sqlalchemy.orm import Session
+from typing import Dict, Any, Optional
+from api.service.impl.proposals_service_impl import ProposalsServiceImpl
+from api.service.proposals_service import ProposalsService
+from models import database
+from models.user import User
+from core.auth import get_current_active_user
+from core import llm_service
+from core import document_service
+import logging
+import json
+import os
+import pdfplumber
+import tempfile
+
+# Configurar logger
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+
+service = ProposalsServiceImpl()
+
+
+@router.post(
+    "/task/analyze", 
+    summary="Analizar documento RFP", 
+    description="Analiza un documento RFP y extrae información relevante usando IA"
+)
+async def analyze_document(
+    file: UploadFile = File(...)
+):
+    analysis = await get_analyze(file=file)
+    return analysis
+
+
+async def get_analyze(
+    file: UploadFile = File(...)
+):
+    """Delega toda la lógica de validación, extracción y análisis al servicio."""
+    if file:
+        logger.info(f"Nombre: {file.filename}")
+        logger.info(f"Tipo: {file.content_type}")
+        logger.info(f"Content-Type recibido: {file.content_type}")
+
+        try:
+            analysis = await service.analyze(
+                file=file,
+            )
+            logger.info(f"ANALYSIS OK: {analysis}")
+            return analysis
+        except Exception as e:
+            logger.error(f"ERROR EN analyze(): {e}")
+            raise
+        
+def get_analyze_stream(
+    query: str,
+    relevant_chunks: Dict[str,Any],
+    chat_model: str,
+    workspace_instructions: str,
+):
+    try:
+        return service.analyze_stream(
+            relevant_chunks=relevant_chunks, 
+            query = query, 
+            workspace_instructions = workspace_instructions
+        )
+    except Exception as e:
+        logger.info(f"No se pudo completar el análisis con el documento adjunto {str(e)}")
+
+    
+
+@router.post(
+    "/task/generate",
+    summary="Generar documento de propuesta",
+    description="Genera un documento Word con la propuesta comercial"
+)
+async def generate_proposal_document(
+    proposal_data: Dict[str, Any],
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(database.get_db)
+):
+    """
+    Genera un documento Word con la propuesta comercial.
+    
+    Args:
+        proposal_data: Datos del análisis de la propuesta
+        current_user: Usuario autenticado
+        db: Sesión de base de datos
+        
+    Returns:
+        Documento Word generado
+        
+    Raises:
+        HTTPException 500: Si hay error en la generación
+    """
+    
+    try:
+        return document_service.generate_document(proposal_data)
+        logger.info(f"Documento de propuesta generado por usuario: {current_user.email}")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al generar documento: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al generar el documento: {str(e)}"
+        )
+
+def respond_chat(
+    query: str,
+    relevant_chunks: Dict[str, Any],
+    chat_model: str,
+    workspace_instructions: str,
+):
+    """
+    Responde a una consulta general usando IA.
+    
+    Args:
+        query: Pregunta del usuario
+        relevant_chunks: Chunks de contexto relevantes
+        chat_model: Modelo de chat a usar
+        
+    Returns:
+        Respuesta generada
+        
+    Raises:
+        HTTPException 500: Si hay error en la generación
+    """
+
+    # Construir prompt simple
+    prompt = f"""
+    Responde de manera clara y concisa a las
+    preguntas basada en el contexto proporcionado.
+    """
+    
+    # Construir prompt completo
+    full_prompt = f"""
+        prompt: {prompt}
+        pregunta: {query}
+        system_instructions: {workspace_instructions}
+    """
+
+    try:
+        # Generar respuesta usando LLM service
+        response = llm_service.generate_response_stream(full_prompt, relevant_chunks, chat_model)
+        return response
+    except Exception as e:
+        logger.error(f"Error al generar respuesta de chat: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al generar la respuesta: {str(e)}"
+        )
+        
+        
+# QUEDA PENDIENTE IMPLEMENTAR ESTE ENDPOINT DE OBTENER PERFILES
+# async def get_profiles()
+
+# ADEMAS UNA VEZ SEA POSIBLE ARREGLAR LA ARQUITECTURA (USAR SERVICES Y IMPL)
+
+#  TOMAR EN CUENTA QUE EL ENDPOINT DE GENERAR DOCUMENTO
+#  SE GENERE A PARTIR DE LA ULTIMA PROPUESTA ANALIZADA
+#  EN EL CHAT

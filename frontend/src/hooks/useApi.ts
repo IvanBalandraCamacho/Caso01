@@ -187,31 +187,37 @@ const deleteDocument = async ({
 };
 
 // ============================================
-// API FUNCTIONS - PROPOSALS
+// API FUNCTIONS - TASK INTENTIONS
 // ============================================
 
 /**
  * Analizar un archivo RFP (PDF) con IA
- * POST /proposals/analyze
+ * POST /task/analyze
  */
 const analyzeProposalFile = async (file: File): Promise<unknown> => {
   const formData = new FormData();
   formData.append("file", file);
 
-  const { data } = await api.post("/proposals/analyze", formData, {
+  // ⬇️ Esto imprime TODO lo que se manda
+  for (const [key, value] of formData.entries()) {
+    console.log("FormData:", key, value);
+  }
+
+  const { data } = await api.post("/task/analyze", formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
   });
+  console.log("Este devuelvo el endpoint de analizar", data);
   return data;
 };
 
 /**
  * Generar documento Word de propuesta
- * POST /proposals/generate
+ * POST /task/generate
  */
 const generateProposalDocx = async (proposalData: unknown): Promise<Blob> => {
-  const { data } = await api.post("/proposals/generate", proposalData, {
+  const { data } = await api.post("/task/generate", proposalData, {
     responseType: "blob",
   });
   return data;
@@ -657,7 +663,7 @@ export const useDeleteConversation = () => {
 };
 
 // ============================================
-// HOOKS - PROPOSALS
+// HOOKS - TASK INTENTIONS
 // ============================================
 
 /**
