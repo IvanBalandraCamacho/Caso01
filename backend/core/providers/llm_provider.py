@@ -11,13 +11,14 @@ class LLMProvider(ABC):
     """Abstract base class for LLM providers."""
     
     @abstractmethod
-    def generate_response(self, query: str, context_chunks: List[DocumentChunk]) -> str:
+    def generate_response(self, query: str, context_chunks: List[DocumentChunk], chat_history: List[dict] = None) -> str:
         """
         Generate a complete response for the given query and context.
         
         Args:
             query: User's question
             context_chunks: Relevant document chunks for context
+            chat_history: List of previous messages [{"role": "user", "content": "..."}]
             
         Returns:
             Complete response as string
@@ -25,13 +26,14 @@ class LLMProvider(ABC):
         pass
     
     @abstractmethod
-    def generate_response_stream(self, query: str, context_chunks: List[DocumentChunk]) -> Generator[str, None, None]:
+    def generate_response_stream(self, query: str, context_chunks: List[DocumentChunk], chat_history: List[dict] = None) -> Generator[str, None, None]:
         """
         Generate a streaming response for the given query and context.
         
         Args:
             query: User's question
             context_chunks: Relevant document chunks for context
+            chat_history: List of previous messages
             
         Yields:
             Response chunks as they are generated

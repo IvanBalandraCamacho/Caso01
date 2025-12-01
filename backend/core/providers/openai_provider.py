@@ -51,7 +51,13 @@ class OpenAIProvider(LLMProvider):
         retry=retry_if_exception_type(Exception),
         reraise=True
     )
-    def generate_response(self, query: str, context_chunks: List[DocumentChunk], custom_prompt: str = None) -> str:
+    def generate_response(
+        self, 
+        query: str, 
+        context_chunks: List[DocumentChunk], 
+        custom_prompt: str = None,
+        chat_history: List[dict] = None
+    ) -> str:
         """
         Genera una respuesta completa usando GPT-4o-mini.
         
@@ -59,27 +65,43 @@ class OpenAIProvider(LLMProvider):
             query: Pregunta del usuario
             context_chunks: Chunks de contexto del RAG
             custom_prompt: Prompt personalizado (opcional)
+            chat_history: Historial de chat (opcional)
             
         Returns:
             Respuesta generada
         """
-        prompt = custom_prompt if custom_prompt else self._build_prompt(query, context_chunks)
+        # Construir el prompt del sistema (contexto RAG)
+        system_content = custom_prompt if custom_prompt else self._build_prompt(query, context_chunks)
+        
+        # Construir lista de mensajes
+        messages = [
+            {
+                "role": "system",
+                "content": "Eres un asistente experto en análisis de documentos y propuestas comerciales. " + system_content
+            }
+        ]
+        
+        # Inyectar historial si existe
+        if chat_history:
+            for msg in chat_history:
+                if msg.get("role") in ["user", "assistant"]:
+                    messages.append({
+                        "role": msg["role"],
+                        "content": msg["content"]
+                    })
+        
+        # Agregar mensaje actual
+        messages.append({
+            "role": "user",
+            "content": query
+        })
         
         start_time = time.time()
         
         try:
             response = self.client.chat.completions.create(
                 model=self.model_name,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "Eres un asistente experto en análisis de documentos y propuestas comerciales."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
+                messages=messages,
                 temperature=0.7,
                 max_tokens=8000,
                 timeout=30.0
@@ -107,7 +129,8 @@ class OpenAIProvider(LLMProvider):
         self, 
         query: str, 
         context_chunks: List[DocumentChunk],
-        custom_prompt: str = None
+        custom_prompt: str = None,
+        chat_history: List[dict] = None
     ) -> Generator[str, None, None]:
         """
         Genera una respuesta en streaming usando GPT-4o-mini.
@@ -116,27 +139,43 @@ class OpenAIProvider(LLMProvider):
             query: Pregunta del usuario
             context_chunks: Chunks de contexto del RAG
             custom_prompt: Prompt personalizado (opcional)
+            chat_history: Historial de chat (opcional)
             
         Yields:
             Chunks de texto de la respuesta
         """
-        prompt = custom_prompt if custom_prompt else self._build_prompt(query, context_chunks)
+        # Construir el prompt del sistema (contexto RAG)
+        system_content = custom_prompt if custom_prompt else self._build_prompt(query, context_chunks)
+        
+        # Construir lista de mensajes
+        messages = [
+            {
+                "role": "system",
+                "content": "Eres un asistente experto en análisis de documentos y propuestas comerciales. " + system_content
+            }
+        ]
+        
+        # Inyectar historial si existe
+        if chat_history:
+            for msg in chat_history:
+                if msg.get("role") in ["user", "assistant"]:
+                    messages.append({
+                        "role": msg["role"],
+                        "content": msg["content"]
+                    })
+        
+        # Agregar mensaje actual
+        messages.append({
+            "role": "user",
+            "content": query
+        })
         
         start_time = time.time()
         
         try:
             stream = self.client.chat.completions.create(
                 model=self.model_name,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "Eres un asistente experto en análisis de documentos y propuestas comerciales."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
+                messages=messages,
                 temperature=0.7,
                 max_tokens=8000,
                 stream=True,

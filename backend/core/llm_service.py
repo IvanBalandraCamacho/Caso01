@@ -63,7 +63,7 @@ def get_provider(model_name: str = None, task_type: str = None) -> LLMProvider:
     return _providers.get("gpt4o_mini")
 
 
-def generate_response(query: str, context_chunks: List[DocumentChunk], model_override: str = None) -> str:
+def generate_response(query: str, context_chunks: List[DocumentChunk], model_override: str = None, chat_history: List[dict] = None) -> str:
     """
     Genera una respuesta usando el LLM apropiado.
     
@@ -71,15 +71,16 @@ def generate_response(query: str, context_chunks: List[DocumentChunk], model_ove
         query: Pregunta del usuario
         context_chunks: Documentos relevantes del RAG
         model_override: Modelo específico a usar (opcional)
+        chat_history: Historial de chat (opcional)
         
     Returns:
         Respuesta generada
     """
     provider = get_provider(model_name=model_override)
-    return provider.generate_response(query, context_chunks)
+    return provider.generate_response(query, context_chunks, chat_history=chat_history)
 
 
-def generate_response_stream(query: str, context_chunks: List[DocumentChunk], model_override: str = None) -> Generator[str, None, None]:
+def generate_response_stream(query: str, context_chunks: List[DocumentChunk], model_override: str = None, chat_history: List[dict] = None) -> Generator[str, None, None]:
     """
     Genera una respuesta en streaming usando el LLM apropiado.
     
@@ -87,9 +88,10 @@ def generate_response_stream(query: str, context_chunks: List[DocumentChunk], mo
         query: Pregunta del usuario
         context_chunks: Documentos relevantes del RAG
         model_override: Modelo específico a usar (opcional)
+        chat_history: Historial de chat (opcional)
         
     Yields:
         Fragmentos de la respuesta
     """
     provider = get_provider(model_name=model_override)
-    return provider.generate_response_stream(query, context_chunks)
+    return provider.generate_response_stream(query, context_chunks, chat_history=chat_history)

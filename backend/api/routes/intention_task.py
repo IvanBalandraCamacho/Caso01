@@ -123,6 +123,7 @@ def respond_chat(
     relevant_chunks: Dict[str, Any],
     chat_model: str,
     workspace_instructions: str,
+    chat_history: list[dict] = None
 ):
     """
     Responde a una consulta general usando IA.
@@ -131,6 +132,8 @@ def respond_chat(
         query: Pregunta del usuario
         relevant_chunks: Chunks de contexto relevantes
         chat_model: Modelo de chat a usar
+        workspace_instructions: Instrucciones del workspace
+        chat_history: Historial de mensajes previos
         
     Returns:
         Respuesta generada
@@ -154,7 +157,12 @@ def respond_chat(
 
     try:
         # Generar respuesta usando LLM service
-        response = llm_service.generate_response_stream(full_prompt, relevant_chunks, chat_model)
+        response = llm_service.generate_response_stream(
+            full_prompt, 
+            relevant_chunks, 
+            chat_model,
+            chat_history=chat_history
+        )
         return response
     except Exception as e:
         logger.error(f"Error al generar respuesta de chat: {str(e)}")

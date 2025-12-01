@@ -890,6 +890,29 @@ async def chat_with_workspace(
     intent = intent_detector.classify_intent(chat_request.query)
     print(f"Intención detectada: {intent}")
 
+    # --- NUEVO: Recuperar historial de chat ---
+    # Obtenemos los últimos 10 mensajes (5 turnos de conversación) para contexto
+    # Excluimos el mensaje actual que acabamos de guardar
+    past_messages = (
+        db.query(Message)
+        .filter(
+            Message.conversation_id == conversation.id,
+            Message.id != user_message.id # Excluir el actual
+        )
+        .order_by(Message.created_at.desc())
+        .limit(10) 
+        .all()
+    )
+    
+    # Reordenar cronológicamente (antiguo -> nuevo) y formatear
+    chat_history = []
+    for msg in reversed(past_messages):
+        chat_history.append({
+            "role": msg.role,
+            "content": msg.content
+        })
+    # ------------------------------------------
+
     # -------------------------------------------------------------
     # 6. Streaming de respuesta del modelo
     # -------------------------------------------------------------
@@ -926,7 +949,13 @@ async def chat_with_workspace(
         if intent == "GENERATE_PROPOSAL":
             response_stream = intention_task.get_analyze_stream(query=chat_request.query,relevant_chunks=relevant_chunks,chat_model= chat_request.model, workspace_instructions= workspace_instructions)
         elif intent == "GENERAL_QUERY":
-            response_stream = intention_task.respond_chat(chat_request.query, relevant_chunks, chat_request.model, workspace_instructions)
+            response_stream = intention_task.respond_chat(
+                chat_request.query, 
+                relevant_chunks, 
+                chat_request.model, 
+                workspace_instructions,
+                chat_history=chat_history
+            )
 
         try:
             for token in response_stream:
