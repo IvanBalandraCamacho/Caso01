@@ -3,7 +3,7 @@ import time
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 # from starlette.middleware.gzip import GZIPMiddleware
-from api.routes import health, workspaces, conversations, document_generation, auth, intention_task, tivit
+from api.routes import health, workspaces, conversations, document_generation, auth, intention_task, tivit, notifications_ws
 # from api.routes import users  # Comentado: módulo no existe aún
 from exceptions import ServiceException
 from core.config import settings
@@ -95,6 +95,7 @@ app.include_router(conversations.router, prefix="/api/v1", tags=["Conversations"
 app.include_router(document_generation.router, prefix="/api/v1", tags=["Document Generation"])
 app.include_router(intention_task.router, prefix="/api/v1", tags=["Task Intentions"])
 app.include_router(tivit.router, prefix="/api/v1", tags=["TIVIT Services"])
+app.include_router(notifications_ws.router, prefix="/api/v1", tags=["Notifications"])
 
 @app.get("/")
 @limiter.limit("30/minute")  # Rate limit en root endpoint

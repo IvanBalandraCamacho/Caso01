@@ -1,6 +1,9 @@
 # tasks.py
 import time
 import os
+import redis
+import logging
+import json
 from pathlib import Path
 from core.celery_app import celery_app
 from models import database, document as document_model
@@ -17,6 +20,13 @@ nest_asyncio.apply()
 # Checklist + chat
 from core.checklist_analyzer import analyze_document_for_suggestions
 from core.chat_service import send_ai_message_to_chat
+
+redis_client = (
+    redis.from_url(settings.REDIS_URL) if hasattr(settings, "REDIS_URL") else None
+)
+
+# Configurar logger
+logger = logging.getLogger(__name__)
 
 
 @celery_app.task(bind=True, max_retries=3)
@@ -104,6 +114,22 @@ def process_document(self, document_id: str, temp_file_path_str: str):
         db_document.status = "COMPLETED"
         db_document.chunk_count = chunk_count
         db.commit()
+        
+        # 5) PUBLICAR NOTIFICACIÓN EN REDIS
+        try:
+            redis_client.publish(
+                "documents",
+                json.dumps(
+                    {
+                        "status": "COMPLETED",
+                        "document_id": db_document.id,
+                        "workspace_id": db_document.workspace_id,
+                        "conversation_id": db_document.conversation_id,
+                    }
+                )
+            )
+        except Exception as e:
+            logger.error(f"ERROR notificando de exito de documento guardado: {str(e)}")
 
         # 5) ENVIAR MENSAJE BREVE AL CHAT
         
