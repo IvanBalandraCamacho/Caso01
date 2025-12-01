@@ -264,7 +264,7 @@ export function Sidebar() {
             title="Generar Propuesta"
           >
             <Sparkles className={cn("h-5 w-5", !isCollapsed && "mr-2")} />
-            {!isCollapsed && "🚀 Análisis de RFP"}
+            {!isCollapsed && "🚀 Análisis rápido RFP"}
           </Button>
         </div>
 

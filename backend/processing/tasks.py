@@ -150,6 +150,23 @@ def process_document(self, document_id: str, temp_file_path_str: str):
         if db_document:
             db_document.status = "FAILED"
             db.commit()
+            
+            # Publicar notificación de error en Redis
+            try:
+                redis_client.publish(
+                    "documents",
+                    json.dumps(
+                        {
+                            "status": "ERROR",
+                            "document_id": db_document.id,
+                            "workspace_id": db_document.workspace_id,
+                            "conversation_id": db_document.conversation_id,
+                            "error": str(e),
+                        }
+                    )
+                )
+            except Exception as redis_error:
+                logger.error(f"ERROR notificando fallo de documento: {str(redis_error)}")
 
     finally:
         db.close()

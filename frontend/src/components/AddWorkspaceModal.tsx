@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -13,9 +13,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateWorkspace } from "@/hooks/useApi";
 import { WorkspacePublic } from "@/types/api";
-import { Loader2, Upload, X } from "lucide-react";
+import { Loader2, Upload, X, CheckCircle, Clock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { uploadDocumentApi } from "@/lib/api";
+import { useNotificationsWS, NotificationMessage } from "@/hooks/useNotificationsWS";
 
 interface AddWorkspaceModalProps {
   isOpen: boolean;
@@ -23,14 +24,63 @@ interface AddWorkspaceModalProps {
   onSuccess?: () => void;
 }
 
+type DocumentProcessingStatus = "idle" | "uploading" | "processing" | "completed" | "error";
+
 export function AddWorkspaceModal({ isOpen, onClose, onSuccess }: AddWorkspaceModalProps) {
   const [name, setName] = useState("");
   const [instructions, setInstructions] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [documentStatus, setDocumentStatus] = useState<DocumentProcessingStatus>("idle");
+  const [uploadedDocumentId, setUploadedDocumentId] = useState<string | null>(null);
+  const [createdWorkspace, setCreatedWorkspace] = useState<WorkspacePublic | null>(null);
   const router = useRouter();
 
   const createWorkspaceMutation = useCreateWorkspace();
+
+  // Handle WebSocket notifications for document processing
+  const handleWSNotification = useCallback((msg: NotificationMessage) => {
+    console.log("📩 AddWorkspaceModal recibió notificación:", msg);
+    
+    if (msg.document_id === uploadedDocumentId) {
+      if (msg.status === "COMPLETED") {
+        setDocumentStatus("completed");
+        // Now we can navigate to the workspace
+        if (createdWorkspace) {
+          setTimeout(() => {
+            onClose();
+            onSuccess?.();
+            if (createdWorkspace.default_conversation_id) {
+              router.push(`/p/${createdWorkspace.id}/c/${createdWorkspace.default_conversation_id}`);
+            } else {
+              router.push(`/p/${createdWorkspace.id}`);
+            }
+            // Reset state
+            resetForm();
+          }, 500);
+        }
+      } else if (msg.status === "ERROR") {
+        setDocumentStatus("error");
+      }
+    }
+  }, [uploadedDocumentId, createdWorkspace, router, onClose, onSuccess]);
+
+  // Connect to WebSocket when document is processing
+  useNotificationsWS({
+    workspaceId: createdWorkspace?.id,
+    documentId: uploadedDocumentId || undefined,
+    onMessage: handleWSNotification,
+    enabled: isOpen && documentStatus === "processing",
+  });
+
+  const resetForm = () => {
+    setName("");
+    setInstructions("");
+    setSelectedFile(null);
+    setDocumentStatus("idle");
+    setUploadedDocumentId(null);
+    setCreatedWorkspace(null);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,39 +97,46 @@ export function AddWorkspaceModal({ isOpen, onClose, onSuccess }: AddWorkspaceMo
         instructions: instructions.trim() || null,
       });
 
-      console.log(workspace);
+      const ws = workspace as WorkspacePublic;
+      setCreatedWorkspace(ws);
 
-      // Si hay un archivo seleccionado, subirlo al workspace
+      // Si hay un archivo seleccionado, subirlo al workspace y esperar procesamiento
       if (selectedFile) {
         setIsUploading(true);
+        setDocumentStatus("uploading");
+        
         try {
           const formData = new FormData();
           formData.append("file", selectedFile);
-          await uploadDocumentApi((workspace as WorkspacePublic).id, formData);
-          console.log("Archivo subido correctamente");
+          const uploadedDoc = await uploadDocumentApi(ws.id, formData);
+          console.log("Archivo subido correctamente, esperando procesamiento...");
+          
+          // Guardar ID del documento y cambiar a estado "processing"
+          setUploadedDocumentId(uploadedDoc.id);
+          setDocumentStatus("processing");
+          setIsUploading(false);
+          
+          // NO navegamos aquí - esperamos la notificación WS de COMPLETED
+          return;
+          
         } catch (uploadError) {
           console.error("Error al subir archivo:", uploadError);
-          alert("Workspace creado, pero hubo un error al subir el archivo");
-        } finally {
+          setDocumentStatus("error");
           setIsUploading(false);
+          alert("Workspace creado, pero hubo un error al subir el archivo. Puedes continuar sin el archivo.");
+          // Aún así podemos navegar al workspace
         }
       }
 
-      // Limpiar formulario
-      setName("");
-      setInstructions("");
-      setSelectedFile(null);
-
-      // Cerrar modal y notificar éxito
+      // Si no hay archivo, navegar directamente
+      resetForm();
       onClose();
       onSuccess?.();
 
-      // Redireccionar a la conversación creada por defecto si existe, si no al workspace
-      const ws = workspace as WorkspacePublic;
       if (ws.default_conversation_id) {
         router.push(`/p/${ws.id}/c/${ws.default_conversation_id}`);
       } else {
-        router.push(`/p/${workspace.id}`);
+        router.push(`/p/${ws.id}`);
       }
     } catch (error: unknown) {
       console.error("Error al crear workspace:", error as Error);
@@ -88,10 +145,9 @@ export function AddWorkspaceModal({ isOpen, onClose, onSuccess }: AddWorkspaceMo
   };
 
   const handleClose = () => {
-    if (!createWorkspaceMutation.isPending && !isUploading) {
-      setName("");
-      setInstructions("");
-      setSelectedFile(null);
+    // No permitir cerrar mientras se está procesando
+    if (!createWorkspaceMutation.isPending && !isUploading && documentStatus !== "processing") {
+      resetForm();
       onClose();
     }
   };
@@ -148,20 +204,39 @@ export function AddWorkspaceModal({ isOpen, onClose, onSuccess }: AddWorkspaceMo
                   onChange={handleFileChange}
                   accept=".pdf,.docx,.xlsx,.txt,.csv"
                   className="bg-brand-dark border-gray-700 text-white focus-visible:ring-brand-red rounded-[8_!important] file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-brand-red file:text-white hover:file:bg-red-700"
-                  disabled={createWorkspaceMutation.isPending || isUploading}
+                  disabled={createWorkspaceMutation.isPending || isUploading || documentStatus === "processing"}
                 />
                 {selectedFile && (
                   <div className="flex items-center gap-2 p-2 bg-gray-800 rounded-md border border-gray-700">
-                    <Upload className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm text-gray-300 flex-1">{selectedFile.name}</span>
-                    <button
-                      type="button"
-                      onClick={removeFile}
-                      className="text-gray-400 hover:text-red-500 transition-colors"
-                      disabled={createWorkspaceMutation.isPending || isUploading}
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
+                    {documentStatus === "processing" ? (
+                      <Clock className="h-4 w-4 text-yellow-400 animate-pulse" />
+                    ) : documentStatus === "completed" ? (
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <Upload className="h-4 w-4 text-gray-400" />
+                    )}
+                    <div className="flex-1">
+                      <span className="text-sm text-gray-300">{selectedFile.name}</span>
+                      {documentStatus === "processing" && (
+                        <p className="text-xs text-yellow-400">Procesando documento...</p>
+                      )}
+                      {documentStatus === "completed" && (
+                        <p className="text-xs text-green-400">¡Documento procesado!</p>
+                      )}
+                      {documentStatus === "error" && (
+                        <p className="text-xs text-red-400">Error al procesar</p>
+                      )}
+                    </div>
+                    {documentStatus === "idle" && (
+                      <button
+                        type="button"
+                        onClick={removeFile}
+                        className="text-gray-400 hover:text-red-500 transition-colors"
+                        disabled={createWorkspaceMutation.isPending || isUploading}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -195,16 +270,21 @@ export function AddWorkspaceModal({ isOpen, onClose, onSuccess }: AddWorkspaceMo
               variant="outline"
               onClick={handleClose}
               className="border-gray-700 text-gray-300 hover:bg-gray-800 rounded-[8_!important] border-none"
-              disabled={createWorkspaceMutation.isPending || isUploading}
+              disabled={createWorkspaceMutation.isPending || isUploading || documentStatus === "processing"}
             >
               Cancelar
             </Button>
             <Button
               type="submit"
               className="bg-brand-red text-white hover:bg-red-700 rounded-[8_!important]"
-              disabled={createWorkspaceMutation.isPending || isUploading || !name.trim()}
+              disabled={createWorkspaceMutation.isPending || isUploading || documentStatus === "processing" || !name.trim()}
             >
-              {createWorkspaceMutation.isPending || isUploading ? (
+              {documentStatus === "processing" ? (
+                <>
+                  <Clock className="mr-2 h-4 w-4 animate-pulse" />
+                  Procesando documento...
+                </>
+              ) : createWorkspaceMutation.isPending || isUploading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   {isUploading ? "Subiendo archivo..." : "Creando..."}

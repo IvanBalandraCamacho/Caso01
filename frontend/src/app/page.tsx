@@ -57,7 +57,7 @@ export default function Home() {
                   </div>
                   <div className="flex-1">
                     <h2 className="text-xl font-bold text-white mb-2">
-                      🚀 Análisis de RFP
+                      🚀 Análisis rápido RFP
                     </h2>
                     <p className="text-gray-300 mb-4 text-sm">
                       Sube un documento PDF y obtén análisis automático con IA:
