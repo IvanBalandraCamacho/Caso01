@@ -101,8 +101,10 @@ services:
       - ./backend/.env
     environment:
       - REDIS_URL=redis://redis:6379
+      - QDRANT_URL=http://qdrant:6333
     depends_on:
       - redis
+      - qdrant
     volumes:
       - rag_data:/app/data
 
