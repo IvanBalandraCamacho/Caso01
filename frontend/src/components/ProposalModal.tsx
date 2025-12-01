@@ -80,7 +80,7 @@ export default function ProposalModal({ open, onClose }: ProposalModalProps) {
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-brand-dark-secondary !rounded-[20]">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">
-            🚀 Análisis de RFP
+            🚀 Análisis rápido RFP
           </DialogTitle>
         </DialogHeader>
 
