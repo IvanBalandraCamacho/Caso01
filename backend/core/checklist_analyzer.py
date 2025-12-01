@@ -303,7 +303,7 @@ def analyze_document_for_suggestions(text: str, file_name: str) -> Tuple[str, st
     provider = llm_service.get_provider()
     logger.info("Checklist Analyzer: solicitando análisis al LLM...")
 
-    prompt = CHECKLIST_ANALYZER_PROMPT.format(document=text)
+    prompt = ""
 
     response_text = provider.generate_response(
         query="",
