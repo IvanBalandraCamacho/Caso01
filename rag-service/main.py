@@ -83,7 +83,8 @@ class SearchResult(BaseModel):
     metadata: Dict[str, Any]
 
 # Utils
-def chunk_text(text: str, chunk_size: int = 512, overlap: int = 50) -> List[str]:
+# deolver a 512 y 50, cambiado por prueba de consumo de tokens y mejora de respuestas (codigo mirai)
+def chunk_text(text: str, chunk_size: int = 2000, overlap: int = 200) -> List[str]:
     """Smart chunking with langchain (using smaller chunks for local models)"""
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,

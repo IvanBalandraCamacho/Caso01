@@ -436,6 +436,9 @@ export const useConversationDocuments = (
     queryKey: [DOCUMENTS_QUERY_KEY, workspaceId, conversationId],
     queryFn: () => fetchConversationDocuments({ workspaceId: workspaceId!, conversationId: conversationId! }),
     enabled: !!workspaceId && !!conversationId,
+    retry: false, // No reintentar si falla (ej: 404)
+    staleTime: 1000 * 60 * 5, // 5 minutos
+    refetchOnWindowFocus: false,
   });
 };
 
@@ -593,12 +596,11 @@ export const useConversationWithMessages = ({
       }),
     enabled: !!workspaceId && !!conversationId,
     retry: false, // No reintentar si falla (ej: 404)
-    staleTime: Infinity, // Nunca se vuelve stale automáticamente
+    staleTime: 1000 * 60 * 5, // 5 minutos antes de considerar stale
     gcTime: 1000 * 60 * 10, // Garbage collection después de 10 minutos
     refetchOnWindowFocus: false, // No refetch al cambiar foco
-    refetchOnMount: false, // No refetch al montar
+    refetchOnMount: true, // SÍ refetch al montar para cargar historial actualizado
     refetchOnReconnect: false, // No refetch al reconectar
-    structuralSharing: true, // Compartir estructura si el contenido es igual
   });
 };
 

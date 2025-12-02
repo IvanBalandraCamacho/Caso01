@@ -87,11 +87,14 @@ export default function ConversationPage() {
   }, [workspaces, workspaceId, router]);
 
   // Estados para el área de contenido (no afecta al sidebar)
-  const isContentLoading = workspaces.length === 0 || 
-                           isLoadingConversations || 
-                           conversationsLoadedForWorkspace !== workspaceId;
+  // Solo mostrar loading en la carga INICIAL, no durante refrescos de conversaciones
+  const hasActiveConversationSet = activeConversation?.id === conversationId;
+  const isInitialLoading = workspaces.length === 0 || 
+                           (isLoadingConversations && !hasActiveConversationSet) || 
+                           (conversationsLoadedForWorkspace !== workspaceId && !hasActiveConversationSet) ||
+                           (!hasActiveConversationSet && !notFound);
 
-  const showNotFound = notFound && !isContentLoading;
+  const showNotFound = notFound && !isInitialLoading;
 
   // Contenido del área principal
   const renderContent = () => {
@@ -112,7 +115,7 @@ export default function ConversationPage() {
       );
     }
 
-    if (isContentLoading) {
+    if (isInitialLoading) {
       return (
         <div className="flex-1 flex items-center justify-center bg-background">
           <div className="text-center">

@@ -36,8 +36,8 @@ class SearchRequest(BaseModel):
     query: str
     workspace_id: Optional[str] = None
     conversation_id: Optional[str] = None
-    limit: int = 5
-    threshold: float = 0.7
+    limit: int = 15
+    threshold: float = 0.6
 
 class RAGIngestRequest(BaseModel):
     document_id: str
