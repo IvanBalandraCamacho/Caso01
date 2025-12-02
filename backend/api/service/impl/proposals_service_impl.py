@@ -1,6 +1,6 @@
 import json
 from typing import Dict, Any, Optional
-from fastapi import UploadFile, HTTPException, status, File
+from fastapi import UploadFile, HTTPException, requests, status, File
 from api.service.proposals_service import ProposalsService
 from prompts.proposals.analyze_prompts import AnalyzePrompts
 from utils.file_util import FileUtil
@@ -43,7 +43,18 @@ class ProposalsServiceImpl(ProposalsService):
                 pregunta: {query}
                 system_instructions: {workspace_instructions}
             """
-            return self._analyze_with_ia_stream(full_prompt, relevant_chunks)
+
+            response = self._analyze_with_ia_stream(full_prompt, relevant_chunks)
+            
+            #response_text = json.dumps(response, ensure_ascii=False, indent=2)
+            #nuevos_skills = self._consume_api(response_text)
+
+            #if "equipo_sugerido" in response:
+                #for miembro in response["equipo_sugerido"]:
+                   # if "skills" in miembro and isinstance(miembro["skills"], list):
+                       # miembro["skills"].extend(nuevos_skills)
+
+            return response
         except Exception as e:
             logger.error(f"Error al analizar RFP: {str(e)}")
             raise HTTPException(
@@ -95,3 +106,33 @@ class ProposalsServiceImpl(ProposalsService):
         if response_text.endswith("```"):
             response_text = response_text[:-3]
         return response_text.strip()
+    
+    def _consume_api(self, response: str) -> list[str]:
+        external_url = "http://localhost:8095/recomendations/recommend"
+        payload = {
+            "requirement": response,
+            "limit": 3,
+            "umbral": 2
+        }
+
+        try:
+            api_result = requests.post(external_url, json=payload)
+            api_result.raise_for_status()
+
+            trabajadores = api_result.json() 
+            textos = []
+
+            for t in trabajadores:
+                if isinstance(t, dict):
+                    texto = "\n".join([
+                        f"{k}: {v}" for k, v in t.items()
+                    ])
+                    textos.append(texto)
+                else:
+                    textos.append(str(t))
+
+            return textos
+
+        except Exception as e:
+            logger.error(f"Error consumiendo API externa: {str(e)}")
+            return []
