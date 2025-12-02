@@ -62,10 +62,11 @@ class LLMProvider(ABC):
 === PREGUNTA DEL USUARIO ===
 {query}
 
-=== INSTRUCCIONES ===
-- Responde usando solo la información provista en el contexto cuando exista.
-- Organiza la respuesta en secciones claras; usa listas cuando sea apropiado.
-- Proporciona recomendaciones accionables si corresponde.
+=== INSTRUCCIONES CRÍTICAS ===
+1. Responde BASÁNDOTE ÚNICAMENTE en el 'CONTEXTO DE LOS DOCUMENTOS' proporcionado arriba.
+2. Si la información NO está en el contexto actual, responde que no tienes acceso a esa información en los documentos activos.
+3. IMPORTANTE: Ignora cualquier información sobre documentos que recuerdes de mensajes anteriores del chat si esa información no está presente en el contexto actual (el documento podría haber sido eliminado).
+4. Organiza la respuesta en secciones claras.
 
 === RESPUESTA ===
 """

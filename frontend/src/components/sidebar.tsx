@@ -77,16 +77,6 @@ export function Sidebar() {
     setIsClient(true);
   }, [workspaces, activeWorkspace]);
 
-  // Cargar conversaciones cuando cambia el workspace activo
-  useEffect(() => {
-    if (activeWorkspace) {
-      fetchConversations(activeWorkspace.id);
-    } else {
-      // Limpiar conversaciones si no hay workspace activo
-      setActiveConversation(null);
-    }
-  }, [activeWorkspace, fetchConversations]);
-
   // Debug: Log cuando cambia el modelo seleccionado
   useEffect(() => {
     console.log("Sidebar: selectedModel actualizado a:", selectedModel);
@@ -131,16 +121,14 @@ export function Sidebar() {
   };
 
   const handleWorkspaceClick = async (workspace: Workspace) => {
-    // Activar el workspace
+    // Activar el workspace (esto disparará el useEffect que carga conversaciones)
     setActiveWorkspace(workspace);
     
     // Limpiar conversación activa
     setActiveConversation(null);
     
-    // Cargar conversaciones del workspace
-    await fetchConversations(workspace.id);
-    
     // Navegar a la vista de lista de conversaciones del workspace
+    // El useEffect se encargará de cargar las conversaciones
     router.push(`/p/${workspace.id}`);
   };
 
@@ -222,7 +210,15 @@ export function Sidebar() {
       )} style={{ backgroundColor: '#282A2C', color: '#ffffff' }}>
         <div className="p-4 flex items-center justify-between">
           {!isCollapsed && (
-            <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => router.push('/')} title="Ir al Dashboard">
+            <div 
+              className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" 
+              onClick={() => {
+                setActiveWorkspace(null);
+                setActiveConversation(null);
+                router.push('/');
+              }} 
+              title="Ir al Dashboard"
+            >
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-primary-foreground font-bold">T</div>
               <h1 className="text-lg font-bold tracking-tight" style={{ color: '#ffffff' }}>TIVIT CHAT</h1>
             </div>
@@ -326,6 +322,26 @@ export function Sidebar() {
                 </div>
               )}
 
+              {/* Show active workspace when minimized */}
+              {isWorkspacesMinimized && activeWorkspace && (
+                <div className="space-y-1 pr-2">
+                  <div className="group relative">
+                    <button
+                      className={cn(
+                        "w-full flex items-center gap-3 p-2 rounded-xl transition-all text-sm",
+                        "bg-red-500 text-white font-medium",
+                        isCollapsed && "justify-center"
+                      )}
+                      onClick={() => handleWorkspaceClick(activeWorkspace)}
+                      title={activeWorkspace.name}
+                    >
+                      <LayoutGrid className="h-4 w-4 shrink-0" />
+                      {!isCollapsed && <span className="truncate max-w-[180px]">{activeWorkspace.name}</span>}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {!isWorkspacesMinimized && (
                 <ScrollArea className="min-h-[100px]">
                   <div className="space-y-1 pr-2">
@@ -383,6 +399,26 @@ export function Sidebar() {
                 >
                   History {isHistoryMinimized ? '<' : ''}
                 </h2>
+              )}
+              {/* Show active conversation when minimized */}
+              {isHistoryMinimized && activeConversation && (
+                <div className="space-y-1 pr-2">
+                  <div className="group relative">
+                    <button
+                      className={cn(
+                        "w-full flex items-center gap-3 p-2 rounded-xl transition-all text-sm pr-8",
+                        "bg-accent font-medium",
+                        isCollapsed && "justify-center"
+                      )}
+                      style={{ color: '#ffffff' }}
+                      onClick={() => handleConversationClick(activeConversation)}
+                      title={activeConversation.title}
+                    >
+                      <MessageSquare className="h-4 w-4 shrink-0" />
+                      {!isCollapsed && <span className="truncate max-w-[150px]">{activeConversation.title}</span>}
+                    </button>
+                  </div>
+                </div>
               )}
               {!isHistoryMinimized && (
                 <ScrollArea className="min-h-[100px]">

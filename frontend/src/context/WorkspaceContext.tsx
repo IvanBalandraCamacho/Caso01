@@ -100,6 +100,7 @@ interface WorkspaceContextType {
   // --- Conversations ---
   conversations: Conversation[];
   isLoadingConversations: boolean;
+  conversationsLoadedForWorkspace: string | null;
   activeConversation: Conversation | null;
   setActiveConversation: (conversation: Conversation | null) => void;
   fetchConversations: (workspaceId: string) => Promise<void>;
@@ -168,6 +169,9 @@ export function WorkspaceProvider({
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [activeConversation, setActiveConversation] =
     useState<Conversation | null>(null);
+  
+  // Track which workspace's conversations are currently loaded
+  const [conversationsLoadedForWorkspace, setConversationsLoadedForWorkspace] = useState<string | null>(null);
 
   // Estado para el modelo LLM seleccionado
   const [selectedModel, setSelectedModel] = useState<string>("gpt-4o-mini");
@@ -335,6 +339,8 @@ export function WorkspaceProvider({
             setActiveConversation(null);
             setConversations([]);
             setDocuments([]);
+            // Clear the loaded conversations state
+            setConversationsLoadedForWorkspace(null);
             
             // Redirigir al landing
             if (typeof window !== "undefined") {
@@ -354,20 +360,38 @@ export function WorkspaceProvider({
   );
 
   // --- Función para cargar conversaciones ---
-  const fetchConversations = useCallback(async (workspaceId: string) => {
-    // Set loading state immediately to prevent flash of empty state
+  const fetchConversationsInternal = useCallback(async (workspaceId: string) => {
     setIsLoadingConversations(true);
     try {
       const data: Conversation[] = await fetchConversationsApi(workspaceId);
-      // Only update conversations after data is fetched (stale data retention)
       setConversations(data);
+      setConversationsLoadedForWorkspace(workspaceId);
     } catch (error) {
       console.error("Error al cargar conversaciones:", error);
       setConversations([]);
+      setConversationsLoadedForWorkspace(null);
     } finally {
       setIsLoadingConversations(false);
     }
   }, []);
+
+  // Public function that can be called from components (for manual refresh)
+  const fetchConversations = useCallback(async (workspaceId: string) => {
+    await fetchConversationsInternal(workspaceId);
+  }, [fetchConversationsInternal]);
+
+  // Auto-load conversations when activeWorkspace changes, clear when null
+  useEffect(() => {
+    if (activeWorkspace?.id) {
+      if (activeWorkspace.id !== conversationsLoadedForWorkspace) {
+        fetchConversationsInternal(activeWorkspace.id);
+      }
+    } else {
+      // Clear conversations when no workspace is selected
+      setConversations([]);
+      setConversationsLoadedForWorkspace(null);
+    }
+  }, [activeWorkspace?.id, conversationsLoadedForWorkspace, fetchConversationsInternal]);
 
   // --- Función para crear conversación ---
   const createConversation = useCallback(
@@ -379,7 +403,7 @@ export function WorkspaceProvider({
         );
 
         // Refrescar lista de conversaciones
-        await fetchConversations(workspaceId);
+        await fetchConversationsInternal(workspaceId);
 
         return newConversation;
       } catch (error) {
@@ -387,7 +411,7 @@ export function WorkspaceProvider({
         throw error;
       }
     },
-    [fetchConversations],
+    [fetchConversationsInternal],
   );
 
   // --- Función para eliminar conversación ---
@@ -414,13 +438,14 @@ export function WorkspaceProvider({
           return current;
         });
         
-        await fetchConversations(workspaceId);
+        // Force refresh after delete
+        await fetchConversationsInternal(workspaceId);
       } catch (error) {
         console.error("Error al eliminar conversación:", error);
         throw error;
       }
     },
-    [fetchConversations],
+    [fetchConversationsInternal],
   );
 
   // --- Función para cargar mensajes de una conversación ---
@@ -625,6 +650,8 @@ export function WorkspaceProvider({
       setConversations([]);
       setActiveConversation(null);
       setDocuments([]);
+      // Clear loaded conversations state
+      setConversationsLoadedForWorkspace(null);
     };
 
     window.addEventListener("loginSuccess", handleLoginSuccess);
@@ -654,6 +681,7 @@ export function WorkspaceProvider({
       setSearchResults,
       conversations,
       isLoadingConversations,
+      conversationsLoadedForWorkspace,
       activeConversation,
       setActiveConversation,
       fetchConversations,
@@ -687,6 +715,7 @@ export function WorkspaceProvider({
       searchResults,
       conversations,
       isLoadingConversations,
+      conversationsLoadedForWorkspace,
       activeConversation,
       selectedModel,
       // Callback functions - include only those with changing dependencies

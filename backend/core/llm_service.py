@@ -55,12 +55,21 @@ def get_provider(model_name: str = None, task_type: str = None) -> LLMProvider:
         
     Returns:
         OpenAIProvider instance
+    
+    Raises:
+        RuntimeError: Si no hay ningún proveedor inicializado correctamente.
     """
     if not _providers:
         initialize_providers()
     
-    # Siempre retornar GPT-4o-mini
-    return _providers.get("gpt4o_mini")
+    provider = _providers.get("gpt4o_mini")
+    
+    if not provider:
+        error_msg = "No LLM provider available. Please check your OPENAI_API_KEY in .env or token.txt"
+        logger.error(f"❌ {error_msg}")
+        raise RuntimeError(error_msg)
+        
+    return provider
 
 
 def generate_response(query: str, context_chunks: List[DocumentChunk], model_override: str = None, chat_history: List[dict] = None) -> str:
