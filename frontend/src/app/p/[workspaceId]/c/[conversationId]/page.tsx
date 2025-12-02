@@ -16,19 +16,19 @@ export default function ConversationPage() {
     workspaces, 
     conversations,
     isLoadingConversations,
+    conversationsLoadedForWorkspace,
     activeWorkspace, 
     setActiveWorkspace,
     activeConversation,
     setActiveConversation,
-    fetchConversations,
-    fetchWorkspaces
+    fetchWorkspaces,
   } = useWorkspaces();
 
-  const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const hasInitialized = useRef(false);
+  const hasSetWorkspace = useRef(false);
 
-  // Cargar workspaces si no están cargados
+  // Cargar workspaces si no están cargados (acceso directo por URL)
   useEffect(() => {
     if (workspaces.length === 0 && !hasInitialized.current) {
       hasInitialized.current = true;
@@ -36,114 +36,100 @@ export default function ConversationPage() {
     }
   }, [workspaces.length, fetchWorkspaces]);
 
-  // Redirigir inmediatamente si el workspace activo fue eliminado
+  // Reset ref when workspaceId changes
   useEffect(() => {
-    // Si ya se cargaron workspaces y el workspace actual no existe, redirigir
-    if (workspaces.length > 0 && !workspaces.find(ws => ws.id === workspaceId)) {
-      router.push('/');
-      return;
-    }
-    
-    // Si el activeWorkspace es null (fue eliminado), redirigir
-    if (activeWorkspace === null && workspaces.length > 0) {
-      router.push('/');
-      return;
-    }
-  }, [workspaces, workspaceId, activeWorkspace, router]);
+    hasSetWorkspace.current = false;
+  }, [workspaceId]);
 
-  // Manejar workspace y conversación
+  // Establecer workspace activo - el contexto auto-carga conversaciones
   useEffect(() => {
-    // Si no hay workspaces todavía, esperar
-    if (workspaces.length === 0) {
-      setIsLoading(true);
-      return;
-    }
+    if (workspaces.length === 0) return;
+    // Don't re-set if we already set it for this workspace
+    if (hasSetWorkspace.current) return;
 
-    // Verificar que el workspace existe
     const workspace = workspaces.find(ws => ws.id === workspaceId);
     if (!workspace) {
       setNotFound(true);
-      setIsLoading(false);
       return;
     }
 
-    // Establecer workspace activo si es diferente
-    if (activeWorkspace?.id !== workspaceId) {
-      setActiveWorkspace(workspace);
-      fetchConversations(workspaceId);
-      return; // Esperar a que se carguen las conversaciones
-    }
-
-    // Si ya tenemos el workspace correcto pero las conversaciones están cargando, esperar
-    if (isLoadingConversations) {
-      setIsLoading(true);
-      return;
-    }
-
-    // Si ya tenemos el workspace correcto pero no hay conversaciones (empty state real), mostrar not found
-    if (conversations.length === 0) {
-      // Wait a bit more - conversations might still be loading
-      setIsLoading(true);
-      return;
-    }
-
-    // Verificar que la conversación existe
-    const conversation = conversations.find(conv => conv.id === conversationId);
-    if (!conversation) {
-      setNotFound(true);
-      setIsLoading(false);
-      return;
-    }
-
-    // Establecer conversación activa si es diferente
-    if (activeConversation?.id !== conversationId) {
-      setActiveConversation(conversation);
-    }
-
-    // Todo está listo
-    setIsLoading(false);
+    hasSetWorkspace.current = true;
+    setActiveWorkspace(workspace);
     setNotFound(false);
-    
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspaceId, conversationId, workspaces, conversations, activeWorkspace?.id, activeConversation?.id]);
+  }, [workspaceId, workspaces, setActiveWorkspace]);
 
-  if (notFound) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold mb-4">404</h1>
-          <p className="text-muted-foreground mb-4">Conversación no encontrada</p>
-          <button
-            onClick={() => router.push("/")}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
-          >
-            Volver al inicio
-          </button>
+  // Establecer conversación activa cuando las conversaciones estén cargadas para ESTE workspace
+  useEffect(() => {
+    if (isLoadingConversations) return;
+    if (conversationsLoadedForWorkspace !== workspaceId) return;
+
+    if (conversations.length === 0) {
+      setNotFound(true);
+      return;
+    }
+
+    const conversation = conversations.find(conv => conv.id === conversationId);
+    if (conversation) {
+      if (activeConversation?.id !== conversationId) {
+        setActiveConversation(conversation);
+      }
+      setNotFound(false);
+    } else {
+      setNotFound(true);
+    }
+  }, [conversationId, conversations, isLoadingConversations, conversationsLoadedForWorkspace, workspaceId, activeConversation?.id, setActiveConversation]);
+
+  // Redirigir si workspace fue eliminado
+  useEffect(() => {
+    if (workspaces.length > 0 && !workspaces.find(ws => ws.id === workspaceId)) {
+      router.push('/');
+    }
+  }, [workspaces, workspaceId, router]);
+
+  // Estados para el área de contenido (no afecta al sidebar)
+  const isContentLoading = workspaces.length === 0 || 
+                           isLoadingConversations || 
+                           conversationsLoadedForWorkspace !== workspaceId;
+
+  const showNotFound = notFound && !isContentLoading;
+
+  // Contenido del área principal
+  const renderContent = () => {
+    if (showNotFound) {
+      return (
+        <div className="flex-1 flex items-center justify-center bg-background">
+          <div className="text-center">
+            <h1 className="text-4xl font-bold mb-4">404</h1>
+            <p className="text-muted-foreground mb-4">Conversación no encontrada</p>
+            <button
+              onClick={() => router.push("/")}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+            >
+              Volver al inicio
+            </button>
+          </div>
         </div>
-      </div>
-    );
-  }
+      );
+    }
 
-  if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-muted-foreground">Cargando conversación...</p>
+    if (isContentLoading) {
+      return (
+        <div className="flex-1 flex items-center justify-center bg-background">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+            <p className="text-muted-foreground">Cargando conversación...</p>
+          </div>
         </div>
-      </div>
-    );
-  }
+      );
+    }
 
-  // Si el workspace fue eliminado, no renderizar nada (la redirección está en proceso)
-  if (!activeWorkspace || !workspaces.find(ws => ws.id === workspaceId)) {
-    return null;
-  }
+    return <ChatArea />;
+  };
 
   return (
     <div className="flex h-screen bg-background">
       <Sidebar />
-      <ChatArea />
+      {renderContent()}
     </div>
   );
 }
