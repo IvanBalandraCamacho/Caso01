@@ -179,8 +179,7 @@ export function ChatArea() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeConversation?.id]);
 
-  // Cargar mensajes cuando llegan los datos - SOLO UNA VEZ por conversación
-  const prevConversationIdRef = useRef<string | null>(null);
+  // Cargar mensajes cuando llegan los datos
   useEffect(() => {
     if (
       !conversationData?.messages ||
@@ -190,13 +189,11 @@ export function ChatArea() {
       return;
     }
 
-    // Si ya cargamos esta conversación, no recargar
-    if (prevConversationIdRef.current === conversationData.id) {
+    // Solo cargar si no estamos en medio de un stream
+    if (isStreaming) {
       return;
     }
 
-    prevConversationIdRef.current = conversationData.id;
-    
     const loadedMessages: ChatMessage[] = conversationData.messages.map(
       (msg) => ({
         role: msg.role,
@@ -208,7 +205,7 @@ export function ChatArea() {
     );
     setChatHistory(loadedMessages);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationData, activeConversation?.id]);
+  }, [conversationData, activeConversation?.id, isStreaming]);
 
   const handleQuickPrompt = (prompt: string) => {
     setMessage(prompt);
