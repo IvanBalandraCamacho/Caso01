@@ -303,10 +303,12 @@ def analyze_document_for_suggestions(text: str, file_name: str) -> Tuple[str, st
     provider = llm_service.get_provider()
     logger.info("Checklist Analyzer: solicitando análisis al LLM...")
 
-    prompt = ""
+    # Truncar texto para evitar errores de tokens
+    safe_text = text[:100000]
+    prompt = CHECKLIST_ANALYZER_PROMPT.format(document=safe_text)
 
     response_text = provider.generate_response(
-        query="",
+        query="Analiza este documento según el checklist.",
         context_chunks=[],
         custom_prompt=prompt
     )
@@ -338,9 +340,13 @@ def analyze_document_for_suggestions(text: str, file_name: str) -> Tuple[str, st
     try:
         if "PREGUNTAS CRÍTICAS" in response_text:
             preguntas_section = response_text.split("PREGUNTAS CRÍTICAS")[1]
+            # Cortar antes de la siguiente sección si existe
+            if "SUPUESTOS RECOMENDADOS" in preguntas_section:
+                preguntas_section = preguntas_section.split("SUPUESTOS RECOMENDADOS")[0]
+            
             preguntas_lines = [
                 line for line in preguntas_section.split("\n")
-                if line.strip().startswith("- ")
+                if line.strip().startswith(("-", "*", "•", "⚫"))
             ]
             preguntas_count = len(preguntas_lines)
     except Exception as e:
