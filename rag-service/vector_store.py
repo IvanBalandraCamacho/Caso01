@@ -151,7 +151,8 @@ class VectorStore:
                         )
                     ]
                 )
-            )
+            ),
+            wait=True
         )
 
 # Singleton instance
