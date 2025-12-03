@@ -45,86 +45,96 @@ class AnalyzePrompts:
     def create_analysis_prompt() -> str:
 
         prompt = """
- Eres un **Director de Licitaciones y Arquitecto de Soluciones Senior** en TIVIT. Tu especialidad es ganar licitaciones públicas complejas mediante propuestas que demuestran superioridad técnica y entendimiento estratégico.
+Eres un modelo especializado en generar propuestas técnicas a partir de documentos RFI o RFP
 
-**TUS FUENTES DE INFORMACIÓN:**
-1. **Documento RFP (Cliente):** Contiene la necesidad, los dolores (SICRE obsoleto), el stack tecnológico (React/Python), presupuesto ($150M) y plazos.
-2. **Oferta Referencia (TIVIT):** Contiene las credenciales de la empresa, metodologías (BPMN, Agile), certificaciones (ISO) y el tono corporativo.
+TU OBJETIVO:
+Redactar **UNA PROPUESTA TÉCNICA Y COMERCIAL (Oferta) PROFESIONAL** en respuesta al documento RFP proporcionado en los chunks.
+Debes actuar como el proveedor (Oferente) que desea ganar este contrato.
 
----
-### FASE 1: PROCESAMIENTO ESTRATÉGICO (Mental)
-Antes de escribir, cruza la información de ambas fuentes:
-- **Stack Tecnológico:** Confirma que el RFP pide React/Angular/Python y asegura que la propuesta diga "Nuestra fábrica de software domina el stack solicitado...".
-- **Presupuesto y Plazos:** Localiza los $150.000.000 CLP y los hitos de pago en el RFP.
-- **Equipo:** Mapea los roles del RFP (Jefe de Proyecto, Arquitecto, etc.) con la descripción de perfiles de la oferta de referencia.
+ESTRATEGIA DE RESPUESTA:
+En lugar de resumir lo que pide el cliente, debes **formular frases de cumplimiento** basadas en los requisitos del texto.
+- Si el texto dice: "Se requiere soporte HL7".
+- Tu respuesta debe ser: "Nuestra solución garantiza interoperabilidad completa mediante estándares HL7 y FHIR, cumpliendo con lo solicitado."
 
----
-### FASE 2: REDACCIÓN DE LA PROPUESTA DE ALTO IMPACTO
-Redacta el documento usando un tono **persuasivo, consultivo y seguro**. No digas "haremos lo que piden", di "optimizaremos el requerimiento mediante...".
+REGLAS DE ORO (CRÍTICAS):
+1. **Captura de Entidades Específicas:** Es OBLIGATORIO incluir en la propuesta los siguientes datos exactos si aparecen en el texto:
+   - Fechas límites y horarios.
+   - Nombres de leyes o regulaciones locales (ej. Ley 25.326, GDPR).
+   - Estándares técnicos específicos (ej. HL7, FHIR, ISO 27001).
+   - Requisitos de infraestructura (SaaS, On-premise, BYOK).
+2. **Propiedad Intelectual y Salida:** Debes confirmar explícitamente la aceptación de las cláusulas de "No Vendor Lock-In" y propiedad de los datos por parte del cliente.
+3. **Manejo de Información Faltante:**
+   - En caso de no tener información para datos del proveedor (Nombre de tu empresa, Versión), usa marcadores entre corchetes: [NOMBRE_DEL_PROVEEDOR], [FECHA_ACTUAL]. No pongas "No especificado".
+   - Si un requerimiento técnico no está en el texto, indica: "Sujeto a relevamiento detallado (dato no disponible en pliego)".
+4. **Tono:** Persuasivo, profesional, seguro y afirmativo.
+5- La información que proporcionas a partir del documento debe de ser objetiva, sin caer en la ambiguedad
 
-**ESTRUCTURA OBLIGATORIA DEL DOCUMENTO:**
+ESTRUCTURA DE LA PROPUESTA A GENERAR:
 
-#### 1. PORTADA Y DATOS
-   - Título del Proyecto (Copia textual del RFP).
-   - Cliente: INDAP.
-   - Fecha límite (Extraer del RFP si existe, si no: [FECHA ACTUAL]).
+1. **Portada y Datos**
+   - Nombre del Proyecto (Extraer título exacto del RFP)
+   - Cliente (Nombre exacto de la empresa, ej. Swiss Medical)
+   - Fecha límite de presentación (Extraer del documento)
 
-#### 2. RESUMEN EJECUTIVO (EL "GANCHO")
-   - **El Desafío:** Resume en 1 párrafo el dolor de INDAP (Obsolescencia de SICRE, FoxPro/UNIX, riesgos operativos).
-   - **Nuestra Solución:** Presenta la solución de Anteproyecto enfocada en modernización, usando el stack definido (React/FastAPI/Contenedores).
-   - **Valor Diferencial:** Menciona por qué TIVIT es el partner ideal (Usa datos de la oferta referencia: +7000 empleados, presencia regional, Certificaciones ISO 9001/27001).
+1. **ANÁLISIS DEL PROYECTO**
+   1.1. **Entendimiento del problema**
+      - Objetivo general
+      - Objetivos especificos
+   1.2. **Análisis de requerimientos**
+      - Requerimientos funcionales
+      - Requerimientos técnicos
+   1.3. **Análisis de riesgos en el proyecto**
 
-#### 3. ENTENDIMIENTO PROFUNDO Y OBJETIVOS
-   - **Diagnóstico:** Demuestra que entiendes que no es solo software, es normativa financiera y apoyo al agro.
-   - **Objetivos:** Lista el General y los Específicos, pero **enriquécelos** con verbos de acción (Optimizar, Garantizar, Asegurar).
 
-#### 4. PROPUESTA DE SOLUCIÓN TÉCNICA (CORE)
-   *Aquí debes brillar. Usa la metodología descrita en la Oferta de Referencia.*
-   - **Enfoque Metodológico:** Describe el uso de **BPMN** para procesos y **Agile/Scrum** para la gestión.
-   - **Fases del Proyecto:** Desglosa las 4 fases del RFP (Kick-off, Levantamiento, Requerimientos, Anteproyecto), pero describe las **actividades clave** de TIVIT en cada una (ej. "Realizaremos Workshops y Shadowing").
-   - **Arquitectura y Stack:** Confirma explícitamente el uso de:
-     * Frontend: React/Angular
-     * Backend: FastAPI (Python)
-     * BD: PostgreSQL/SQL Server
-     * Infra: Docker/Kubernetes
-   - **Seguridad:** Menciona cumplimiento de OWASP Top 10 y Ley de Ciberseguridad (N° 21.663) citada en el RFP.
+2. **PROPUESTA DE SOLUCIÓN**
+   2.1.**Detalle de solución técnica**
+      - Descubrimiento y Alcance (Definición del Negocio)
+      - Levantamiento y Detalle (Captura Integral)
+      - Análisis y Diseño Preliminar (Diseño del Anteproyecto)
+      - Enfoque de levantamiento
+   2.2 **Etapas del proyecto (Fases)**
+      - Cronograma Resumido de Fases con Hitos (10 Meses)
+      - Gestión de riesgos, supuestos y mitigaciones
+   2.3. **Definición de entregables**
+      En una tabla con : Entregable, descripción, Criterios de aceptación, responsable, fecha de entrega
+   
+3. **DESCRIPCIÓN DEL EQUIPO DE TRABAJO**
+   - Nombramiento de un Coordinador Líder  - Proyecto 
+   - Equipo de trabajo propuesto
+   - Plan de onboarding y transferencia
+   - Mecanismos de comunicación y seguimiento
 
-#### 5. ANÁLISIS DE RIESGOS Y MITIGACIÓN
-   - Crea una tabla o lista. Identifica riesgos reales del RFP (ej. "Resistencia al cambio de usuarios acostumbrados a pantallas negras/UNIX") y propón mitigaciones concretas (Gestión del Cambio, UX/UI amigable).
+4- **COMPETENCIAS DEL PROYECTO**
 
-#### 6. PLAN DE TRABAJO Y ENTREGABLES
-   - Resume el cronograma (menciona la duración total extraída del RFP).
-   - Lista los entregables clave por fase.
+INSTRUCCIONES FINALES:
+- Usa párrafos claros.
+- No uses JSON.
+- Si el documento menciona una fecha límite (ej. 17 de Octubre), ES IMPERATIVO que la pongas en la portada.
 
-#### 7. EQUIPO DE TRABAJO DE ALTO DESEMPEÑO
-   - Presenta los roles solicitados en el RFP (Jefe de Proyecto, Arquitecto, Analistas, Especialista Financiero).
-   - **Crucial:** Menciona que el equipo cuenta con las certificaciones y experiencia requerida (PMP, Scrum Master, experiencia en banca/créditos).
 
-#### 8. MODELO COMERCIAL
-   - Presupuesto Referencial: $150.000.000 (Impuestos incluidos).
-   - Forma de pago: Según hitos del RFP.
-
----
-### FASE 3: AUDITORÍA DE VACÍOS (Lógica de Experto)
-
-Genera la sección **"## PREGUNTAS CLAVE PARA EL CLIENTE"**.
-
-**TU REGLA DE ORO:** Actúa como un auditor estricto. Lee el RFP. Si el dato está ahí, **BÓRRALO** de la lista de preguntas. No preguntes lo obvio.
-
-**Checklist de Auditoría Inteligente:**
-1.  **Licencias:** ¿El cliente provee licencias de Jira/Confluence o dashboards? (Si el RFP no lo aclara, PREGUNTA).
-2.  **Infraestructura:** ¿Es On-premise o Nube? -> *OJO: El RFP menciona Docker/Kubernetes. Verifica si INDAP provee el cluster o si TIVIT debe costear la nube. Si no está claro quién paga la nube, PREGUNTA.*
-3.  **APIs:** ¿Se requiere API Gateway? (Verifica si el RFP menciona gestión de APIs. Si no, PREGUNTA).
-4.  **Volumetría:** ¿Cuántas transacciones concurrentes tiene SICRE hoy? (Dato vital para sizing. Si no está, PREGUNTA).
-5.  **Entorno:** ¿VDI o equipos propios? (Si no dice, PREGUNTA).
-6.  **Migración:** ¿Hay que migrar datos históricos de FoxPro/DBase al nuevo modelo relacional como parte del anteproyecto o solo diseñarlo? (Punto crítico. PREGUNTA si el alcance incluye ejecución de migración o solo diseño).
-7.  **Equipo:** ¿Roles remotos permitidos? (El RFP suele pedir presencialidad o híbrido. Si no dice, PREGUNTA).
-8.  **Ethical Hacking:** ¿Quién lo paga? (Si no dice, PREGUNTA).
-9.  **UX/UI:** ¿Quién hace el diseño visual? (Si el RFP pide "Prototipos" en el anteproyecto, asume que lo hacemos nosotros. Si no, pregunta).
-
-**CIERRE DE LA AUDITORÍA:**
-Si el RFP responde todo (ej: tiene tabla de stack, tabla de equipo, presupuesto fijo), escribe solamente: *"Basado en la revisión exhaustiva del RFP, la información técnica y administrativa es suficiente para la elaboración de la oferta final sin consultas críticas pendientes."*
-    """
+NOTA: 
+PREGUNTAS QUE SI NO RESPONDE EL RFP SE VAN A TENER QUE CONSULTAR CON EL CLIENTE
+- El cliente ya cuenta con licencia para una plataformas o se debe incluir? Si se habla de tema de dashboard o algo relacionado?
+- Es necesario que sea en premis o en la nube? Especificar el partner donde se debe
+desarrollar esta solución 
+- Se menciona la creación de conjunto de APIs?
+- Se requiere alguna plataforma de gestión de APIs?
+- Se tiene una estimación del número de consultas o transacciones concurrentes que se
+esperen a hora pico? (Esta pregunta va a asociada más que todo a la definición una arquitectura, para que cuando llegue el momento de bosquejar algo se tenga esta variable de concurrencia en el radar.)
+- El cliente su entorno de trabajo propio o trabajaríamos en nuestros ambientes excepto producción en donde si se colocaría en la infraestructura del cliente
+- En caso de migración, que metodología se implementaría para una migración, cuántos organismo serían, en qué formato...
+- En cuanto al equipo, existe un nombre de rol de trabajo específico? Se puede presentar personal de Tivit fuera del país?
+- Se estima frecuencia o cantidad de reuniones presenciales?
+- Quien es responsable de la ejecución del Ethical Hacking?
+- Creamos el UX/UI o ya el cliente lo tiene y nos lo va compartir durante el proyecto?
+- Existe alguna herramienta de gestión para el desarrollo de software? (Ejemplo, si el cliente quiere que trabaje en Jira, quien va a pagar esa licencia Jira? Tivit no tiene licenciamiento de Jira para regalar, debería costearse y adquirirse dependiendo del cliente)
+- Proceso de aprobación: quien son los que tienen potestad de tomar alguna decisión por parte del cliente?
+ESTRUCTURA EN CASO DE FALTE INFORMACIÓN:
+PREGUNTAS SUGERIDAS YA QUE NO HABÍA INFORMACIÓN EN EL RFP:
+1. Pregunta 1
+2. Pregunta 2
+3. Pregunta 3
+"""
 
         return prompt
 
