@@ -164,11 +164,15 @@ export function ChatArea() {
     setIsStreaming(false);
   }, [activeWorkspace?.id]);
 
+  // Ref para trackear qué conversación ya cargamos (evita recargas después del streaming)
+  const lastLoadedConversationRef = useRef<string | null>(null);
+
   // Limpiar y preparar cuando cambia la conversación activa
   useEffect(() => {
     if (!activeConversation?.id) {
       setChatHistory([]);
       setCurrentConversationId(undefined);
+      lastLoadedConversationRef.current = null;
       return;
     }
 
@@ -176,10 +180,11 @@ export function ChatArea() {
     activeStreamRef.current = null;
     setIsStreaming(false);
     setCurrentConversationId(activeConversation.id);
+    lastLoadedConversationRef.current = null; // Resetear para permitir recarga
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeConversation?.id]);
 
-  // Cargar mensajes cuando llegan los datos
+  // Cargar mensajes cuando llegan los datos - solo en carga inicial o cambio de conversación
   useEffect(() => {
     if (
       !conversationData?.messages ||
@@ -189,10 +194,17 @@ export function ChatArea() {
       return;
     }
 
-    // Solo cargar si no estamos en medio de un stream
+    // No recargar si ya cargamos esta conversación y estamos en streaming
     if (isStreaming) {
       return;
     }
+
+    // No recargar si ya cargamos esta conversación (evita sobreescribir después del streaming)
+    if (lastLoadedConversationRef.current === conversationData.id) {
+      return;
+    }
+
+    lastLoadedConversationRef.current = conversationData.id;
 
     const loadedMessages: ChatMessage[] = conversationData.messages.map(
       (msg) => ({
@@ -205,7 +217,7 @@ export function ChatArea() {
     );
     setChatHistory(loadedMessages);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationData, activeConversation?.id, isStreaming]);
+  }, [conversationData, activeConversation?.id]);
 
   const handleQuickPrompt = (prompt: string) => {
     setMessage(prompt);
