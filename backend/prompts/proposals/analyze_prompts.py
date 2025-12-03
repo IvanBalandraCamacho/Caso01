@@ -71,15 +71,20 @@ REGLAS DE ORO (CRÍTICAS):
 
 ESTRUCTURA DE LA PROPUESTA A GENERAR:
 
+TITULO: Un titulo descriptivo del caso y que esté acorde al contexto.
+
 1. **Portada y Datos**
-   - Nombre del Proyecto (Extraer título exacto del RFP)
-   - Cliente (Nombre exacto de la empresa, ej. Swiss Medical)
-   - Fecha límite de presentación (Extraer del documento)
+   - Nombre del Proyecto (Extraer título exacto del RFP)
+   - Cliente (Nombre exacto de la empresa, ej. Swiss Medical)
+   - Fecha límite de presentación (Extraer del documento)
 
 1. **ANÁLISIS DEL PROYECTO**
    1.1. **Entendimiento del problema**
+    NOTA: Redactalo de manera extensa, específica y altamente contextualizado. No resumas: explica en detalle la situación actual, el origen del problema, limitaciones tecnológicas/operativas, impactos institucionales, riesgos, brechas frente a mejores prácticas, desafíos de interoperabilidad, gestión del cambio y consecuencias de mantener el estado actual. Tu redacción debe ser tan detallada como si conocieras el sistema actual, su tecnología, los procesos institucionales y el contexto sectorial. Debe sonar como un análisis experto, no genérico.
       - Objetivo general
+      NOTA: Redacta un Objetivo General extenso, concreto y estratégico. Evita frases genéricas. El objetivo debe describir con precisión el propósito institucional del proyecto, el problema estructural que busca resolver, el alcance real (funcional, tecnológico, operativo, organizacional), la modernización esperada, las capacidades técnicas y regulatorias imprescindibles, y cómo la iniciativa se alinea con la misión, los objetivos estratégicos y las necesidades sectoriales de la institución. Redactalo con el nivel de detalle propio de un anteproyecto público o corporativo, incluyendo contexto, intención, impacto esperado y lineamientos estratégicos.
       - Objetivos especificos
+      NOTA: Redacta Objetivos Específicos completos, técnicos y detallados. Evita generalidades. Cada objetivo debe describir una acción concreta, un alcance claro y un resultado verificable. Incluye actividades como levantamiento y análisis de procesos, identificación de brechas, documentación exhaustiva de requerimientos funcionales y no funcionales, análisis de factibilidad técnica/económica/regulatoria, diseño técnico y modelamiento, elaboración de documentos para licitación, definición de estándares de calidad, integración, seguridad, cumplimiento normativo y recomendaciones estratégicas. Los objetivos deben estar orientados a entregables reales, medibles y alineados a la misión institucional. Redáctalos como los objetivos específicos de un anteproyecto público o corporativo.
    1.2. **Análisis de requerimientos**
       - Requerimientos funcionales
       - Requerimientos técnicos
