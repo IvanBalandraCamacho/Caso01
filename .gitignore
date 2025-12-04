@@ -31,6 +31,9 @@ frontend/out/
 frontend/.turbo/
 frontend/.vercel/
 
+# Front-v2 (carpeta temporal/experimental)
+front-v2/
+
 # ===== EDITORES =====
 .vscode/
 .idea/
