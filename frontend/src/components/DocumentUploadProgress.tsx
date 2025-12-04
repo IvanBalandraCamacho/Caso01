@@ -1,41 +1,21 @@
 "use client";
-import React, { useEffect, useCallback } from "react";
+import React, { useEffect } from "react";
 import { Loader2, CheckCircle, XCircle, FileText } from "lucide-react";
-import { useIndividualDocumentPolling } from "@/hooks/useDocumentPolling";
 import { DocumentStatus } from "@/types/api";
 
 interface DocumentUploadProgressItemProps {
   documentId: string;
   fileName: string;
-  initialStatus: DocumentStatus;
-  onStatusChange: (status: DocumentStatus) => void;
+  status: DocumentStatus;
 }
 
 const DocumentUploadProgressItem: React.FC<DocumentUploadProgressItemProps> = React.memo(({
   documentId,
   fileName,
-  initialStatus,
-  onStatusChange,
+  status,
 }) => {
-  const [currentStatus, setCurrentStatus] = React.useState<DocumentStatus>(initialStatus);
-
-  // Solo hacer polling si no está COMPLETED o FAILED
-  const shouldPoll = currentStatus !== "COMPLETED" && currentStatus !== "FAILED";
-
-  const handleStatusChange = useCallback((newStatus: DocumentStatus) => {
-    setCurrentStatus(newStatus);
-    onStatusChange(newStatus);
-  }, [onStatusChange]);
-
-  useIndividualDocumentPolling(
-    documentId,
-    fileName,
-    handleStatusChange,
-    shouldPoll
-  );
-
   const getStatusIcon = () => {
-    switch (currentStatus) {
+    switch (status) {
       case "COMPLETED":
         return <CheckCircle className="h-4 w-4 text-green-500" />;
       case "FAILED":
@@ -49,7 +29,7 @@ const DocumentUploadProgressItem: React.FC<DocumentUploadProgressItemProps> = Re
   };
 
   const getStatusText = () => {
-    switch (currentStatus) {
+    switch (status) {
       case "COMPLETED":
         return "Completado";
       case "FAILED":
@@ -59,12 +39,12 @@ const DocumentUploadProgressItem: React.FC<DocumentUploadProgressItemProps> = Re
       case "PENDING":
         return "En cola...";
       default:
-        return currentStatus;
+        return status;
     }
   };
 
   const getStatusColor = () => {
-    switch (currentStatus) {
+    switch (status) {
       case "COMPLETED":
         return "text-green-500";
       case "FAILED":
@@ -96,13 +76,11 @@ interface DocumentUploadProgressProps {
     file_name: string;
     status: DocumentStatus;
   }>;
-  onDocumentStatusChange: (documentId: string, status: DocumentStatus) => void;
   onAllCompleted?: () => void;
 }
 
 export const DocumentUploadProgress: React.FC<DocumentUploadProgressProps> = React.memo(({
   documents,
-  onDocumentStatusChange,
   onAllCompleted,
 }) => {
   useEffect(() => {
@@ -133,8 +111,7 @@ export const DocumentUploadProgress: React.FC<DocumentUploadProgressProps> = Rea
             key={doc.id}
             documentId={doc.id}
             fileName={doc.file_name}
-            initialStatus={doc.status}
-            onStatusChange={(status) => onDocumentStatusChange(doc.id, status)}
+            status={doc.status}
           />
         ))}
       </div>
