@@ -41,6 +41,7 @@ import { DocumentStatus, ProposalAnalysis } from "@/types/api";
 import rehypeRaw from "rehype-raw";
 import { QuickPrompts } from "./QuickPrompts";
 import { showToast } from "./Toast";
+import { useNotificationsWS, NotificationMessage } from "@/hooks/useNotificationsWS";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -93,6 +94,38 @@ export function ChatArea() {
   const activeStreamRef = useRef<string | null>(null);
   // Ref to track detected intent during streaming (for auto-generating proposal)
   const detectedIntentRef = useRef<string | null>(null);
+
+  // Handle WebSocket notifications
+  const handleWSNotification = useCallback((msg: NotificationMessage) => {
+    console.log("📩 ChatArea recibió notificación:", msg);
+
+    if (msg.document_id && (msg.status === "COMPLETED" || msg.status === "ERROR")) {
+      setUploadingDocuments((prev) =>
+        prev.map((doc) => {
+          if (doc.id === msg.document_id) {
+            return { ...doc, status: msg.status as DocumentStatus };
+          }
+          return doc;
+        })
+      );
+
+      // If completed, refresh documents
+      if (msg.status === "COMPLETED") {
+        refetchConversationDocuments();
+      }
+    }
+  }, [refetchConversationDocuments]);
+
+  // Connect to WebSocket when there are uploading documents
+  const hasUploadingFiles = uploadingDocuments.some(
+    doc => doc.status === "PENDING" || doc.status === "PROCESSING"
+  );
+
+  useNotificationsWS({
+    workspaceId: activeWorkspace?.id,
+    onMessage: handleWSNotification,
+    enabled: !!activeWorkspace?.id && hasUploadingFiles,
+  });
 
   // Evitar error de hidratación
   useEffect(() => {
@@ -241,12 +274,12 @@ export function ChatArea() {
     if (attachedFiles.length > 0 && activeConversation) {
       setIsUploadingToConversation(true);
       const uploadedDocs: Array<{ id: string; file_name: string; status: DocumentStatus }> = [];
-      
+
       try {
         for (const file of attachedFiles) {
           const formData = new FormData();
           formData.append("file", file);
-          
+
           const uploadedDoc = await uploadDocumentToConversation(activeWorkspace.id, activeConversation.id, formData);
           uploadedDocs.push({
             id: uploadedDoc.id,
@@ -254,7 +287,7 @@ export function ChatArea() {
             status: (uploadedDoc.status as DocumentStatus) || "PENDING",
           });
         }
-        
+
         if (uploadedDocs.length > 0) {
           setUploadingDocuments((prev) => [...prev, ...uploadedDocs]);
           showToast(`${uploadedDocs.length} archivo(s) adjuntado(s), procesando...`, "success");
@@ -400,7 +433,7 @@ export function ChatArea() {
         // Si el intent fue GENERATE_PROPOSAL, auto-generar el documento Word
         if (detectedIntentRef.current === "GENERATE_PROPOSAL") {
           console.log("ChatArea: Auto-generando documento Word para propuesta...");
-          
+
           // Obtener el último mensaje del asistente para extraer datos de propuesta
           setChatHistory((prevHistory) => {
             const lastMessage = prevHistory[prevHistory.length - 1];
@@ -437,21 +470,21 @@ export function ChatArea() {
     }
   };
 
-  const handleDocumentStatusChange = useCallback((documentId: string, newStatus: DocumentStatus) => {
-    setUploadingDocuments((prev) =>
-      prev.map((doc) => (doc.id === documentId ? { ...doc, status: newStatus } : doc))
-    );
-  }, []);
+
+  // ... existing code
 
   const handleAllDocumentsCompleted = useCallback(() => {
     // Refrescar lista de documentos cuando todos estén procesados
     refetchConversationDocuments();
-    
+
     // Limpiar la lista después de 3 segundos para que el usuario vea los estados finales
     setTimeout(() => {
       setUploadingDocuments([]);
     }, 3000);
   }, [refetchConversationDocuments]);
+
+  // ... existing code
+
 
   /**
    * Detect if a message content contains a proposal/analysis response.
@@ -468,12 +501,12 @@ export function ChatArea() {
       "equipo sugerido:",
       "alcance económico:",
     ];
-    
+
     const lowerContent = content.toLowerCase();
-    const matchCount = proposalIndicators.filter(indicator => 
+    const matchCount = proposalIndicators.filter(indicator =>
       lowerContent.includes(indicator)
     ).length;
-    
+
     // If at least 3 indicators are present, try to extract proposal data
     if (matchCount >= 3) {
       try {
@@ -491,14 +524,14 @@ export function ChatArea() {
           preguntas_sugeridas: extractListField(content, "preguntas sugeridas") || extractListField(content, "preguntas") || [],
           equipo_sugerido: [], // Complex to extract, leave empty
         };
-        
+
         return proposal;
       } catch {
         console.warn("Could not extract proposal data from message");
         return null;
       }
     }
-    
+
     return null;
   }, []);
 
@@ -518,14 +551,14 @@ export function ChatArea() {
     const regex = new RegExp(`${fieldName}[:\\s]+([\\s\\S]*?)(?=\\n\\n|\\n[A-Z]|$)`, 'i');
     const match = text.match(regex);
     if (!match) return null;
-    
+
     const listContent = match[1];
     // Try to split by bullets, numbers, or commas
     const items = listContent
       .split(/[•\-\*\n,]/)
       .map(item => item.trim())
       .filter(item => item.length > 2 && !item.includes(':'));
-    
+
     return items.length > 0 ? items : null;
   };
 
@@ -551,7 +584,7 @@ export function ChatArea() {
       : undefined;
 
     setIsGeneratingProposal(true);
-    
+
     try {
       const request: GenerateProposalFromChatRequest = {
         proposal_data: proposalData,
@@ -587,7 +620,7 @@ export function ChatArea() {
   const handleAutoGenerateProposal = useCallback(async (proposalData: ProposalAnalysis) => {
     // Use currentConversationId which should be set from the stream's "sources" chunk
     const conversationId = currentConversationId || activeConversation?.id;
-    
+
     if (!conversationId) {
       console.warn("ChatArea: No conversation ID available for auto-generating proposal");
       showToast("⚠️ No se pudo generar documento automáticamente: falta ID de conversación", "error");
@@ -606,7 +639,7 @@ export function ChatArea() {
     });
 
     setIsGeneratingProposal(true);
-    
+
     // Add a message indicating generation is in progress
     setChatHistory((prev) => [
       ...prev,
@@ -652,7 +685,7 @@ export function ChatArea() {
       showToast("✅ Propuesta Word generada y descargada automáticamente", "success");
     } catch (error) {
       console.error("Error auto-generating proposal document:", error);
-      
+
       // Update message to show error
       setChatHistory((prev) => {
         const newHistory = [...prev];
@@ -665,7 +698,7 @@ export function ChatArea() {
         }
         return newHistory;
       });
-      
+
       showToast("Error al generar el documento Word automáticamente", "error");
     } finally {
       setIsGeneratingProposal(false);
@@ -863,16 +896,14 @@ export function ChatArea() {
                 {chatHistory.map((msg, index) => (
                   <div
                     key={index}
-                    className={`flex ${
-                      msg.role === "user" ? "justify-end" : "justify-start"
-                    }`}
+                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"
+                      }`}
                   >
                     <div
-                      className={`max-w-[85%] break-words ${
-                        msg.role === "user"
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-card text-card-foreground border border-border"
-                      } rounded-2xl p-5 relative group shadow-sm`}
+                      className={`max-w-[85%] break-words ${msg.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-card text-card-foreground border border-border"
+                        } rounded-2xl p-5 relative group shadow-sm`}
                     >
                       {/* Botón de copiar (solo para mensajes del asistente) */}
                       {msg.role === "assistant" && (
@@ -920,7 +951,7 @@ export function ChatArea() {
                               🤖 {msg.modelUsed}
                             </span>
                           )}
-                          
+
                           {/* Proposal Download Button - shows if message contains proposal-like content */}
                           {(() => {
                             const proposalData = msg.proposalData || detectProposalInMessage(msg.content);
@@ -1017,7 +1048,6 @@ export function ChatArea() {
               <div className="px-4 pt-3">
                 <DocumentUploadProgress
                   documents={uploadingDocuments}
-                  onDocumentStatusChange={handleDocumentStatusChange}
                   onAllCompleted={handleAllDocumentsCompleted}
                 />
               </div>
