@@ -20,7 +20,7 @@ class AnalyzePrompts:
             "moneda": "USD/EUR/MXN/etc o 'No especificada'"
         }},
         "tecnologias_requeridas": ["tecnología1", "tecnología2", ...],
-        "riesgos_detectados": ["riesgo1", "riesgo2", ...],
+        "objetivo_general": ["texto del objetivo general"],
         "preguntas_sugeridas": ["pregunta1", "pregunta2", ...],
         "equipo_sugerido": [
             {{
@@ -35,7 +35,7 @@ class AnalyzePrompts:
         INSTRUCCIONES:
         1. Extrae ÚNICAMENTE la información presente en el documento
         2. Si algo no está especificado, usa "No especificado" o arrays vacíos
-        3. Para riesgos, identifica problemas potenciales del proyecto, y no te limites, genera todas las que desees
+        3. Para objetivo general, debe ser concreto y estratégico. Evita frases genéricas. El objetivo debe describir con precisión el propósito institucional del proyecto
         4. Para preguntas, sugiere clarificaciones necesarias para el cliente, y no te limites, genera todas las que desees
         5. Para el equipo, sugiere perfiles basados en las tecnologías y alcance
         6. Retorna SOLO el JSON, sin texto adicional"""
