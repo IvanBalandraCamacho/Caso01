@@ -91,7 +91,6 @@ export function ChatArea() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const activeStreamRef = useRef<string | null>(null);
-  const conversationFileInputRef = useRef<HTMLInputElement>(null);
   // Ref to track detected intent during streaming (for auto-generating proposal)
   const detectedIntentRef = useRef<string | null>(null);
 
@@ -229,12 +228,48 @@ export function ChatArea() {
     }, 100);
   };
 
-  const handleSendMessage = (overrideMessage?: string) => {
+  const handleSendMessage = async (overrideMessage?: string) => {
     const query = overrideMessage || message;
     if (!query.trim() || !activeWorkspace) return;
 
-    // Detectar si es el primer mensaje de la conversación
-    const isFirstMessage = chatHistory.length === 0;
+    // Si hay archivos adjuntos pero aún no hay conversación activa, informar al usuario
+    if (attachedFiles.length > 0 && !activeConversation) {
+      showToast("Los archivos adjuntos se subirán después de crear la conversación", "info");
+    }
+
+    // Si hay archivos adjuntos y ya existe una conversación, subirlos primero
+    if (attachedFiles.length > 0 && activeConversation) {
+      setIsUploadingToConversation(true);
+      const uploadedDocs: Array<{ id: string; file_name: string; status: DocumentStatus }> = [];
+      
+      try {
+        for (const file of attachedFiles) {
+          const formData = new FormData();
+          formData.append("file", file);
+          
+          const uploadedDoc = await uploadDocumentToConversation(activeWorkspace.id, activeConversation.id, formData);
+          uploadedDocs.push({
+            id: uploadedDoc.id,
+            file_name: uploadedDoc.file_name,
+            status: (uploadedDoc.status as DocumentStatus) || "PENDING",
+          });
+        }
+        
+        if (uploadedDocs.length > 0) {
+          setUploadingDocuments((prev) => [...prev, ...uploadedDocs]);
+          showToast(`${uploadedDocs.length} archivo(s) adjuntado(s), procesando...`, "success");
+          refetchConversationDocuments();
+        }
+      } catch (error) {
+        console.error("Error al subir archivos adjuntos:", error);
+        const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+        showToast(`Error al adjuntar archivos: ${errorMessage}`, "error");
+        setIsUploadingToConversation(false);
+        return; // No enviar el mensaje si falló la subida
+      } finally {
+        setIsUploadingToConversation(false);
+      }
+    }
 
     // Agregar mensaje del usuario al historial
     const userMessage: ChatMessage = {
@@ -397,44 +432,8 @@ export function ChatArea() {
     if (files && files.length > 0) {
       const newFiles = Array.from(files);
       setAttachedFiles((prev) => [...prev, ...newFiles]);
-    }
-  };
-
-  const handleConversationFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0 || !activeConversation || !activeWorkspace) return;
-
-    setIsUploadingToConversation(true);
-    const uploadedDocs: Array<{ id: string; file_name: string; status: DocumentStatus }> = [];
-    
-    try {
-      for (const file of Array.from(files)) {
-        const formData = new FormData();
-        formData.append("file", file);
-        const uploadedDoc = await uploadDocumentToConversation(activeWorkspace.id, activeConversation.id, formData);
-        
-        // Registrar el documento para hacer polling
-        uploadedDocs.push({
-          id: uploadedDoc.id,
-          file_name: uploadedDoc.file_name,
-          status: (uploadedDoc.status as DocumentStatus) || "PENDING",
-        });
-      }
-      
-      // Agregar documentos al estado para activar polling
-      setUploadingDocuments((prev) => [...prev, ...uploadedDocs]);
-      
-      showToast(`${files.length} archivo(s) subido(s), procesando...`, "success");
-      refetchConversationDocuments();
-    } catch (error) {
-      console.error("Error al subir documento:", error);
-      const errorMessage = error instanceof Error ? error.message : "Error desconocido";
-      showToast(`Error: ${errorMessage}`, "error");
-    } finally {
-      setIsUploadingToConversation(false);
-      if (conversationFileInputRef.current) {
-        conversationFileInputRef.current.value = '';
-      }
+      // Limpiar el input para que se pueda seleccionar el mismo archivo de nuevo
+      event.target.value = '';
     }
   };
 
@@ -1026,22 +1025,31 @@ export function ChatArea() {
 
             {/* Attached Files */}
             {attachedFiles.length > 0 && (
-              <div className="px-4 pt-3 flex flex-wrap gap-2 bg-muted/30 pb-2">
-                {attachedFiles.map((file, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center gap-2 bg-background border border-border rounded-md px-2 py-1 text-xs text-foreground shadow-sm"
-                  >
-                    <FileText className="h-3 w-3 text-primary" />
-                    <span className="max-w-[150px] truncate">{file.name}</span>
-                    <button
-                      onClick={() => removeAttachedFile(index)}
-                      className="text-muted-foreground hover:text-destructive transition-colors"
-                    >
-                      ✕
-                    </button>
+              <div className="px-4 pt-3 flex flex-col gap-2 bg-muted/30 pb-2">
+                {isUploadingToConversation && (
+                  <div className="flex items-center gap-2 text-xs text-primary">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <span>Subiendo archivos adjuntos...</span>
                   </div>
-                ))}
+                )}
+                <div className="flex flex-wrap gap-2">
+                  {attachedFiles.map((file, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-2 bg-background border border-border rounded-md px-2 py-1 text-xs text-foreground shadow-sm"
+                    >
+                      <FileText className="h-3 w-3 text-primary" />
+                      <span className="max-w-[150px] truncate">{file.name}</span>
+                      <button
+                        onClick={() => removeAttachedFile(index)}
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                        disabled={isUploadingToConversation}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -1053,31 +1061,15 @@ export function ChatArea() {
                 multiple
                 accept=".pdf,.docx,.xlsx,.txt,.csv"
                 onChange={handleFileAttach}
-                disabled={!activeWorkspace}
-              />
-              <input
-                ref={conversationFileInputRef}
-                type="file"
-                id="conversation-file-upload"
-                className="hidden"
-                multiple
-                accept=".pdf,.docx,.xlsx,.txt,.csv"
-                onChange={handleConversationFileUpload}
-                disabled={!activeConversation || isUploadingToConversation}
+                disabled={!activeWorkspace || isUploadingToConversation}
               />
               <Button
                 variant="ghost"
                 size="icon"
                 className="text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-xl h-10 w-10"
-                onClick={() => {
-                  if (activeConversation) {
-                    conversationFileInputRef.current?.click();
-                  } else {
-                    showToast("Inicia una conversación para subir archivos", "error");
-                  }
-                }}
-                title={activeConversation ? "Subir archivos a esta conversación" : "Inicia una conversación primero"}
-                disabled={isUploadingToConversation}
+                onClick={() => document.getElementById("file-attach")?.click()}
+                title="Adjuntar archivos al mensaje"
+                disabled={!activeWorkspace || isUploadingToConversation}
               >
                 {isUploadingToConversation ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus />}
               </Button>
@@ -1120,9 +1112,9 @@ export function ChatArea() {
                   size="icon"
                   className="bg-brand-red text-white hover:bg-brand-red/80 rounded-xl h-10 w-10 transition-transform active:scale-95"
                   onClick={() => handleSendMessage()}
-                  disabled={!activeWorkspace || !message.trim() || isStreaming}
+                  disabled={!activeWorkspace || !message.trim() || isStreaming || isUploadingToConversation}
                 >
-                  {isStreaming ? (
+                  {isStreaming || isUploadingToConversation ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
                   ) : (
                     <SendHorizontal />
