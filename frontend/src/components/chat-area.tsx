@@ -95,6 +95,14 @@ export function ChatArea() {
   // Ref to track detected intent during streaming (for auto-generating proposal)
   const detectedIntentRef = useRef<string | null>(null);
 
+
+  // Hook para cargar documentos de la conversación
+  const { data: conversationDocuments, refetch: refetchConversationDocuments } =
+    useConversationDocuments(
+      activeWorkspace?.id,
+      activeConversation?.id,
+    );
+
   // Handle WebSocket notifications
   const handleWSNotification = useCallback((msg: NotificationMessage) => {
     console.log("📩 ChatArea recibió notificación:", msg);
@@ -160,12 +168,7 @@ export function ChatArea() {
     conversationId: activeConversation?.id,
   });
 
-  // Hook para cargar documentos de la conversación
-  const { data: conversationDocuments, refetch: refetchConversationDocuments } =
-    useConversationDocuments(
-      activeWorkspace?.id,
-      activeConversation?.id,
-    );
+
 
   // Si hay error 404, la conversación no existe - limpiar el estado
   useEffect(() => {
