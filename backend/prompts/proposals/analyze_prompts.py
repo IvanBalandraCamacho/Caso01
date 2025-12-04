@@ -80,7 +80,7 @@ REGLAS CRÍTICAS (OBLIGATORIAS)
    - sin “palabras bonitas” vacías
    - sin marketing
    Cada párrafo debe tener 8-12 líneas, rico en contenido sustantivo.
-4. Captura obligatoria de entidades
+3. Captura obligatoria de entidades
    Si el texto incluye:
    - fechas
    - leyes
@@ -89,14 +89,14 @@ REGLAS CRÍTICAS (OBLIGATORIAS)
    - formatos
    - plazos
    → Debes incluirlos EXACTAMENTE.
-5. Mirada de Auditor Senior
+4. Mirada de Auditor Senior
    Tu redacción debe incluir: exposición de fallas, fragilidades técnicas, procesos obsoletos, deuda técnica, riesgos de continuidad, dependencia de conocimiento tácito, incumplimientos normativos, debilidad en integraciones, ausencias o vacíos críticos del RFP.
    Usa marcadores del tipo [NOMBRE_DEL_PROVEEDOR], [FECHA_ACTUAL], etc.
-9. La información que proporcionas a partir del documento debe de ser objetiva, sin caer en la ambiguedad
-10. Inferencia experta obligatoria : El modelo debe inferir, ampliar y contextualizar información no explícita en el RFP, basándose en mejores prácticas, conocimiento sectorial, riesgos típicos, brechas tecnológicas comunes y escenarios operativos habituales. El análisis debe ser superior, más amplio y más profundo que lo declarado por el cliente, sin limitarse únicamente al contenido textual del documento.
-11. Ampliación sectorial obligatoria: El análisis debe contextualizar el proyecto dentro de su sector (salud, financiero, gobierno, retail, etc.), explicando tendencias, presiones regulatorias, riesgos característicos, problemáticas recurrentes y desafíos institucionales propios de ese entorno. 
-12. Identificación de omisiones del RFP: El modelo debe señalar explícitamente vacíos informativos, riesgos no declarados, supuestos implícitos y elementos críticos que el cliente no ha especificado, explicando por qué estas omisiones tienen impacto estructural en el proyecto.
-8. Tono: Persuasivo, profesional, seguro y afirmativo.
+5. La información que proporcionas a partir del documento debe de ser objetiva, sin caer en la ambiguedad
+6. Inferencia experta obligatoria : El modelo debe inferir, ampliar y contextualizar información no explícita en el RFP, basándose en mejores prácticas, conocimiento sectorial, riesgos típicos, brechas tecnológicas comunes y escenarios operativos habituales. El análisis debe ser superior, más amplio y más profundo que lo declarado por el cliente, sin limitarse únicamente al contenido textual del documento.
+7. Ampliación sectorial obligatoria: El análisis debe contextualizar el proyecto dentro de su sector (salud, financiero, gobierno, retail, etc.), explicando tendencias, presiones regulatorias, riesgos característicos, problemáticas recurrentes y desafíos institucionales propios de ese entorno. 
+8. Identificación de omisiones del RFP: El modelo debe señalar explícitamente vacíos informativos, riesgos no declarados, supuestos implícitos y elementos críticos que el cliente no ha especificado, explicando por qué estas omisiones tienen impacto estructural en el proyecto.
+9. Tono: Persuasivo, profesional, seguro y afirmativo.
 
 
 ESTRUCTURA DE LA PROPUESTA A GENERAR:
