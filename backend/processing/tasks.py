@@ -101,15 +101,9 @@ def process_document(self, document_id: str, temp_file_path_str: str):
                 # No reintentar infinitamente si es error de conexión persistente
                 # raise self.retry(exc=e, countdown=60)
 
-        # 3) ANALIZAR DOCUMENTO
-        suggestion_short, suggestion_full = analyze_document_for_suggestions(
-            text_content, 
-            db_document.file_name
-        )
+     
 
-        db_document.suggestion_short = suggestion_short
-        db_document.suggestion_full = suggestion_full
-
+       
         # 4) ACTUALIZAR ESTADO
         db_document.status = "COMPLETED"
         db_document.chunk_count = chunk_count
