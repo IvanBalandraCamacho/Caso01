@@ -4,8 +4,8 @@ import json
 class AnalyzePrompts:
     
     @staticmethod
-    def create_analysis_JSON_prompt(pdf_text: str, max_length: int = 8000) -> str:
-        document_text = pdf_text[:max_length]
+    def create_analysis_JSON_prompt(document_text: str, max_length: int = 8000) -> str:
+        document_text = document_text[:max_length]
         prompt = f"""Analiza el siguiente documento RFP y extrae la siguiente información en formato JSON estricto:
 
         DOCUMENTO RFP:

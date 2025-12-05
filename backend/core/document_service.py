@@ -2,13 +2,57 @@ from docx import Document
 from docx.shared import Pt, RGBColor
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from docx.oxml.ns import qn
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, TableStyle
+from reportlab.lib.units import inch
+from reportlab.lib import colors
 from typing import Dict, Any
 from datetime import datetime
 from fastapi.responses import FileResponse
+from fastapi import HTTPException, status
 import tempfile
 from typing import Dict, Any
+from io import BytesIO
+import logging
 
-def generate_document(proposal_data: Dict[str, Any]) -> str:
+logger = logging.getLogger(__name__)
+
+def generate_document(proposal_data: Dict[str, Any], format: str = "docx") -> bytes:
+    """
+    Genera un documento con la propuesta comercial.
+    
+    Args:
+        proposal_data: Datos del análisis de la propuesta
+        format: Formato del documento ("docx" o "pdf")
+        
+    Returns:
+        Documento generado como bytes
+        
+    Raises:
+        HTTPException 400: Si el formato no es soportado
+        HTTPException 500: Si hay error en la generación
+    """
+    try:
+        if format.lower() == "docx":
+            return _generate_docx(proposal_data)
+        elif format.lower() == "pdf":
+            return _generate_pdf(proposal_data)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Formato no soportado: {format}. Use 'docx' o 'pdf'."
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al generar documento ({format}): {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al generar el documento: {str(e)}"
+        )
+
+def _generate_docx(proposal_data: Dict[str, Any]) -> bytes:
     """
     Genera un docuemto de Word basado en los datos de la propuesta proporcionados.
 
@@ -145,9 +189,104 @@ def generate_document(proposal_data: Dict[str, Any]) -> str:
         
     file_name = f"Propuesta_{proposal_data.get('cliente', 'Cliente')}.docx"
     
-    return FileResponse(
-        path=tmp_path,
-        filename=file_name,
-        media_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    # Guardar en memoria
+    output = BytesIO()
+    doc.save(output)
+    output.seek(0)
+    
+    # Devolver documento
+    return output.getvalue()
+
+def _generate_pdf(proposal_data: Dict[str, Any]) -> bytes:
+    """Genera documento PDF usando ReportLab"""
+    
+    output = BytesIO()
+    doc = SimpleDocTemplate(output, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
+    
+    styles = getSampleStyleSheet()
+    story = []
+    
+    # Estilos personalizados
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        textColor=colors.HexColor('#1e40af'),
+        spaceAfter=30,
+        alignment=1  # Center
     )
+    
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=14,
+        textColor=colors.HexColor('#1e3a8a'),
+        spaceAfter=12,
+        spaceBefore=12
+    )
+    
+    # Título
+    story.append(Paragraph("Propuesta Comercial", title_style))
+    story.append(Spacer(1, 0.3*inch))
+    
+    # Cliente
+    story.append(Paragraph("Cliente", heading_style))
+    story.append(Paragraph(proposal_data.get("cliente", "N/A"), styles['Normal']))
+    story.append(Spacer(1, 0.15*inch))
+    
+    # Alcance Económico
+    story.append(Paragraph("Alcance Económico", heading_style))
+    alcance = proposal_data.get("alcance_economico", {})
+    presupuesto_text = f"<b>Presupuesto:</b> {alcance.get('presupuesto', 'N/A')} {alcance.get('moneda', 'USD')}"
+    story.append(Paragraph(presupuesto_text, styles['Normal']))
+    story.append(Spacer(1, 0.15*inch))
+    
+    # Fecha Entrega
+    story.append(Paragraph("Fecha de Entrega", heading_style))
+    story.append(Paragraph(proposal_data.get("fecha_entrega", "N/A"), styles['Normal']))
+    story.append(Spacer(1, 0.15*inch))
+    
+    # Riesgos
+    riesgos = proposal_data.get("riesgos_detectados", [])
+    if riesgos:
+        story.append(Paragraph("Riesgos Detectados", heading_style))
+        for riesgo in riesgos:
+            story.append(Paragraph(f"• {riesgo}", styles['Normal']))
+        story.append(Spacer(1, 0.15*inch))
+    
+    # Preguntas Sugeridas
+    preguntas = proposal_data.get("preguntas_sugeridas", [])
+    if preguntas:
+        story.append(Paragraph("Preguntas Sugeridas", heading_style))
+        for pregunta in preguntas:
+            story.append(Paragraph(f"• {pregunta}", styles['Normal']))
+        story.append(Spacer(1, 0.15*inch))
+    
+    # Equipo Sugerido
+    equipo = proposal_data.get("equipo_sugerido", [])
+    if equipo:
+        story.append(Paragraph("Equipo Sugerido", heading_style))
+        for miembro in equipo:
+            nombre = miembro.get('nombre', 'N/A')
+            rol = miembro.get('rol', 'N/A')
+            exp = miembro.get('experiencia', 'N/A')
+            skills = ', '.join(miembro.get('skills', []))
+            
+            miembro_text = f"<b>{nombre}</b><br/>Rol: {rol}<br/>Experiencia: {exp}<br/>Skills: {skills}"
+            story.append(Paragraph(miembro_text, styles['Normal']))
+            story.append(Spacer(1, 0.1*inch))
+        story.append(Spacer(1, 0.15*inch))
+    
+    # Tecnologías
+    techs = proposal_data.get("tecnologias_requeridas", [])
+    if techs:
+        story.append(Paragraph("Tecnologías Requeridas", heading_style))
+        story.append(Paragraph(", ".join(techs), styles['Normal']))
+    
+    # Construir PDF
+    doc.build(story)
+    output.seek(0)
+    
+    # Devolver documento
+    return output.getvalue()
 

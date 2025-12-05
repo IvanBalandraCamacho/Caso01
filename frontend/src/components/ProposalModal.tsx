@@ -32,6 +32,17 @@ export default function ProposalModal({ open, onClose }: ProposalModalProps) {
   const handleAnalyze = async () => {
     if (!selectedFile) return;
 
+    // Validar tipos permitidos (PDF y Word)
+    const allowed = [
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ];
+    if (!allowed.includes(selectedFile.type)) {
+      alert("Formato no soportado. Por favor sube un archivo PDF o DOCX.");
+      return;
+    }
+
     setState("analyzing");
     try {
       const result = await analyzeMutation.mutateAsync(selectedFile);
@@ -47,14 +58,17 @@ export default function ProposalModal({ open, onClose }: ProposalModalProps) {
   const handleGenerateWord = async () => {
     if (!analysis) return;
 
+    // Determinar formato y generar
+    const format = "docx";
+
     try {
-      const blob = await generateMutation.mutateAsync(analysis);
+      const blob = await generateMutation.mutateAsync({proposal_data: analysis, format});
 
       // Descargar el archivo
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Propuesta_${analysis.cliente.replace(/\s+/g, "_")}.docx`;
+      a.download = `Propuesta_${analysis.cliente.replace(/\s+/g, "_")}.${format}`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -65,6 +79,30 @@ export default function ProposalModal({ open, onClose }: ProposalModalProps) {
     } catch (error) {
       console.error("Error generating document:", error);
       alert("Error al generar el documento. Intente nuevamente.");
+    }
+  };
+
+  const handleGeneratePDF = async () => {
+    if (!analysis) return;
+
+    const format = "pdf";
+    try {
+      const blob = await generateMutation.mutateAsync({proposal_data: analysis, format});
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Propuesta_${analysis.cliente.replace(/\s+/g, "_")}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      // Cerrar modal
+      handleClose();
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      alert("Error al generar el PDF. Intente nuevamente.");
     }
   };
 
@@ -90,11 +128,11 @@ export default function ProposalModal({ open, onClose }: ProposalModalProps) {
             <div className="border-2 border-dashed  border-gray-600 rounded-xl p-8 text-center">
               <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
               <p className="text-sm text-gray-400 mb-4">
-                Sube el archivo PDF del RFP para análisis automático
+                Sube el archivo PDF o DOCX del RFP para análisis automático
               </p>
               <Input
                 type="file"
-                accept=".pdf"
+                accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 onChange={handleFileChange}
                 className="max-w-md mx-auto"
               />
@@ -164,8 +202,23 @@ export default function ProposalModal({ open, onClose }: ProposalModalProps) {
               </div>
             </div>
 
-            {/* Riesgos Detectados */}
-            {analysis.riesgos_detectados.length > 0 && (
+            {/* Riesgos Detectados -> ahora usamos "Objetivo General" provisto por el LLM.
+                Si por compatibilidad aún existe "riesgos_detectados", se muestra como fallback */}
+            {(analysis.objetivo_general && analysis.objetivo_general.length > 0) ? (
+              <div className="bg-orange-50 p-4 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <FileText className="h-5 w-5 text-orange-600 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-orange-900 mb-2">Objetivo General</h3>
+                    <div className="space-y-2 text-sm text-orange-700">
+                      {analysis.objetivo_general.map((obj: string, idx: number) => (
+                        <p key={idx} className="whitespace-pre-line">• {obj}</p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (analysis.riesgos_detectados && analysis.riesgos_detectados.length > 0) ? (
               <div className="bg-orange-50 p-4 rounded-lg">
                 <div className="flex items-start gap-3">
                   <AlertCircle className="h-5 w-5 text-orange-600 mt-0.5" />
@@ -181,7 +234,7 @@ export default function ProposalModal({ open, onClose }: ProposalModalProps) {
                   </div>
                 </div>
               </div>
-            )}
+            ) : null}
 
             {/* Preguntas Sugeridas */}
             {analysis.preguntas_sugeridas.length > 0 && (
@@ -256,7 +309,23 @@ export default function ProposalModal({ open, onClose }: ProposalModalProps) {
                     Generando...
                   </>
                 ) : (
-                  "📄 Generar Documento Word"
+                  "📄 Generar Word"
+                )}
+              </Button>
+              <Button
+                onClick={handleGeneratePDF}
+                disabled={generateMutation.isPending}
+                className="flex-1 !rounded-[8]"
+                size="lg"
+                variant="secondary"
+              >
+                {generateMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generando...
+                  </>
+                ) : (
+                  "📕 Generar PDF"
                 )}
               </Button>
               <Button
