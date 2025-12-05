@@ -194,6 +194,8 @@ TÍTULO → Debe describir con precisión el alcance solicitado por el RFP.
 - Nombre exacto del cliente
 - Fecha oficial del RFP (si está disponible)
 
+RESUMEN EJECUTIVO: genera un resumen ejecutivo estratégico que interprete la necesidad del cliente, proponga una solución diferenciadora, exponga beneficios de negocio (ROI, eficiencia, reducción de riesgos/costos), resuma alcance y tiempos de forma estratégica, destaque credenciales relevantes del proveedor y finalice con un llamado claro a la acción, sin describir el documento, sino transformándolo en valor.
+
 1) ANÁLISIS DEL PROYECTO
 1.1 Entendimiento del Problema (análisis crítico, extenso, 8-12 líneas)
    - Objetivo General (impacto institucional y/o regulatorio)
@@ -302,7 +304,7 @@ REGUNTAS SUGERIDAS
             1.
             2.
             3.
-            .... (Todas las preguntas necesarias)
+            .... (Todas las preguntas necesarias, no pongas todas las preguntas si no es necesario, depende de si la información del RFP/RFI falta)
 """
 
         return prompt
