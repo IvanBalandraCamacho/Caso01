@@ -672,8 +672,9 @@ const analyzeProposalFile = async (file: File): Promise<ProposalAnalysis> => {
  * 
  * @param proposalData - Datos del análisis de la propuesta
  */
-const generateProposalDocx = async (proposalData: ProposalAnalysis): Promise<Blob> => {
-  const { data } = await api.post<Blob>("/task/generate", proposalData, {
+const generateProposalDocx = async (request: { proposal_data: ProposalAnalysis; format: "docx" | "pdf" }): Promise<Blob> => {
+  const { data } = await api.post<Blob>("/task/generate", request.proposal_data, {
+    params: { format: request.format },
     responseType: "blob",
   });
   return data;

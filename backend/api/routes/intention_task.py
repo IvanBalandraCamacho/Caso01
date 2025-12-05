@@ -8,7 +8,7 @@ Este módulo proporciona endpoints para:
 - Retornar perfiles de las APIS de Tivit según la intención del usuario
 """
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, Form, Response
 from sqlalchemy.orm import Session
 from typing import Dict, Any, Optional
 from api.service.impl.proposals_service_impl import ProposalsServiceImpl
@@ -51,7 +51,6 @@ async def get_analyze(
     if file:
         logger.info(f"Nombre: {file.filename}")
         logger.info(f"Tipo: {file.content_type}")
-        logger.info(f"Content-Type recibido: {file.content_type}")
 
         try:
             analysis = await service.analyze(
@@ -83,36 +82,63 @@ def get_analyze_stream(
 @router.post(
     "/task/generate",
     summary="Generar documento de propuesta",
-    description="Genera un documento Word con la propuesta comercial"
+    description="Genera un documento Word o PDF con la propuesta comercial"
 )
 async def generate_proposal_document(
     proposal_data: Dict[str, Any],
+    format: str = "docx",
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(database.get_db)
 ):
     """
-    Genera un documento Word con la propuesta comercial.
+    Genera un documento con la propuesta comercial.
     
     Args:
         proposal_data: Datos del análisis de la propuesta
+        format: Formato del documento ("docx" o "pdf")
         current_user: Usuario autenticado
         db: Sesión de base de datos
         
     Returns:
-        Documento Word generado
+        Documento generado
         
     Raises:
+        HTTPException 400: Si el formato no es válido
         HTTPException 500: Si hay error en la generación
     """
     
     try:
-        return document_service.generate_document(proposal_data)
-        logger.info(f"Documento de propuesta generado por usuario: {current_user.email}")
+        # Validar formato
+        if format.lower() not in ["docx", "pdf"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Formato no soportado: {format}. Use 'docx' o 'pdf'."
+            )
+        
+        # Generar documento
+        doc_bytes = document_service.generate_document(proposal_data, format=format)
+        logger.info(f"Documento de propuesta ({format}) generado por usuario: {current_user.email}")
+        
+        # Determinar media type y extensión según formato
+        if format.lower() == "pdf":
+            media_type = "application/pdf"
+            filename = f"Propuesta_{proposal_data.get('cliente', 'documento').replace(' ', '_')}.pdf"
+        else:  # docx
+            media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            filename = f"Propuesta_{proposal_data.get('cliente', 'documento').replace(' ', '_')}.docx"
+        
+        return Response(
+            content=doc_bytes, 
+            media_type=media_type,
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error al generar documento: {str(e)}")
+        logger.error(f"Error al generar documento ({format}): {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error al generar el documento: {str(e)}"

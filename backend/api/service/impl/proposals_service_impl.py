@@ -16,10 +16,11 @@ class ProposalsServiceImpl(ProposalsService):
     ):
         if file:
             logger.info(file)
-            FileUtil.is_pdf(file)
+            FileUtil.validate_supported_file(file)
             try:
-                pdf_text = await FileUtil.extract_text_from_pdf(file)
-                prompt = AnalyzePrompts.create_analysis_JSON_prompt(pdf_text = pdf_text, max_length=8000)
+                # Validar y extraer texto soportando PDF o DOCX
+                document_text = await FileUtil.extract_text(file)
+                prompt = AnalyzePrompts.create_analysis_JSON_prompt(document_text = document_text, max_length=8000)
                 return self._analyze_with_ia(prompt)
             except HTTPException:
                 raise
