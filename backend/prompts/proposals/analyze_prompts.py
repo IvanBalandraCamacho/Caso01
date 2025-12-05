@@ -36,9 +36,56 @@ class AnalyzePrompts:
         1. Extrae ÚNICAMENTE la información presente en el documento
         2. Si algo no está especificado, usa "No especificado" o arrays vacíos
         3. Para objetivo general, debe ser concreto y estratégico. Evita frases genéricas. El objetivo debe describir con precisión el propósito institucional del proyecto
-        4. Para preguntas, sugiere clarificaciones necesarias para el cliente, y no te limites, genera todas las que desees
-        5. Para el equipo, sugiere perfiles basados en las tecnologías y alcance
-        6. Retorna SOLO el JSON, sin texto adicional"""
+        4. Para el equipo, sugiere perfiles basados en las tecnologías y alcance
+        5. Retorna SOLO el JSON, sin texto adicional
+        6. Analiza TODO el documento RFP/RFI y genera solo preguntas objetivas, técnicas y obligatorias para evitar ambigüedad contractual, enfocándote en información faltante, ambigua o inconclusa en: alcance funcional, arquitectura, integraciones, normativas aplicables, datos sensibles, seguridad, SLAs/penalidades, volúmenes transaccionales, licenciamiento, ambientes, soporte, propiedad intelectual y restricciones operativas. Cada pregunta debe ser específica, verificable y no genérica, similar al estilo de la referencia dada. Prohibido hacer preguntas vagas. Si una duda impacta costo, plazo, responsabilidad o cumplimiento legal, destácala explícitamente con: “(impacto en costo/plazo/legalidad)”.
+            Toma de referencia:
+            ¿Cuál es el promedio mensual histórico de incidencias registradas por el sistema y por servicio o plataforma?
+            ¿Qué proporción corresponde a incidencias críticas, altas y medias?
+            ¿La Superintendencia cuenta con herramienta propia de Service Desk o debe proveerla el oferente?
+            ¿Existe actualmente una base de conocimiento para soporte nivel 1 y 1.5?
+            ¿Cuál es la expectativa de tiempo de resolución para aplicaciones nivel 1.5?
+            ¿Cómo se deben reportar los errores detectados (correo, sistema de tickets, logs centralizados)?
+            ¿Se desea una mesa de ayuda telefónica, soporte remoto o ambas para el primer nivel de soporte?
+            ¿Cómo se maneja el proceso de escalamiento en caso de incidentes en los ambientes de desarrollo y producción?
+            ¿Se puede recibir un inventario actualizado de equipos por sede, tipo y estado?
+            ¿Se cuenta con etiquetado estandarizado por activo (código, serie, ubicación)?
+            ¿Por política del cliente, el proveedor puede aprovisionar laptops y licencias o serán provistas por el cliente?
+            ¿Qué aplicaciones tienen integraciones con terceros, APIs o servicios externos?
+            ¿Se menciona la creación de conjuntos de APIs dentro del alcance?
+            ¿Se requiere una plataforma de gestión de APIs?
+            ¿Se tiene una estimación del número de consultas o transacciones concurrentes esperadas en hora pico?
+            ¿Todos los ambientes (DEV, QA, Preproducción, Producción) serán provistos por la Superintendencia?
+            ¿Es correcto interpretar que el cliente proveerá los ambientes de desarrollo y QA para el trabajo de las células?
+            ¿El oferente tendrá responsabilidades sobre actualizaciones de sistema operativo, librerías y dependencias?
+            ¿Es necesario que la solución sea On-Premise o en la nube? En caso de nube, especificar el partner (Azure, AWS, GCP).
+            ¿El cliente ya cuenta con licencias para plataformas asociadas a dashboards, monitoreo, gestión o integración, o se deben incluir?
+            ¿Cuántos datasets activos existen en el Data Lake?
+            ¿Cuál es la complejidad estimada del modelo de datos PostgreSQL (tablas, vistas, procedimientos, triggers, particiones)?
+            ¿Cuáles son las fuentes de datos principales que recibirá el sistema a desarrollar?
+            ¿Los datos procesados contienen información sensible o confidencial (financiera, personal, etc.)?
+            ¿Hay requerimientos de seguridad, privacidad o normativos que debamos considerar?
+            ¿Se necesita trazabilidad completa de cada acción que ejecute el sistema?
+            ¿Qué controles de acceso deben considerarse (usuarios, contraseñas, roles)?
+            ¿Quién sería el responsable de ejecutar el Ethical Hacking de los desarrollos entregados?
+            ¿Es válido proponer profesionales ubicados en oficinas del oferente en el extranjero si cumplen con el perfil requerido?
+            ¿Para efectos de calificación, es válido presentar experiencias de oficinas extranjeras?
+            ¿Se espera o requiere alguna certificación específica para los perfiles de la célula?
+            ¿Cuál es el plazo esperado de aprovisionamiento ante rotación o nueva solicitud de perfiles?
+            ¿Cuál es el máximo de días para el Onboarding o transición de perfiles?
+            En caso de ausencias temporales (vacaciones, licencias, descanso médico), ¿cuál es el tratamiento esperado?
+            ¿El cliente proporcionará una herramienta para gestión y seguimiento de proyectos (hitos, avances, registro)? Si requiere licencias (p. ej. Jira), ¿quién las costea?
+            ¿Las reuniones de seguimiento serán orquestadas por el cliente o por el oferente? ¿Cuál sería la frecuencia y si se requiere presencialidad?
+            ¿Existe un rol o comité del cliente con potestad de toma de decisiones y aprobación?
+            ¿Se tiene un estimado de participantes para las transferencias de conocimiento?
+            ¿Se debe proponer tarifa fuera de horario hábil por atención de incidentes?
+            ¿El diseño UX/UI será generado por el oferente o el cliente lo proporcionará?
+            En caso de migración, ¿qué metodología se espera? ¿Cuántos organismos serían incluidos y en qué formato?
+            ¿Se necesita un dashboard o portal para monitorar la ejecución de robots o automatizaciones?
+            ¿Quién será responsable de administrar los robots (TI, negocio o proveedor)?
+            ¿De dónde provienen los datos de entrada (formularios web, correos, Excel, BD, APIs, aplicaciones)?
+            ¿Cuál es el período de garantía exigido post pase a producción de un aplicativo?
+        """
         return prompt
 
     @staticmethod
@@ -203,28 +250,59 @@ INSTRUCCIONES FINALES PARA CUALQUIER RFP
 
 
 REGUNTAS SUGERIDAS
- NOTA: Debes de analizar todo el documento y verificar si falta información relevante para hacer diferentes preguntas objetivas hacia el que generó el RFP y así ahorrarnos el trabajo de buscar lo que falta manualmente, aquí te muestro unos emeplos de preguntas.
-- El cliente ya cuenta con licencia para una plataformas o se debe incluir? Si se habla de tema de dashboard o algo relacionado?
-- Es necesario que sea en premis o en la nube? Especificar el partner donde se debe
-desarrollar esta solución 
-- Se menciona la creación de conjunto de APIs?
-- Se requiere alguna plataforma de gestión de APIs?
-- Se tiene una estimación del número de consultas o transacciones concurrentes que se
-esperen a hora pico? (Esta pregunta va a asociada más que todo a la definición una arquitectura, para que cuando llegue el momento de bosquejar algo se tenga esta variable de concurrencia en el radar.)
-- El cliente su entorno de trabajo propio o trabajaríamos en nuestros ambientes excepto producción en donde si se colocaría en la infraestructura del cliente
-- En caso de migración, que metodología se implementaría para una migración, cuántos organismo serían, en qué formato...
-- En cuanto al equipo, existe un nombre de rol de trabajo específico? Se puede presentar personal de Tivit fuera del país?
-- Se estima frecuencia o cantidad de reuniones presenciales?
-- Quien es responsable de la ejecución del Ethical Hacking?
-- Creamos el UX/UI o ya el cliente lo tiene y nos lo va compartir durante el proyecto?
-- Existe alguna herramienta de gestión para el desarrollo de software? (Ejemplo, si el cliente quiere que trabaje en Jira, quien va a pagar esa licencia Jira? Tivit no tiene licenciamiento de Jira para regalar, debería costearse y adquirirse dependiendo del cliente)
-- Proceso de aprobación: quien son los que tienen potestad de tomar alguna decisión por parte del cliente?
-ESTRUCTURA EN CASO DE FALTE INFORMACIÓN:
-PREGUNTAS SUGERIDAS YA QUE NO HABÍA INFORMACIÓN EN EL RFP:
-1. Pregunta 1
-2. Pregunta 2
-3. Pregunta 3
-... (Pueden ser cuantas preguntas como sean necesarias)
+ NOTA: Analiza TODO el documento RFP/RFI y genera solo preguntas objetivas, técnicas y obligatorias para evitar ambigüedad contractual, enfocándote en información faltante, ambigua o inconclusa en: alcance funcional, arquitectura, integraciones, normativas aplicables, datos sensibles, seguridad, SLAs/penalidades, volúmenes transaccionales, licenciamiento, ambientes, soporte, propiedad intelectual y restricciones operativas. Cada pregunta debe ser específica, verificable y no genérica, similar al estilo de la referencia dada. Prohibido hacer preguntas vagas. Si una duda impacta costo, plazo, responsabilidad o cumplimiento legal, destácala explícitamente con: “(impacto en costo/plazo/legalidad)”.
+            Toma de referencia:
+            ¿Cuál es el promedio mensual histórico de incidencias registradas por el sistema y por servicio o plataforma?
+            ¿Qué proporción corresponde a incidencias críticas, altas y medias?
+            ¿La Superintendencia cuenta con herramienta propia de Service Desk o debe proveerla el oferente?
+            ¿Existe actualmente una base de conocimiento para soporte nivel 1 y 1.5?
+            ¿Cuál es la expectativa de tiempo de resolución para aplicaciones nivel 1.5?
+            ¿Cómo se deben reportar los errores detectados (correo, sistema de tickets, logs centralizados)?
+            ¿Se desea una mesa de ayuda telefónica, soporte remoto o ambas para el primer nivel de soporte?
+            ¿Cómo se maneja el proceso de escalamiento en caso de incidentes en los ambientes de desarrollo y producción?
+            ¿Se puede recibir un inventario actualizado de equipos por sede, tipo y estado?
+            ¿Se cuenta con etiquetado estandarizado por activo (código, serie, ubicación)?
+            ¿Por política del cliente, el proveedor puede aprovisionar laptops y licencias o serán provistas por el cliente?
+            ¿Qué aplicaciones tienen integraciones con terceros, APIs o servicios externos?
+            ¿Se menciona la creación de conjuntos de APIs dentro del alcance?
+            ¿Se requiere una plataforma de gestión de APIs?
+            ¿Se tiene una estimación del número de consultas o transacciones concurrentes esperadas en hora pico?
+            ¿Todos los ambientes (DEV, QA, Preproducción, Producción) serán provistos por la Superintendencia?
+            ¿Es correcto interpretar que el cliente proveerá los ambientes de desarrollo y QA para el trabajo de las células?
+            ¿El oferente tendrá responsabilidades sobre actualizaciones de sistema operativo, librerías y dependencias?
+            ¿Es necesario que la solución sea On-Premise o en la nube? En caso de nube, especificar el partner (Azure, AWS, GCP).
+            ¿El cliente ya cuenta con licencias para plataformas asociadas a dashboards, monitoreo, gestión o integración, o se deben incluir?
+            ¿Cuántos datasets activos existen en el Data Lake?
+            ¿Cuál es la complejidad estimada del modelo de datos PostgreSQL (tablas, vistas, procedimientos, triggers, particiones)?
+            ¿Cuáles son las fuentes de datos principales que recibirá el sistema a desarrollar?
+            ¿Los datos procesados contienen información sensible o confidencial (financiera, personal, etc.)?
+            ¿Hay requerimientos de seguridad, privacidad o normativos que debamos considerar?
+            ¿Se necesita trazabilidad completa de cada acción que ejecute el sistema?
+            ¿Qué controles de acceso deben considerarse (usuarios, contraseñas, roles)?
+            ¿Quién sería el responsable de ejecutar el Ethical Hacking de los desarrollos entregados?
+            ¿Es válido proponer profesionales ubicados en oficinas del oferente en el extranjero si cumplen con el perfil requerido?
+            ¿Para efectos de calificación, es válido presentar experiencias de oficinas extranjeras?
+            ¿Se espera o requiere alguna certificación específica para los perfiles de la célula?
+            ¿Cuál es el plazo esperado de aprovisionamiento ante rotación o nueva solicitud de perfiles?
+            ¿Cuál es el máximo de días para el Onboarding o transición de perfiles?
+            En caso de ausencias temporales (vacaciones, licencias, descanso médico), ¿cuál es el tratamiento esperado?
+            ¿El cliente proporcionará una herramienta para gestión y seguimiento de proyectos (hitos, avances, registro)? Si requiere licencias (p. ej. Jira), ¿quién las costea?
+            ¿Las reuniones de seguimiento serán orquestadas por el cliente o por el oferente? ¿Cuál sería la frecuencia y si se requiere presencialidad?
+            ¿Existe un rol o comité del cliente con potestad de toma de decisiones y aprobación?
+            ¿Se tiene un estimado de participantes para las transferencias de conocimiento?
+            ¿Se debe proponer tarifa fuera de horario hábil por atención de incidentes?
+            ¿El diseño UX/UI será generado por el oferente o el cliente lo proporcionará?
+            En caso de migración, ¿qué metodología se espera? ¿Cuántos organismos serían incluidos y en qué formato?
+            ¿Se necesita un dashboard o portal para monitorar la ejecución de robots o automatizaciones?
+            ¿Quién será responsable de administrar los robots (TI, negocio o proveedor)?
+            ¿De dónde provienen los datos de entrada (formularios web, correos, Excel, BD, APIs, aplicaciones)?
+            ¿Cuál es el período de garantía exigido post pase a producción de un aplicativo?
+
+            Enlista las preguntas :
+            1.
+            2.
+            3.
+            .... (Todas las preguntas necesarias)
 """
 
         return prompt
