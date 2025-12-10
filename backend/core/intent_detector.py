@@ -7,6 +7,9 @@ Responde ÚNICAMENTE con uno de estos valores (sin texto extra):
 
 - GENERATE_PROPOSAL  → Si el usuario quiere crear, generar o redactar una propuesta, documento, informe, reporte o similar.
 - GENERAL_QUERY    → Para preguntas generales o conversación normal o si el usuario quiere revisar, examinar, comparar, evaluar o resumir un documento.
+- REQUIREMENTS_MATRIX → Si el usuario quiere generar un plan de requisitos, matriz de requisitos o requisitos funcionales.
+- PREELIMINAR_PRICE_QUOTE → Si el usuario quiere obtener una cotización preliminar o estimación de costos.
+- LEGAL_RISKS → Si el usuario quiere identificar los riesgos legales o regulatorios asociados a un proyecto.
 
 Ejemplo:
 Usuario: "Genera una propuesta comercial"
@@ -14,6 +17,15 @@ Respuesta: GENERATE_PROPOSAL
 
 Usuario: "Realiza un resumen del documento adjunto/ analiza este informe/ indicame el personal necesario para el proyecto"
 Respuesta: GENERAL_QUERY
+
+Usuario: "Crea una matriz de requisitos según el archivo proporcionado"
+Respuesta: REQUIREMENTS_MATRIX
+
+Usuario: "Quiero saber el costo preelimiar de la propuesta"
+Respuesta: PREELIMINAR_PRICE_QUOTE
+
+Usuario: "¿Cuáles son los riesgos legales asociados a este proyecto?"
+Respuesta: LEGAL_RISKS
 """
 
 def classify_intent(user_query: str):
@@ -32,5 +44,11 @@ def classify_intent(user_query: str):
         return "GENERATE_PROPOSAL"
     elif "GENERAL_QUERY" in response:
         return "GENERAL_QUERY"
-    
-    return "GENERAL_QUERY"  # Default
+    elif "REQUIREMENTS_MATRIX" in response:
+        return "REQUIREMENTS_MATRIX"
+    elif "PREELIMINAR_PRICE_QUOTE" in response:
+        return "PREELIMINAR_PRICE_QUOTE"
+    elif "LEGAL_RISKS" in response:
+        return "LEGAL_RISKS"
+    else:
+        return "GENERAL_QUERY"

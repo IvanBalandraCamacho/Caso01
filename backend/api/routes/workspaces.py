@@ -949,7 +949,7 @@ async def chat_with_workspace(
         if intent == "GENERATE_PROPOSAL":
             response_stream = intention_task.get_analyze_stream(query=chat_request.query,relevant_chunks=relevant_chunks,chat_model= chat_request.model, workspace_instructions= workspace_instructions)
         elif intent == "GENERAL_QUERY":
-            response_stream = intention_task.respond_chat(
+            response_stream = intention_task.general_query_chat(
                 chat_request.query, 
                 relevant_chunks, 
                 chat_request.model, 

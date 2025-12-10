@@ -144,7 +144,7 @@ async def generate_proposal_document(
             detail=f"Error al generar el documento: {str(e)}"
         )
 
-def respond_chat(
+def general_query_chat(
     query: str,
     relevant_chunks: Dict[str, Any],
     chat_model: str,
@@ -197,12 +197,165 @@ def respond_chat(
             detail=f"Error al generar la respuesta: {str(e)}"
         )
         
+def requirements_matrix_chat(
+    query: str,
+    relevant_chunks: Dict[str, Any],
+    chat_model: str,
+    workspace_instructions: str,
+    chat_history: list[dict] = None
+):
+    """
+    Responde a una consulta general usando IA.
+    
+    Args:
+        query: Pregunta del usuario
+        relevant_chunks: Chunks de contexto relevantes
+        chat_model: Modelo de chat a usar
+        workspace_instructions: Instrucciones del workspace
+        chat_history: Historial de mensajes previos
+        
+    Returns:
+        Respuesta generada
+        
+    Raises:
+        HTTPException 500: Si hay error en la generación
+    """
+
+    # Construir prompt simple
+    prompt = f"""
+    Indica un plan de requisitos funcionales y no funcionales,
+    utilizando los requisitos proporcionados en el documento adjunto.
+    """
+    
+    # Construir prompt completo
+    full_prompt = f"""
+        prompt: {prompt}
+        pregunta: {query}
+        system_instructions: {workspace_instructions}
+    """
+
+    try:
+        # Generar respuesta usando LLM service
+        response = llm_service.generate_response_stream(
+            full_prompt, 
+            relevant_chunks, 
+            chat_model,
+            chat_history=chat_history
+        )
+        return response
+    except Exception as e:
+        logger.info(f"No se pudo completar el análisis con el documento adjunto {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al generar la respuesta: {str(e)}"
+        )
+   
+def preeliminar_price_quote_chat(
+    query: str,
+    relevant_chunks: Dict[str, Any],
+    chat_model: str,
+    workspace_instructions: str,
+    chat_history: list[dict] = None
+):
+    """
+    Responde a una consulta general usando IA.
+    
+    Args:
+        query: Pregunta del usuario
+        relevant_chunks: Chunks de contexto relevantes
+        chat_model: Modelo de chat a usar
+        workspace_instructions: Instrucciones del workspace
+        chat_history: Historial de mensajes previos
+        
+    Returns:
+        Respuesta generada
+        
+    Raises:
+        HTTPException 500: Si hay error en la generación
+    """
+
+    # Construir prompt simple
+    prompt = f"""
+    Proporciona una cotización preliminar o estimación de costos
+    basada en la información del documento adjunto.
+    Si no hay información suficiente, responde con "No hay información de costos en el documento adjunto".
+    """
+    
+    # Construir prompt completo
+    full_prompt = f"""
+        prompt: {prompt}
+        pregunta: {query}
+        system_instructions: {workspace_instructions}
+    """
+
+    try:
+        # Generar respuesta usando LLM service
+        response = llm_service.generate_response_stream(
+            full_prompt, 
+            relevant_chunks, 
+            chat_model,
+            chat_history=chat_history
+        )
+        return response
+    except Exception as e:
+        logger.info(f"No se pudo completar el análisis con el documento adjunto {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al generar la respuesta: {str(e)}"
+        )
+        
+def legal_risks_chat(
+    query: str,
+    relevant_chunks: Dict[str, Any],
+    chat_model: str,
+    workspace_instructions: str,
+    chat_history: list[dict] = None
+):
+    """
+    Responde a una consulta general usando IA.
+    
+    Args:
+        query: Pregunta del usuario
+        relevant_chunks: Chunks de contexto relevantes
+        chat_model: Modelo de chat a usar
+        workspace_instructions: Instrucciones del workspace
+        chat_history: Historial de mensajes previos
+        
+    Returns:
+        Respuesta generada
+        
+    Raises:
+        HTTPException 500: Si hay error en la generación
+    """
+
+    # Construir prompt simple
+    prompt = f"""
+    Identifica los riesgos legales o regulatorios asociados
+    al documento adjunto.
+    """
+    
+    # Construir prompt completo
+    full_prompt = f"""
+        prompt: {prompt}
+        pregunta: {query}
+        system_instructions: {workspace_instructions}
+    """
+
+    try:
+        # Generar respuesta usando LLM service
+        response = llm_service.generate_response_stream(
+            full_prompt, 
+            relevant_chunks, 
+            chat_model,
+            chat_history=chat_history
+        )
+        return response
+    except Exception as e:
+        logger.info(f"No se pudo completar el análisis con el documento adjunto {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al generar la respuesta: {str(e)}"
+        )
         
 # QUEDA PENDIENTE IMPLEMENTAR ESTE ENDPOINT DE OBTENER PERFILES
 # async def get_profiles()
-
-# ADEMAS UNA VEZ SEA POSIBLE ARREGLAR LA ARQUITECTURA (USAR SERVICES Y IMPL)
-
-#  TOMAR EN CUENTA QUE EL ENDPOINT DE GENERAR DOCUMENTO
-#  SE GENERE A PARTIR DE LA ULTIMA PROPUESTA ANALIZADA
-#  EN EL CHAT

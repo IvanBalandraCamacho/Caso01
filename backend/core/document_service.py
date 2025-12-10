@@ -147,18 +147,8 @@ def _generate_docx(proposal_data: Dict[str, Any]) -> bytes:
     else:
         doc.add_paragraph("No se especificaron tecnologías requeridas.")
 
-    # ============ SECCIÓN: RIESGOS ============
-    doc.add_paragraph("6. Riesgos Identificados", style="CorporateHeader")
-    riesgos = proposal_data.get('riesgos_detectados', [])
-
-    if riesgos:
-        for riesgo in riesgos:
-            doc.add_paragraph(f"• {riesgo}", style="List Bullet")
-    else:
-        doc.add_paragraph("No se identificaron riesgos relevantes.")
-
     # ============ SECCIÓN: PREGUNTAS ============
-    doc.add_paragraph("7. Preguntas para Aclaración", style="CorporateHeader")
+    doc.add_paragraph("6. Preguntas para Aclaración", style="CorporateHeader")
     preguntas = proposal_data.get('preguntas_sugeridas', [])
 
     if preguntas:
@@ -168,7 +158,7 @@ def _generate_docx(proposal_data: Dict[str, Any]) -> bytes:
         doc.add_paragraph("No se registraron preguntas.")
 
     # ============ SECCIÓN: EQUIPO ============
-    doc.add_paragraph("8. Equipo Propuesto", style="CorporateHeader")
+    doc.add_paragraph("7. Equipo Propuesto", style="CorporateHeader")
     equipo = proposal_data.get('equipo_sugerido', [])
 
     for miembro in equipo:
@@ -246,13 +236,10 @@ def _generate_pdf(proposal_data: Dict[str, Any]) -> bytes:
     story.append(Paragraph(proposal_data.get("fecha_entrega", "N/A"), styles['Normal']))
     story.append(Spacer(1, 0.15*inch))
     
-    # Riesgos
-    riesgos = proposal_data.get("riesgos_detectados", [])
-    if riesgos:
-        story.append(Paragraph("Riesgos Detectados", heading_style))
-        for riesgo in riesgos:
-            story.append(Paragraph(f"• {riesgo}", styles['Normal']))
-        story.append(Spacer(1, 0.15*inch))
+    #Objetivo General
+    story.append(Paragraph("Objetivo General", heading_style))
+    story.append(Paragraph(proposal_data.get("objetivo_general", "N/A"), styles['Normal']))
+    story.append(Spacer(1, 0.15*inch))
     
     # Preguntas Sugeridas
     preguntas = proposal_data.get("preguntas_sugeridas", [])

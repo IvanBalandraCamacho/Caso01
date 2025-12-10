@@ -1,6 +1,3 @@
-# ESTE ARCHIVO SEGURAMENTE SE ELIMINE PRONTO
-# YA QUE LA CREACIÓN DEL DOCUMENTO SE GENERARÁ DESDE PYTHON DIRECTAMENTE
-
 """
 Rutas para generación de documentos descargables sin OAuth.
 Sistema simplificado que genera documentos en TXT, Markdown o PDF.
