@@ -54,6 +54,8 @@ interface ChatMessage {
   modelUsed?: string;
   /** Extracted proposal data if this message contains a proposal analysis */
   proposalData?: ProposalAnalysis;
+  /** Flag to indicate this is a proposal download bubble */
+  isProposalDownload?: boolean;
 }
 
 export function ChatArea() {
@@ -425,6 +427,9 @@ export function ChatArea() {
         // Verificar que este stream sigue activo
         if (activeStreamRef.current !== streamId) return;
 
+        const finalIntent = detectedIntentRef.current;
+        console.log("ChatArea: onFinish llamado. Intent detectado:", finalIntent);
+
         activeStreamRef.current = null;
         setIsStreaming(false);
 
@@ -433,26 +438,50 @@ export function ChatArea() {
           fetchConversations(activeWorkspace.id);
         }
 
-        // Si el intent fue GENERATE_PROPOSAL, auto-generar el documento Word
-        if (detectedIntentRef.current === "GENERATE_PROPOSAL") {
-          console.log("ChatArea: Auto-generando documento Word para propuesta...");
+        // Si el intent fue GENERATE_PROPOSAL, agregar burbuja con botón de descarga
+        if (finalIntent === "GENERATE_PROPOSAL") {
+          console.log("ChatArea: Intent GENERATE_PROPOSAL confirmado, agregando burbuja de descarga...");
 
-          // Obtener el último mensaje del asistente para extraer datos de propuesta
-          setChatHistory((prevHistory) => {
-            const lastMessage = prevHistory[prevHistory.length - 1];
-            if (lastMessage && lastMessage.role === "assistant") {
-              const proposalData = detectProposalInMessage(lastMessage.content);
-              if (proposalData) {
-                // Ejecutar generación de propuesta de forma asíncrona
-                setTimeout(async () => {
-                  await handleAutoGenerateProposal(proposalData);
-                }, 100);
-              } else {
-                console.warn("ChatArea: No se pudo extraer datos de propuesta del mensaje");
+          // Usar setTimeout para asegurar que el estado se haya actualizado
+          setTimeout(() => {
+            setChatHistory((prevHistory) => {
+              console.log("ChatArea: Historial actual tiene", prevHistory.length, "mensajes");
+              const lastMessage = prevHistory[prevHistory.length - 1];
+              console.log("ChatArea: Último mensaje:", lastMessage?.role, "longitud:", lastMessage?.content?.length);
+              
+              if (lastMessage && lastMessage.role === "assistant" && lastMessage.content && lastMessage.content.length > 100) {
+                // Crear proposalData básico con el contenido del mensaje
+                const basicProposalData: ProposalAnalysis = {
+                  cliente: "Propuesta Comercial",
+                  fecha_entrega: new Date().toISOString().split('T')[0],
+                  alcance_economico: {
+                    presupuesto: "Por definir",
+                    moneda: "USD",
+                  },
+                  tecnologias_requeridas: [],
+                  riesgos_detectados: [],
+                  preguntas_sugeridas: [],
+                  equipo_sugerido: [],
+                  // Guardar el contenido completo para generar el documento
+                  contenido_propuesta: lastMessage.content,
+                };
+
+                console.log("ChatArea: Agregando burbuja de descarga al historial");
+                // Agregar burbuja extra con botón de descarga
+                return [
+                  ...prevHistory,
+                  {
+                    role: "assistant" as const,
+                    content: "📄 **¡Propuesta lista!**\n\nHe generado el análisis de tu propuesta comercial. Puedes descargarla como documento Word haciendo clic en el botón de abajo.",
+                    proposalData: basicProposalData,
+                    isProposalDownload: true,
+                  },
+                ];
               }
-            }
-            return prevHistory;
-          });
+              console.log("ChatArea: Condiciones no cumplidas para agregar burbuja");
+              return prevHistory;
+            });
+          }, 100);
         }
       },
     });
@@ -902,90 +931,99 @@ export function ChatArea() {
                     className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"
                       }`}
                   >
-                    <div
-                      className={`max-w-[85%] break-words ${msg.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-card text-card-foreground border border-border"
-                        } rounded-2xl p-5 relative group shadow-sm`}
-                    >
-                      {/* Botón de copiar (solo para mensajes del asistente) */}
-                      {msg.role === "assistant" && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
-                          onClick={() => {
-                            navigator.clipboard.writeText(msg.content);
-                            setCopiedMessageId(`${index}`);
-                            showToast(
-                              "Respuesta copiada al portapapeles",
-                              "success",
-                            );
-                            setTimeout(() => setCopiedMessageId(null), 2000);
-                          }}
-                          title="Copiar respuesta"
-                        >
-                          {copiedMessageId === `${index}` ? (
-                            <Check className="h-4 w-4 text-green-400" />
-                          ) : (
-                            <Copy className="h-4 w-4" />
-                          )}
-                        </Button>
-                      )}
-
-                      {msg.role === "user" ? (
-                        <p className="whitespace-pre-wrap">{msg.content}</p>
-                      ) : (
-                        <div className="markdown-content">
-                          <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            rehypePlugins={[rehypeRaw]}
-                          >
-                            {msg.content}
-                          </ReactMarkdown>
+                    {/* Burbuja especial de descarga de propuesta */}
+                    {msg.isProposalDownload && msg.proposalData ? (
+                      <div className="max-w-[85%] break-words bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-2 border-green-500/30 rounded-2xl p-5 shadow-lg">
+                        <div className="flex items-start gap-4">
+                          <div className="p-3 bg-green-500/20 rounded-full">
+                            <FileText className="h-6 w-6 text-green-400" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="markdown-content mb-4">
+                              <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                rehypePlugins={[rehypeRaw]}
+                              >
+                                {msg.content}
+                              </ReactMarkdown>
+                            </div>
+                            <Button
+                              variant="default"
+                              size="lg"
+                              className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold shadow-md"
+                              onClick={() => handleGenerateProposalWord(msg.proposalData!, index)}
+                              disabled={isGeneratingProposal}
+                            >
+                              {isGeneratingProposal ? (
+                                <>
+                                  <Loader2 className="h-5 w-5 animate-spin" />
+                                  Generando documento...
+                                </>
+                              ) : (
+                                <>
+                                  <Download className="h-5 w-5" />
+                                  Descargar Propuesta (Word)
+                                </>
+                              )}
+                            </Button>
+                          </div>
                         </div>
-                      )}
+                      </div>
+                    ) : (
+                      <div
+                        className={`max-w-[85%] break-words ${msg.role === "user"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-card text-card-foreground border border-border"
+                          } rounded-2xl p-5 relative group shadow-sm`}
+                      >
+                        {/* Botón de copiar (solo para mensajes del asistente) */}
+                        {msg.role === "assistant" && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
+                            onClick={() => {
+                              navigator.clipboard.writeText(msg.content);
+                              setCopiedMessageId(`${index}`);
+                              showToast(
+                                "Respuesta copiada al portapapeles",
+                                "success",
+                              );
+                              setTimeout(() => setCopiedMessageId(null), 2000);
+                            }}
+                            title="Copiar respuesta"
+                          >
+                            {copiedMessageId === `${index}` ? (
+                              <Check className="h-4 w-4 text-green-400" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                          </Button>
+                        )}
 
-                      {/* Model used badge and Proposal Download button for assistant messages */}
-                      {msg.role === "assistant" && (
-                        <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between gap-2 flex-wrap">
-                          {msg.modelUsed && (
+                        {msg.role === "user" ? (
+                          <p className="whitespace-pre-wrap">{msg.content}</p>
+                        ) : (
+                          <div className="markdown-content">
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm]}
+                              rehypePlugins={[rehypeRaw]}
+                            >
+                              {msg.content}
+                            </ReactMarkdown>
+                          </div>
+                        )}
+
+                        {/* Model used badge for assistant messages */}
+                        {msg.role === "assistant" && msg.modelUsed && (
+                          <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-2">
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground font-medium">
                               🤖 {msg.modelUsed}
                             </span>
-                          )}
-
-                          {/* Proposal Download Button - shows if message contains proposal-like content */}
-                          {(() => {
-                            const proposalData = msg.proposalData || detectProposalInMessage(msg.content);
-                            if (proposalData && msg.content.length > 200) {
-                              return (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="gap-2 text-xs bg-green-500/10 border-green-500/30 hover:bg-green-500/20 text-green-400"
-                                  onClick={() => handleGenerateProposalWord(proposalData, index)}
-                                  disabled={isGeneratingProposal}
-                                >
-                                  {isGeneratingProposal ? (
-                                    <>
-                                      <Loader2 className="h-3 w-3 animate-spin" />
-                                      Generando...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Download className="h-3 w-3" />
-                                      Descargar Propuesta (Word)
-                                    </>
-                                  )}
-                                </Button>
-                              );
-                            }
-                            return null;
-                          })()}
-                        </div>
-                      )}
-                    </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
 

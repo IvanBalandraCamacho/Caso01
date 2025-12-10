@@ -352,5 +352,7 @@ export interface ProposalAnalysis {
   riesgos_detectados: string[];
   preguntas_sugeridas: string[];
   equipo_sugerido: ProposalTeamMember[];
+  /** Full proposal content for document generation */
+  contenido_propuesta?: string;
 }
 
