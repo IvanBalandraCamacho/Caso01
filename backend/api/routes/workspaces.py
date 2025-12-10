@@ -980,6 +980,14 @@ async def chat_with_workspace(
                 workspace_instructions,
                 chat_history=chat_history
             )
+        elif intent == "SPECIFIC_QUERY":
+            response_stream = intention_task.specific_query_chat(
+                chat_request.query,
+                relevant_chunks,
+                chat_request.model,
+                workspace_instructions,
+                chat_history=chat_history
+            )
 
         try:
             for token in response_stream:
