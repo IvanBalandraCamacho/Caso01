@@ -956,6 +956,30 @@ async def chat_with_workspace(
                 workspace_instructions,
                 chat_history=chat_history
             )
+        elif intent == "REQUIREMENTS_MATRIX":
+            response_stream = intention_task.requirements_matrix_chat(
+                chat_request.query,
+                relevant_chunks,
+                chat_request.model,
+                workspace_instructions,
+                chat_history=chat_history
+            )
+        elif intent == "PREELIMINAR_PRICE_QUOTE":
+            response_stream = intention_task.preeliminar_price_quote_chat(
+                chat_request.query,
+                relevant_chunks,
+                chat_request.model,
+                workspace_instructions,
+                chat_history=chat_history
+            )
+        elif intent == "LEGAL_RISKS":
+            response_stream = intention_task.legal_risks_chat(
+                chat_request.query,
+                relevant_chunks,
+                chat_request.model,
+                workspace_instructions,
+                chat_history=chat_history
+            )
 
         try:
             for token in response_stream:
