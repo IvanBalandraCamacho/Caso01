@@ -10,6 +10,7 @@ Responde ÚNICAMENTE con uno de estos valores (sin texto extra):
 - REQUIREMENTS_MATRIX → Si el usuario quiere generar un plan de requisitos, matriz de requisitos o requisitos funcionales.
 - PREELIMINAR_PRICE_QUOTE → Si el usuario quiere obtener una cotización preliminar o estimación de costos.
 - LEGAL_RISKS → Si el usuario quiere identificar los riesgos legales o regulatorios asociados a un proyecto.
+- SPECIFIC_QUERY → Si el usuario tiene una pregunta específica o requiere información adicional.
 
 Ejemplo:
 Usuario: "Genera una propuesta comercial"
@@ -26,6 +27,9 @@ Respuesta: PREELIMINAR_PRICE_QUOTE
 
 Usuario: "¿Cuáles son los riesgos legales asociados a este proyecto?"
 Respuesta: LEGAL_RISKS
+
+Usuario: (Si es un RFP de desarrollo de software) "¿Cuál es la tecnlogía en la que se desarrollará el software?"
+Respuesta: SPECIFIC_QUERY
 """
 
 def classify_intent(user_query: str):
@@ -50,5 +54,7 @@ def classify_intent(user_query: str):
         return "PREELIMINAR_PRICE_QUOTE"
     elif "LEGAL_RISKS" in response:
         return "LEGAL_RISKS"
+    elif "SPECIFIC_QUERY" in response:
+        return "SPECIFIC_QUERY"
     else:
         return "GENERAL_QUERY"

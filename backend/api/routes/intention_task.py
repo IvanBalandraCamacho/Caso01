@@ -437,5 +437,58 @@ def legal_risks_chat(
             detail=f"Error al generar la respuesta: {str(e)}"
         )
         
+def specific_query_chat(
+    query: str,
+    relevant_chunks: Dict[str, Any],
+    chat_model: str,
+    workspace_instructions: str,
+    chat_history: list[dict] = None
+):
+    """
+    Responde a una consulta general usando IA.
+    
+    Args:
+        query: Pregunta del usuario
+        relevant_chunks: Chunks de contexto relevantes
+        chat_model: Modelo de chat a usar
+        workspace_instructions: Instrucciones del workspace
+        chat_history: Historial de mensajes previos
+        
+    Returns:
+        Respuesta generada
+        
+    Raises:
+        HTTPException 500: Si hay error en la generación
+    """
+
+    # Construir prompt simple
+    prompt = f"""
+    Indica la respuesta específica a la pregunta del usuario.
+    Si no hay respuesta específica, responde con "No hay respuesta específica".
+    """
+    
+    # Construir prompt completo
+    full_prompt = f"""
+        prompt: {prompt}
+        pregunta: {query}
+        system_instructions: {workspace_instructions}
+    """
+
+    try:
+        # Generar respuesta usando LLM service
+        response = llm_service.generate_response_stream(
+            full_prompt, 
+            relevant_chunks, 
+            chat_model,
+            chat_history=chat_history
+        )
+        return response
+    except Exception as e:
+        logger.info(f"No se pudo completar el análisis con el documento adjunto {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al generar la respuesta: {str(e)}"
+        )
+        
 # QUEDA PENDIENTE IMPLEMENTAR ESTE ENDPOINT DE OBTENER PERFILES
 # async def get_profiles()
