@@ -346,10 +346,14 @@ export interface ProposalEconomicScope {
  */
 export interface ProposalAnalysis {
   cliente: string;
-  fecha_entrega: string;
+  fechas_y_plazos: Array<{
+   tipo: string;
+   valor: string;
+   unidad: "FECHA_ABSOLUTA" | "HITO_RELATIVO" | "SEMANAS" | "MESES" | "DIAS" | "NO_ESPECIFICADA";
+  }>;
   alcance_economico: ProposalEconomicScope;
   tecnologias_requeridas: string[];
-  riesgos_detectados: string[];
+  objetivo_general: string[];
   preguntas_sugeridas: string[];
   equipo_sugerido: ProposalTeamMember[];
   /** Full proposal content for document generation */

@@ -186,7 +186,13 @@ export default function ProposalModal({ open, onClose }: ProposalModalProps) {
                   <div>
                     <h3 className="font-semibold text-green-900">Presupuesto</h3>
                     <p className="text-green-700">
-                      {analysis.alcance_economico.presupuesto} {analysis.alcance_economico.moneda}
+                      {analysis.alcance_economico.presupuesto === 'No especificado' ? (
+                        'No especificado'
+                      ) : (
+                        <>
+                          {analysis.alcance_economico.presupuesto} {analysis.alcance_economico.moneda}
+                        </>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -195,8 +201,21 @@ export default function ProposalModal({ open, onClose }: ProposalModalProps) {
                 <div className="flex items-start gap-3">
                   <Calendar className="h-5 w-5 text-purple-600 mt-0.5" />
                   <div>
-                    <h3 className="font-semibold text-purple-900">Fecha Entrega</h3>
-                    <p className="text-purple-700">{analysis.fecha_entrega}</p>
+                   <h3 className="font-semibold text-purple-900">Fechas y Plazos</h3>
+                   <div className="space-y-2">
+                     {Array.isArray(analysis.fechas_y_plazos) && analysis.fechas_y_plazos.length > 0 ? (
+                       analysis.fechas_y_plazos.map((fecha, idx) => (
+                         <div key={idx} className="text-sm text-purple-700">
+                           <p className="font-medium">{fecha.tipo}</p>
+                           <p className="text-xs text-purple-600">
+                             {fecha.valor} ({fecha.unidad})
+                           </p>
+                         </div>
+                       ))
+                     ) : (
+                       <p className="text-purple-700 text-sm">No especificada</p>
+                     )}
+                   </div>
                   </div>
                 </div>
               </div>

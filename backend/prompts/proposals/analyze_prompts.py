@@ -14,7 +14,18 @@ class AnalyzePrompts:
         Debes retornar un JSON con esta estructura EXACTA (sin markdown, sin explicaciones adicionales):
         {{
         "cliente": "nombre de la empresa cliente",
-        "fecha_entrega": "fecha límite en formato YYYY-MM-DD o 'No especificada'",
+        "fechas_y_plazos": [
+            {{
+                "tipo": "Entrega de Propuesta (Oferta)", 
+                "valor": "YYYY-MM-DD o Hito relativo",
+                "unidad": "FECHA_ABSOLUTA / HITO_RELATIVO / PLAZO_RELATIVO / NO_ESPECIFICADA"
+            }},
+            {{
+                "tipo": "Plazo de Ejecución del Proyecto", 
+                "valor": "X semanas / X meses / X días o 'No especificado'",
+                "unidad": "SEMANAS / MESES / DIAS / NO_ESPECIFICADA"
+            }}
+        ],
         "alcance_economico": {{
             "presupuesto": "monto numérico o 'No especificado'",
             "moneda": "USD/EUR/MXN/etc o 'No especificada'"
@@ -85,6 +96,19 @@ class AnalyzePrompts:
             ¿Quién será responsable de administrar los robots (TI, negocio o proveedor)?
             ¿De dónde provienen los datos de entrada (formularios web, correos, Excel, BD, APIs, aplicaciones)?
             ¿Cuál es el período de garantía exigido post pase a producción de un aplicativo?
+            
+        INSTRUCCIONES ADICIONALES PARA FECHAS Y PLAZOS:
+        
+        1. Cada objeto en este array debe especificar claramente el "tipo" de fecha:
+            - Usa **"Entrega de Propuesta (Oferta)"** para la fecha límite de presentación de la oferta.
+            - Usa **"Plazo de Ejecución del Proyecto"** para la duración total del servicio/proyecto.
+            - Usa **"Fecha de Publicación/Resolución"** para la fecha del documento legal que inicia la licitación.
+        2.  El campo "valor" debe contener la fecha o el plazo exacto del documento.
+        3.  El campo "unidad" debe categorizar el formato encontrado:
+            - **FECHA_ABSOLUTA:** para fechas en formato YYYY-MM-DD (ej: 2025-10-24).
+            - **HITO_RELATIVO:** para hitos que usan días hábiles (ej: Día 10 hábil).
+            - **SEMANAS / MESES / DIAS:** para la duración del proyecto (ej: 26 semanas).
+        4.  Si un tipo de fecha no se encuentra (ej: no hay Plazo de Ejecución), NO incluyas ese objeto en el array. Si no se encuentra *ninguna* fecha, el array debe ser `[]`.
         """
         return prompt
 

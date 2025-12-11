@@ -16,7 +16,7 @@ Ejemplo:
 Usuario: "Genera una propuesta comercial"
 Respuesta: GENERATE_PROPOSAL
 
-Usuario: "Realiza un resumen del documento adjunto/ analiza este informe/ indicame el personal necesario para el proyecto"
+Usuario: "Realiza un resumen del documento adjunto/ analiza este informe/ indicame el personal necesario para el proyecto/ de que trata el documento/ realiza un resumen ejecutivo del documento"
 Respuesta: GENERAL_QUERY
 
 Usuario: "Crea una matriz de requisitos según el archivo proporcionado"
