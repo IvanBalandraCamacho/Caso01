@@ -1,0 +1,1480 @@
+"use client"
+
+import type React from "react"
+import type { UploadFile } from "antd"
+import { useRouter, usePathname } from "next/navigation"
+
+import {
+  MenuOutlined,
+  EditOutlined,
+  FolderOpenOutlined,
+  FolderOutlined,
+  CommentOutlined,
+  MoreOutlined,
+  DeleteOutlined,
+  FileOutlined,
+  FormOutlined,
+  RightOutlined,
+  DownOutlined,
+  PlusOutlined,
+  FilePdfOutlined,
+  FileWordOutlined,
+  FilePptOutlined,
+  FileExcelOutlined,
+  CloseOutlined,
+} from "@ant-design/icons"
+import { Button, Layout, Typography, Modal, Input, Upload, Dropdown, App } from "antd"
+import { useState, useEffect, useRef } from "react"
+import { useWorkspaceContext } from "@/context/WorkspaceContext"
+import { fetchWorkspaceDocuments, deleteDocumentApi } from "@/lib/api"
+import type { DocumentPublic } from "@/types/api"
+
+const { Sider } = Layout
+const { Text } = Typography
+const { TextArea } = Input
+
+interface Chat {
+  key: string
+  label: string
+}
+
+interface WorkspaceWithChats {
+  key: string
+  label: string
+  chats: Chat[]
+}
+
+interface SidebarItem {
+  key: string
+  label: string
+  icon: React.ReactNode
+  isNested?: boolean
+  type: "workspace" | "chat"
+  parentKey?: string
+}
+
+export default function Sidebar() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const { message, modal } = App.useApp()
+  
+  // Cargar estado del sidebar desde localStorage
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('sidebarCollapsed')
+      return saved ? JSON.parse(saved) : false
+    }
+    return false
+  })
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [workspaceName, setWorkspaceName] = useState("")
+  const [additionalContext, setAdditionalContext] = useState("")
+  const [fileList, setFileList] = useState<UploadFile[]>([])
+  const [selectedItem, setSelectedItem] = useState<string | null>(null)
+
+  const [isRenameModalOpen, setIsRenameModalOpen] = useState(false)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [currentEditItem, setCurrentEditItem] = useState<SidebarItem | null>(null)
+  const [renameValue, setRenameValue] = useState("")
+  const [editContext, setEditContext] = useState("")
+  const [existingDocuments, setExistingDocuments] = useState<DocumentPublic[]>([])
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false)
+
+  const [workspacesSectionCollapsed, setWorkspacesSectionCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('workspacesSectionCollapsed')
+      return saved ? JSON.parse(saved) : false
+    }
+    return false
+  })
+  const [chatsSectionCollapsed, setChatsSectionCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('chatsSectionCollapsed')
+      return saved ? JSON.parse(saved) : false
+    }
+    return false
+  })
+  const [expandedWorkspace, setExpandedWorkspace] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('expandedWorkspace')
+      return saved ? JSON.parse(saved) : null
+    }
+    return null
+  })
+  const [hoveredItem, setHoveredItem] = useState<string | null>(null)
+  
+  // Ref para rastrear el último workspace para el que se cargaron conversaciones
+  const lastLoadedWorkspaceRef = useRef<string | null>(null)
+
+  // Guardar estado del sidebar en localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sidebarCollapsed', JSON.stringify(collapsed))
+    }
+  }, [collapsed])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('workspacesSectionCollapsed', JSON.stringify(workspacesSectionCollapsed))
+    }
+  }, [workspacesSectionCollapsed])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('chatsSectionCollapsed', JSON.stringify(chatsSectionCollapsed))
+    }
+  }, [chatsSectionCollapsed])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('expandedWorkspace', JSON.stringify(expandedWorkspace))
+    }
+  }, [expandedWorkspace])
+
+  // Usar el contexto de workspaces
+  const { 
+    workspaces, 
+    conversations,
+    activeWorkspace,
+    setActiveWorkspace,
+    fetchConversations,
+    isLoadingConversations,
+    fetchWorkspaces,
+    createWorkspace: createWorkspaceApi,
+    updateWorkspace: updateWorkspaceApi,
+    deleteWorkspace: deleteWorkspaceApi,
+    deleteConversation: deleteConversationApi,
+  } = useWorkspaceContext()
+
+  // Cargar workspaces al montar el componente - solo una vez
+  useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+    if (token && workspaces.length === 0) {
+      fetchWorkspaces()
+    }
+  }, [])
+
+  // Transformar workspaces del contexto al formato del sidebar
+  // Incluir las conversaciones del workspace activo expandido
+  const workspacesData: WorkspaceWithChats[] = workspaces.map(ws => ({
+    key: ws.id,
+    label: ws.name,
+    // Solo mostrar chats si este workspace está expandido y es el activo
+    chats: (expandedWorkspace === ws.id && activeWorkspace?.id === ws.id) 
+      ? conversations.map(conv => ({
+          key: conv.id,
+          label: conv.title,
+        }))
+      : [],
+  }))
+
+  // Chats generales (sin workspace) - por ahora vacío, se implementará cuando haya endpoint
+  const generalChats: SidebarItem[] = []
+
+  // Detectar workspace desde la URL y cargar conversaciones
+  useEffect(() => {
+    if (pathname.startsWith("/workspace/")) {
+      const workspaceId = pathname.split("/")[2]
+      if (workspaceId) {
+        setExpandedWorkspace(workspaceId)
+        setSelectedItem(workspaceId)
+        // Collapse chats section when a workspace is open
+        setChatsSectionCollapsed(true)
+        
+        // Cargar conversaciones solo si hay workspaces y no se han cargado ya para este workspace
+        const workspace = workspaces.find(ws => ws.id === workspaceId)
+        if (workspace && lastLoadedWorkspaceRef.current !== workspaceId) {
+          lastLoadedWorkspaceRef.current = workspaceId
+          setActiveWorkspace(workspace)
+          fetchConversations(workspaceId)
+        }
+      }
+    } else {
+      setExpandedWorkspace(null)
+      lastLoadedWorkspaceRef.current = null
+    }
+  }, [pathname, workspaces.length]) // Only depend on pathname and workspaces length
+
+  const toggleWorkspaceExpand = (workspaceKey: string, hasChats: boolean) => {
+    if (expandedWorkspace === workspaceKey) {
+      // Colapsar
+      setExpandedWorkspace(null)
+      lastLoadedWorkspaceRef.current = null
+    } else {
+      // Expandir y cargar conversaciones
+      setExpandedWorkspace(workspaceKey)
+      lastLoadedWorkspaceRef.current = workspaceKey
+      const workspace = workspaces.find(ws => ws.id === workspaceKey)
+      if (workspace) {
+        setActiveWorkspace(workspace)
+        fetchConversations(workspaceKey)
+      }
+    }
+  }
+
+  const handleRename = (item: SidebarItem) => {
+    setCurrentEditItem(item)
+    setRenameValue(item.label)
+    setIsRenameModalOpen(true)
+  }
+
+  const handleEdit = async (item: SidebarItem) => {
+    setCurrentEditItem(item)
+    setEditContext("")
+    setExistingDocuments([])
+    setIsEditModalOpen(true)
+    
+    // Cargar documentos del workspace
+    if (item.type === "workspace") {
+      setIsLoadingDocuments(true)
+      try {
+        const docs = await fetchWorkspaceDocuments(item.key)
+        setExistingDocuments(docs)
+      } catch (error) {
+        console.error("Error loading workspace documents:", error)
+      } finally {
+        setIsLoadingDocuments(false)
+      }
+    }
+  }
+
+  const handleDelete = (item: SidebarItem) => {
+    setCurrentEditItem(item)
+    setIsDeleteModalOpen(true)
+  }
+
+  const confirmRename = async () => {
+    if (!currentEditItem) return
+    
+    try {
+      if (currentEditItem.type === "workspace") {
+        await updateWorkspaceApi(currentEditItem.key, { name: renameValue })
+      }
+      // Para chats, necesitaríamos una función de renombrar conversación
+    } catch (error) {
+      console.error("Error renaming:", error)
+    }
+    
+    setIsRenameModalOpen(false)
+    setCurrentEditItem(null)
+    setRenameValue("")
+  }
+
+  const confirmEdit = async () => {
+    if (!currentEditItem) return
+    
+    try {
+      if (currentEditItem.type === "workspace") {
+        await updateWorkspaceApi(currentEditItem.key, { instructions: editContext })
+      }
+    } catch (error) {
+      console.error("Error editing:", error)
+    }
+    
+    setIsEditModalOpen(false)
+    setCurrentEditItem(null)
+    setEditContext("")
+  }
+
+  const confirmDelete = async () => {
+    if (!currentEditItem) return
+    
+    try {
+      if (currentEditItem.type === "workspace") {
+        await deleteWorkspaceApi(currentEditItem.key)
+      } else if (currentEditItem.type === "chat") {
+        await deleteConversationApi(currentEditItem.key)
+      }
+    } catch (error) {
+      console.error("Error deleting:", error)
+    }
+    
+    setIsDeleteModalOpen(false)
+    setCurrentEditItem(null)
+  }
+
+  const getDropdownItems = (item: SidebarItem) => [
+    {
+      key: "rename",
+      label: "Renombrar",
+      icon: <FormOutlined />,
+      onClick: (e: { domEvent: React.MouseEvent }) => {
+        e.domEvent.stopPropagation()
+        handleRename(item)
+      },
+    },
+    ...(item.type === "workspace"
+      ? [
+          {
+            key: "edit",
+            label: "Editar",
+            icon: <EditOutlined />,
+            onClick: (e: { domEvent: React.MouseEvent }) => {
+              e.domEvent.stopPropagation()
+              handleEdit(item)
+            },
+          },
+        ]
+      : []),
+    {
+      key: "delete",
+      label: "Eliminar",
+      icon: <DeleteOutlined />,
+      danger: true,
+      onClick: (e: { domEvent: React.MouseEvent }) => {
+        e.domEvent.stopPropagation()
+        handleDelete(item)
+      },
+    },
+  ]
+
+  const handleOpenModal = () => {
+    setIsModalOpen(true)
+  }
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false)
+    setWorkspaceName("")
+    setAdditionalContext("")
+    setFileList([])
+  }
+
+  const handleCreateWorkspace = async () => {
+    try {
+      const newWorkspace = await createWorkspaceApi({
+        name: workspaceName,
+        description: additionalContext || undefined,
+        instructions: additionalContext || undefined,
+      })
+      handleCloseModal()
+      router.push(`/workspace/${newWorkspace.id}`)
+    } catch (error) {
+      console.error("Error creating workspace:", error)
+    }
+  }
+
+  const handleRemoveFile = (file: UploadFile) => {
+    setFileList(fileList.filter((f) => f.uid !== file.uid))
+  }
+
+  const handleNewChat = () => {
+    router.push("/")
+  }
+
+  const renderWorkspaceItem = (workspace: WorkspaceWithChats) => {
+    const isExpanded = expandedWorkspace === workspace.key
+    const isLoading = isExpanded && isLoadingConversations && activeWorkspace?.id === workspace.key
+    const hasChats = workspace.chats.length > 0
+    const item: SidebarItem = {
+      key: workspace.key,
+      label: workspace.label,
+      icon: <FolderOutlined />,
+      type: "workspace",
+    }
+
+    return (
+      <div key={workspace.key}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "10px 16px",
+            cursor: "pointer",
+            borderRadius: "8px",
+            margin: "2px 8px",
+            transition: "background 0.2s",
+            background: selectedItem === workspace.key ? "#2A2A2D" : "transparent",
+          }}
+          onMouseEnter={(e) => {
+            setHoveredItem(workspace.key)
+            if (selectedItem !== workspace.key) {
+              e.currentTarget.style.background = "#2A2A2D"
+            }
+          }}
+          onMouseLeave={(e) => {
+            setHoveredItem(null)
+            if (selectedItem !== workspace.key) {
+              e.currentTarget.style.background = "transparent"
+            }
+          }}
+          onClick={() => {
+            setSelectedItem(workspace.key)
+            router.push(`/workspace/${workspace.key}`)
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <span style={{ color: "#E3E3E3", fontSize: "14px" }}>{item.icon}</span>
+            {!collapsed && <Text style={{ color: "#E3E3E3", fontSize: "14px" }}>{item.label}</Text>}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {!collapsed && (
+              <span
+                style={{ color: "#666666", fontSize: "10px", cursor: "pointer" }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  toggleWorkspaceExpand(workspace.key, true)
+                }}
+              >
+                {isExpanded ? <DownOutlined /> : <RightOutlined />}
+              </span>
+            )}
+            {!collapsed && (selectedItem === workspace.key || hoveredItem === workspace.key) && (
+              <Dropdown
+                menu={{ items: getDropdownItems(item) }}
+                trigger={["click"]}
+                placement="bottomRight"
+                popupRender={(menu) => (
+                  <div
+                    style={{
+                      background: "#2A2A2D",
+                      borderRadius: "8px",
+                      border: "1px solid #3A3A3D",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {menu}
+                  </div>
+                )}
+              >
+                <MoreOutlined
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ color: "#E3E3E3", fontSize: "14px", padding: "4px" }}
+                />
+              </Dropdown>
+            )}
+          </div>
+        </div>
+
+        {isExpanded && !collapsed && (
+          <div style={{ position: "relative" }}>
+            {isLoading ? (
+              <div style={{ position: "relative", padding: "10px 16px 10px 40px" }}>
+                {/* Línea vertical corta + horizontal para loading */}
+                <div
+                  style={{
+                    position: "absolute",
+                    left: "24px",
+                    top: "0",
+                    height: "50%",
+                    width: "1px",
+                    background: "#3A3A3D",
+                  }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    left: "24px",
+                    top: "50%",
+                    width: "12px",
+                    height: "1px",
+                    background: "#3A3A3D",
+                  }}
+                />
+                <Text style={{ color: "#888888", fontSize: "12px" }}>Cargando...</Text>
+              </div>
+            ) : hasChats ? (
+              workspace.chats.map((chat, index) => {
+                const isLastItem = index === workspace.chats.length - 1
+                const chatItem: SidebarItem = {
+                  key: chat.key,
+                  label: chat.label,
+                  icon: <CommentOutlined />,
+                  type: "chat",
+                  isNested: true,
+                  parentKey: workspace.key,
+                }
+                return (
+                  <div
+                    key={chat.key}
+                    style={{
+                      position: "relative",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "10px 16px",
+                      paddingLeft: "40px",
+                      cursor: "pointer",
+                      borderRadius: "8px",
+                      margin: "2px 8px",
+                      transition: "background 0.2s",
+                      background: selectedItem === chat.key ? "#2A2A2D" : "transparent",
+                    }}
+                    onMouseEnter={(e) => {
+                      setHoveredItem(chat.key)
+                      if (selectedItem !== chat.key) {
+                        e.currentTarget.style.background = "#2A2A2D"
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      setHoveredItem(null)
+                      if (selectedItem !== chat.key) {
+                        e.currentTarget.style.background = "transparent"
+                      }
+                    }}
+                    onClick={() => {
+                      setSelectedItem(chat.key)
+                      router.push(`/workspace/${workspace.key}/chat/${chat.key}`)
+                    }}
+                  >
+                    {/* Línea vertical - solo hasta el centro si es el último */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: "24px",
+                        top: "0",
+                        height: isLastItem ? "50%" : "100%",
+                        width: "1px",
+                        background: "#3A3A3D",
+                      }}
+                    />
+                    {/* Línea horizontal */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: "24px",
+                        top: "50%",
+                        width: "12px",
+                        height: "1px",
+                        background: "#3A3A3D",
+                      }}
+                    />
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <span style={{ color: "#E3E3E3", fontSize: "14px" }}>
+                      <CommentOutlined />
+                    </span>
+                    <Text style={{ color: "#E3E3E3", fontSize: "14px" }}>{chat.label}</Text>
+                  </div>
+                  {(selectedItem === chat.key || hoveredItem === chat.key) && (
+                    <Dropdown
+                      menu={{ items: getDropdownItems(chatItem) }}
+                      trigger={["click"]}
+                      placement="bottomRight"
+                      popupRender={(menu) => (
+                        <div
+                          style={{
+                            background: "#2A2A2D",
+                            borderRadius: "8px",
+                            border: "1px solid #3A3A3D",
+                            overflow: "hidden",
+                          }}
+                        >
+                          {menu}
+                        </div>
+                      )}
+                    >
+                      <MoreOutlined
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ color: "#E3E3E3", fontSize: "14px", padding: "4px" }}
+                      />
+                    </Dropdown>
+                  )}
+                </div>
+              )
+              })
+            ) : (
+              <div style={{ position: "relative", padding: "10px 16px 10px 40px" }}>
+                {/* Línea en L para "Sin chats" */}
+                <div
+                  style={{
+                    position: "absolute",
+                    left: "24px",
+                    top: "0",
+                    height: "50%",
+                    width: "1px",
+                    background: "#3A3A3D",
+                  }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    left: "24px",
+                    top: "50%",
+                    width: "12px",
+                    height: "1px",
+                    background: "#3A3A3D",
+                  }}
+                />
+                <Text style={{ color: "#888888", fontSize: "12px" }}>Sin chats</Text>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const renderChatItem = (item: SidebarItem) => {
+    const handleChatClick = () => {
+      setSelectedItem(item.key)
+      // Navegar al chat general (sin workspace)
+      router.push(`/chat/${item.key}`)
+    }
+
+    return (
+      <div
+        key={item.key}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "10px 16px",
+          cursor: "pointer",
+          borderRadius: "8px",
+          margin: "2px 8px",
+          transition: "background 0.2s",
+          background: selectedItem === item.key ? "#2A2A2D" : "transparent",
+        }}
+        onMouseEnter={(e) => {
+          setHoveredItem(item.key)
+          if (selectedItem !== item.key) {
+            e.currentTarget.style.background = "#2A2A2D"
+          }
+        }}
+        onMouseLeave={(e) => {
+          setHoveredItem(null)
+          if (selectedItem !== item.key) {
+            e.currentTarget.style.background = "transparent"
+          }
+        }}
+        onClick={handleChatClick}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <span style={{ color: "#E3E3E3", fontSize: "14px" }}>{item.icon}</span>
+          {!collapsed && <Text style={{ color: "#E3E3E3", fontSize: "14px" }}>{item.label}</Text>}
+        </div>
+        {!collapsed && (selectedItem === item.key || hoveredItem === item.key) && (
+          <Dropdown
+            menu={{ items: getDropdownItems(item) }}
+            trigger={["click"]}
+            placement="bottomRight"
+            popupRender={(menu) => (
+              <div
+                style={{
+                  background: "#2A2A2D",
+                  borderRadius: "8px",
+                  border: "1px solid #3A3A3D",
+                  overflow: "hidden",
+                }}
+              >
+                {menu}
+              </div>
+            )}
+          >
+            <MoreOutlined
+              onClick={(e) => e.stopPropagation()}
+              style={{ color: "#E3E3E3", fontSize: "14px", padding: "4px" }}
+            />
+          </Dropdown>
+        )}
+      </div>
+    )
+  }
+
+  const sidebarContent = (
+    <>
+      {/* Header with hamburger */}
+      <div style={{ padding: "16px", display: "flex", alignItems: "center" }}>
+        <Button
+          type="text"
+          icon={<MenuOutlined style={{ fontSize: "18px" }} />}
+          onClick={() => {
+            setCollapsed(!collapsed)
+            if (window.innerWidth < 768) setMobileOpen(!mobileOpen)
+          }}
+          style={{ color: "#E3E3E3", padding: "4px 8px" }}
+        />
+      </div>
+
+      {/* Nuevo Chat button */}
+      <div style={{ padding: "0 12px", marginBottom: "24px" }}>
+        <Button
+          type="text"
+          icon={<EditOutlined style={{ fontSize: "14px" }} />}
+          onClick={handleNewChat}
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            justifyContent: "flex-start",
+            padding: "10px 16px",
+            height: "auto",
+            background: "#2A2A2D",
+            border: "none",
+            borderRadius: "8px",
+            color: "#E3E3E3",
+            fontSize: "14px",
+          }}
+        >
+          {!collapsed && "Nuevo Chat"}
+        </Button>
+      </div>
+
+      <div style={{ marginBottom: "24px" }}>
+        {!collapsed && (
+          <div
+            onClick={() => setWorkspacesSectionCollapsed(!workspacesSectionCollapsed)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              cursor: "pointer",
+              padding: "0 16px",
+              marginBottom: "8px",
+            }}
+          >
+            <span style={{ color: "#888888", fontSize: "10px" }}>
+              {workspacesSectionCollapsed ? <RightOutlined /> : <DownOutlined />}
+            </span>
+            <Text
+              style={{
+                color: "#888888",
+                fontSize: "12px",
+                fontWeight: 500,
+                textTransform: "capitalize",
+              }}
+            >
+              Workspaces
+            </Text>
+          </div>
+        )}
+        
+        {/* Nuevo Workspace - siempre visible */}
+        {!collapsed && (
+          <div style={{ marginTop: "8px" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                padding: "10px 16px",
+                cursor: "pointer",
+                borderRadius: "8px",
+                margin: "2px 8px",
+                transition: "background 0.2s",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "#2A2A2D")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              onClick={handleOpenModal}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <span style={{ color: "#E3E3E3", fontSize: "14px" }}>
+                  <FolderOpenOutlined />
+                </span>
+                <Text style={{ color: "#E3E3E3", fontSize: "14px", fontWeight: 600 }}>Nuevo Workspace</Text>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Workspace activo - siempre visible si hay uno expandido */}
+        {!collapsed && workspacesSectionCollapsed && expandedWorkspace && (
+          <div style={{ marginTop: "4px" }}>
+            {workspacesData
+              .filter(ws => ws.key === expandedWorkspace)
+              .map(renderWorkspaceItem)}
+          </div>
+        )}
+
+        {/* Lista de workspaces - solo cuando no está colapsado */}
+        {!workspacesSectionCollapsed && (
+          <div style={{ marginTop: "4px" }}>
+            {workspacesData.map(renderWorkspaceItem)}
+          </div>
+        )}
+      </div>
+
+      <div>
+        {!collapsed && (
+          <div
+            onClick={() => setChatsSectionCollapsed(!chatsSectionCollapsed)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              cursor: "pointer",
+              padding: "0 16px",
+              marginBottom: "8px",
+            }}
+          >
+            <span style={{ color: "#888888", fontSize: "10px" }}>
+              {chatsSectionCollapsed ? <RightOutlined /> : <DownOutlined />}
+            </span>
+            <Text
+              style={{
+                color: "#888888",
+                fontSize: "12px",
+                fontWeight: 500,
+                textTransform: "capitalize",
+              }}
+            >
+              Chats
+            </Text>
+          </div>
+        )}
+        {!chatsSectionCollapsed && (
+          <div style={{ marginTop: "8px" }}>
+            {generalChats.length === 0 ? (
+              <div style={{ padding: "16px", textAlign: "center" }}>
+                <Text style={{ color: "#666666", fontSize: "12px" }}>
+                  Sin chats generales
+                </Text>
+              </div>
+            ) : (
+              generalChats.map(renderChatItem)
+            )}
+          </div>
+        )}
+      </div>
+    </>
+  )
+
+  const modalStyles = {
+    content: {
+      background: "#252528",
+      borderRadius: "16px",
+      padding: "24px",
+      border: "1px solid #404045",
+      boxShadow: "0 8px 32px rgba(0, 0, 0, 0.6)",
+    },
+    mask: {
+      background: "rgba(0, 0, 0, 0.75)",
+      backdropFilter: "blur(4px)",
+    },
+  }
+
+  // Función para obtener el icono según el tipo de archivo
+  const getFileIcon = (fileName: string) => {
+    const ext = fileName.toLowerCase().split('.').pop()
+    switch (ext) {
+      case 'pdf':
+        return <FilePdfOutlined style={{ color: '#E53935', fontSize: '20px' }} />
+      case 'doc':
+      case 'docx':
+        return <FileWordOutlined style={{ color: '#2196F3', fontSize: '20px' }} />
+      case 'ppt':
+      case 'pptx':
+        return <FilePptOutlined style={{ color: '#FF9800', fontSize: '20px' }} />
+      case 'xls':
+      case 'xlsx':
+        return <FileExcelOutlined style={{ color: '#4CAF50', fontSize: '20px' }} />
+      default:
+        return <FileOutlined style={{ color: '#888888', fontSize: '20px' }} />
+    }
+  }
+
+  // Función para obtener icono desde file_type del backend
+  const getFileIconFromType = (fileType: string) => {
+    const type = fileType.toLowerCase()
+    if (type.includes('pdf')) {
+      return <FilePdfOutlined style={{ color: '#E53935', fontSize: '20px' }} />
+    } else if (type.includes('word') || type.includes('doc')) {
+      return <FileWordOutlined style={{ color: '#2196F3', fontSize: '20px' }} />
+    } else if (type.includes('powerpoint') || type.includes('ppt') || type.includes('presentation')) {
+      return <FilePptOutlined style={{ color: '#FF9800', fontSize: '20px' }} />
+    } else if (type.includes('excel') || type.includes('xls') || type.includes('sheet')) {
+      return <FileExcelOutlined style={{ color: '#4CAF50', fontSize: '20px' }} />
+    } else {
+      return <FileOutlined style={{ color: '#888888', fontSize: '20px' }} />
+    }
+  }
+
+  // Función para eliminar documento
+  const handleDeleteDocument = (documentId: string, fileName: string) => {
+    modal.confirm({
+      title: '¿Eliminar documento?',
+      content: `¿Estás seguro de que deseas eliminar "${fileName}"? Esta acción no se puede deshacer.`,
+      okText: 'Eliminar',
+      cancelText: 'Cancelar',
+      okButtonProps: {
+        danger: true,
+      },
+      onOk: async () => {
+        try {
+          await deleteDocumentApi(documentId)
+          message.success('Documento eliminado correctamente')
+          // Recargar documentos
+          if (currentEditItem?.type === "workspace") {
+            const docs = await fetchWorkspaceDocuments(currentEditItem.key)
+            setExistingDocuments(docs)
+          }
+        } catch (error) {
+          console.error('Error deleting document:', error)
+          message.error('Error al eliminar el documento')
+        }
+      },
+    })
+  }
+
+  // Tipos de archivo permitidos
+  const acceptedFileTypes = '.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx'
+
+  return (
+    <>
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div
+          onClick={() => setMobileOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            zIndex: 999,
+          }}
+        />
+      )}
+
+      {/* Desktop Sidebar */}
+      <Sider
+        width={220}
+        collapsedWidth={60}
+        collapsed={collapsed}
+        style={{
+          background: "#1E1E21",
+          height: "100vh",
+          position: "fixed",
+          left: 0,
+          top: 0,
+          zIndex: 1000,
+          display: "block",
+        }}
+        trigger={null}
+      >
+        {sidebarContent}
+      </Sider>
+
+      {/* Spacer for fixed sidebar */}
+      <div style={{ width: collapsed ? 60 : 220, flexShrink: 0, transition: "width 0.2s" }} />
+
+      {/* Modal for new workspace */}
+      <Modal
+        title={null}
+        open={isModalOpen}
+        onCancel={handleCloseModal}
+        footer={null}
+        centered
+        width={500}
+        styles={modalStyles}
+        closeIcon={<span style={{ color: "#666666", fontSize: "18px" }}>×</span>}
+      >
+        <div style={{ marginBottom: "24px" }}>
+          <Text style={{ color: "#FFFFFF", fontSize: "20px", fontWeight: 600 }}>Crear Nuevo Workspace</Text>
+        </div>
+
+        {/* Workspace Name */}
+        <div style={{ marginBottom: "20px" }}>
+          <Text style={{ color: "#888888", fontSize: "14px", display: "block", marginBottom: "8px" }}>
+            Nombre del Workspace
+          </Text>
+          <Input
+            placeholder="Ej: Proyecto Marketing Q1"
+            value={workspaceName}
+            onChange={(e) => setWorkspaceName(e.target.value)}
+            style={{
+              background: "#2A2A2D",
+              border: "1px solid #3A3A3D",
+              borderRadius: "8px",
+              padding: "12px 16px",
+              color: "#FFFFFF",
+              fontSize: "14px",
+            }}
+          />
+        </div>
+
+        <div style={{ marginBottom: "20px" }}>
+          <Text style={{ color: "#888888", fontSize: "14px", display: "block", marginBottom: "8px" }}>Archivos</Text>
+          <Upload
+            multiple
+            fileList={fileList}
+            onChange={({ fileList }) => setFileList(fileList)}
+            beforeUpload={() => false}
+            showUploadList={false}
+          >
+            <Button
+              icon={<PlusOutlined />}
+              style={{
+                background: "#2A2A2D",
+                border: "1px dashed #3A3A3D",
+                borderRadius: "8px",
+                color: "#888888",
+                width: "100%",
+                height: "48px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+              }}
+            >
+              Añadir archivos
+            </Button>
+          </Upload>
+          {/* File list */}
+          {fileList.length > 0 && (
+            <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
+              {fileList.map((file) => (
+                <div
+                  key={file.uid}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    background: "#2A2A2D",
+                    padding: "8px 12px",
+                    borderRadius: "6px",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <FileOutlined style={{ color: "#888888", fontSize: "14px" }} />
+                    <Text style={{ color: "#E3E3E3", fontSize: "13px" }}>{file.name}</Text>
+                  </div>
+                  <DeleteOutlined
+                    onClick={() => handleRemoveFile(file)}
+                    style={{ color: "#666666", fontSize: "14px", cursor: "pointer" }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Additional Context */}
+        <div style={{ marginBottom: "24px" }}>
+          <Text style={{ color: "#888888", fontSize: "14px", display: "block", marginBottom: "8px" }}>
+            Contexto adicional para la IA
+          </Text>
+          <TextArea
+            placeholder="Describe el propósito del workspace, instrucciones especiales o información relevante para la IA..."
+            value={additionalContext}
+            onChange={(e) => setAdditionalContext(e.target.value)}
+            rows={4}
+            style={{
+              background: "#2A2A2D",
+              border: "1px solid #3A3A3D",
+              borderRadius: "8px",
+              padding: "12px 16px",
+              color: "#FFFFFF",
+              fontSize: "14px",
+              resize: "none",
+            }}
+          />
+        </div>
+
+        {/* Action Buttons */}
+        <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+          <Button
+            onClick={handleCloseModal}
+            style={{
+              background: "transparent",
+              border: "1px solid #3A3A3D",
+              borderRadius: "8px",
+              color: "#888888",
+              padding: "8px 20px",
+              height: "auto",
+            }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleCreateWorkspace}
+            disabled={!workspaceName.trim()}
+            style={{
+              background: workspaceName.trim() ? "#E53935" : "#3A3A3D",
+              border: "none",
+              borderRadius: "8px",
+              color: workspaceName.trim() ? "#FFFFFF" : "#666666",
+              padding: "8px 20px",
+              height: "auto",
+            }}
+          >
+            Crear Workspace
+          </Button>
+        </div>
+      </Modal>
+
+      {/* Rename Modal */}
+      <Modal
+        title={null}
+        open={isRenameModalOpen}
+        onCancel={() => setIsRenameModalOpen(false)}
+        footer={null}
+        centered
+        width={400}
+        styles={modalStyles}
+        closeIcon={<span style={{ color: "#666666", fontSize: "18px" }}>×</span>}
+      >
+        <div style={{ marginBottom: "24px" }}>
+          <Text style={{ color: "#FFFFFF", fontSize: "20px", fontWeight: 600 }}>
+            Renombrar {currentEditItem?.type === "workspace" ? "Workspace" : "Chat"}
+          </Text>
+        </div>
+
+        <div style={{ marginBottom: "24px" }}>
+          <Text style={{ color: "#888888", fontSize: "14px", display: "block", marginBottom: "8px" }}>
+            Nuevo nombre
+          </Text>
+          <Input
+            placeholder="Ingresa el nuevo nombre"
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            style={{
+              background: "#2A2A2D",
+              border: "1px solid #3A3A3D",
+              borderRadius: "8px",
+              padding: "12px 16px",
+              color: "#FFFFFF",
+              fontSize: "14px",
+            }}
+          />
+        </div>
+
+        <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+          <Button
+            onClick={() => setIsRenameModalOpen(false)}
+            style={{
+              background: "transparent",
+              border: "1px solid #3A3A3D",
+              borderRadius: "8px",
+              color: "#888888",
+              padding: "8px 20px",
+              height: "auto",
+            }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={confirmRename}
+            disabled={!renameValue.trim()}
+            style={{
+              background: renameValue.trim() ? "#E53935" : "#3A3A3D",
+              border: "none",
+              borderRadius: "8px",
+              color: renameValue.trim() ? "#FFFFFF" : "#666666",
+              padding: "8px 20px",
+              height: "auto",
+            }}
+          >
+            Guardar
+          </Button>
+        </div>
+      </Modal>
+
+      {/* Edit Workspace Modal */}
+      <Modal
+        title={null}
+        open={isEditModalOpen}
+        onCancel={() => setIsEditModalOpen(false)}
+        footer={null}
+        centered
+        width={500}
+        styles={modalStyles}
+        closeIcon={<span style={{ color: "#666666", fontSize: "18px" }}>×</span>}
+      >
+        <div style={{ marginBottom: "24px" }}>
+          <Text style={{ color: "#FFFFFF", fontSize: "20px", fontWeight: 600 }}>Editar Workspace</Text>
+        </div>
+
+        <div style={{ marginBottom: "20px" }}>
+          <Text style={{ color: "#888888", fontSize: "14px", display: "block", marginBottom: "8px" }}>
+            Nombre del Workspace
+          </Text>
+          <Input
+            placeholder="Nombre"
+            value={renameValue || currentEditItem?.label}
+            onChange={(e) => setRenameValue(e.target.value)}
+            style={{
+              background: "#2A2A2D",
+              border: "1px solid #3A3A3D",
+              borderRadius: "8px",
+              padding: "12px 16px",
+              color: "#FFFFFF",
+              fontSize: "14px",
+            }}
+          />
+        </div>
+
+        {/* Documentos Existentes */}
+        {existingDocuments.length > 0 && (
+          <div style={{ marginBottom: "20px" }}>
+            <Text style={{ color: "#888888", fontSize: "14px", display: "block", marginBottom: "8px" }}>
+              Documentos Existentes
+            </Text>
+            <div 
+              style={{ 
+                maxHeight: "200px", 
+                overflowY: "auto", 
+                display: "flex", 
+                flexDirection: "column", 
+                gap: "8px" 
+              }}
+              className="chat-scrollbar"
+            >
+              {existingDocuments.map((doc) => (
+                <div
+                  key={doc.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "10px 12px",
+                    background: "#2A2A2D",
+                    borderRadius: "8px",
+                    border: "1px solid #3A3A3D",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1, minWidth: 0 }}>
+                    {getFileIconFromType(doc.file_type)}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <Text
+                        style={{
+                          color: "#E3E3E3",
+                          fontSize: "13px",
+                          display: "block",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {doc.file_name}
+                      </Text>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
+                        {doc.status === 'COMPLETED' && (
+                          <>
+                            <span style={{ color: "#52C41A", fontSize: "10px" }}>✓</span>
+                            <Text style={{ color: "#666666", fontSize: "11px" }}>
+                              {doc.chunk_count} chunks
+                            </Text>
+                          </>
+                        )}
+                        {doc.status === 'PROCESSING' && (
+                          <>
+                            <span style={{ color: "#FFA940", fontSize: "10px" }}>⟳</span>
+                            <Text style={{ color: "#666666", fontSize: "11px" }}>Procesando...</Text>
+                          </>
+                        )}
+                        {doc.status === 'FAILED' && (
+                          <>
+                            <span style={{ color: "#E31837", fontSize: "10px" }}>✗</span>
+                            <Text style={{ color: "#666666", fontSize: "11px" }}>Error</Text>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<DeleteOutlined style={{ fontSize: "12px" }} />}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDeleteDocument(doc.id, doc.file_name)
+                    }}
+                    style={{
+                      color: "#E31837",
+                      padding: "4px",
+                      minWidth: "auto",
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {isLoadingDocuments && (
+          <div style={{ marginBottom: "20px", textAlign: "center" }}>
+            <Text style={{ color: "#888888", fontSize: "13px" }}>Cargando documentos...</Text>
+          </div>
+        )}
+
+        <div style={{ marginBottom: "20px" }}>
+          <Text style={{ color: "#888888", fontSize: "14px", display: "block", marginBottom: "8px" }}>Archivos</Text>
+          <Text style={{ color: "#666666", fontSize: "12px", display: "block", marginBottom: "12px" }}>
+            Formatos permitidos: PDF, Word, PowerPoint, Excel
+          </Text>
+          <Upload
+            multiple
+            fileList={fileList}
+            onChange={({ fileList }) => setFileList(fileList)}
+            beforeUpload={() => false}
+            showUploadList={false}
+            accept={acceptedFileTypes}
+          >
+            <Button
+              icon={<PlusOutlined />}
+              style={{
+                background: "#2A2A2D",
+                border: "1px dashed #4A4A4D",
+                borderRadius: "8px",
+                color: "#AAAAAA",
+                width: "100%",
+                height: "48px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+              }}
+            >
+              Añadir archivos
+            </Button>
+          </Upload>
+          
+          {/* Lista de archivos subidos */}
+          {fileList.length > 0 && (
+            <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
+              {fileList.map((file) => (
+                <div
+                  key={file.uid}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "10px 12px",
+                    background: "#2A2A2D",
+                    borderRadius: "8px",
+                    border: "1px solid #3A3A3D",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1, minWidth: 0 }}>
+                    {getFileIcon(file.name)}
+                    <Text
+                      style={{
+                        color: "#E3E3E3",
+                        fontSize: "13px",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {file.name}
+                    </Text>
+                  </div>
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<CloseOutlined style={{ fontSize: "12px" }} />}
+                    onClick={() => handleRemoveFile(file)}
+                    style={{
+                      color: "#666666",
+                      padding: "4px",
+                      minWidth: "auto",
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={{ marginBottom: "24px" }}>
+          <Text style={{ color: "#888888", fontSize: "14px", display: "block", marginBottom: "8px" }}>
+            Contexto adicional para la IA
+          </Text>
+          <TextArea
+            placeholder="Edita el contexto para la IA..."
+            value={editContext}
+            onChange={(e) => setEditContext(e.target.value)}
+            rows={4}
+            style={{
+              background: "#2A2A2D",
+              border: "1px solid #3A3A3D",
+              borderRadius: "8px",
+              padding: "12px 16px",
+              color: "#FFFFFF",
+              fontSize: "14px",
+              resize: "none",
+            }}
+          />
+        </div>
+
+        <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+          <Button
+            onClick={() => setIsEditModalOpen(false)}
+            style={{
+              background: "transparent",
+              border: "1px solid #3A3A3D",
+              borderRadius: "8px",
+              color: "#888888",
+              padding: "8px 24px",
+              height: "auto",
+            }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={confirmEdit}
+            style={{
+              background: "#E53935",
+              border: "none",
+              borderRadius: "8px",
+              color: "#FFFFFF",
+              padding: "8px 24px",
+              height: "auto",
+            }}
+          >
+            Guardar cambios
+          </Button>
+        </div>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        title={null}
+        open={isDeleteModalOpen}
+        onCancel={() => setIsDeleteModalOpen(false)}
+        footer={null}
+        centered
+        width={400}
+        styles={modalStyles}
+        closeIcon={<span style={{ color: "#666666", fontSize: "18px" }}>×</span>}
+      >
+        <div style={{ textAlign: "center", padding: "20px 0" }}>
+          <DeleteOutlined style={{ fontSize: "48px", color: "#E53935", marginBottom: "16px" }} />
+          <div style={{ marginBottom: "16px" }}>
+            <Text style={{ color: "#FFFFFF", fontSize: "20px", fontWeight: 600, display: "block" }}>
+              Eliminar {currentEditItem?.type === "workspace" ? "Workspace" : "Chat"}
+            </Text>
+          </div>
+          <Text style={{ color: "#888888", fontSize: "14px", display: "block", marginBottom: "8px" }}>
+            ¿Estás seguro de que deseas eliminar "{currentEditItem?.label}"?
+          </Text>
+          {currentEditItem?.type === "workspace" && (
+            <Text style={{ color: "#E53935", fontSize: "13px", display: "block" }}>
+              Esta acción eliminará también todos los chats asociados.
+            </Text>
+          )}
+        </div>
+
+        <div style={{ display: "flex", gap: "12px", justifyContent: "center", marginTop: "16px" }}>
+          <Button
+            onClick={() => setIsDeleteModalOpen(false)}
+            style={{
+              background: "transparent",
+              border: "1px solid #3A3A3D",
+              borderRadius: "8px",
+              color: "#888888",
+              padding: "8px 24px",
+              height: "auto",
+            }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={confirmDelete}
+            style={{
+              background: "#E53935",
+              border: "none",
+              borderRadius: "8px",
+              color: "#FFFFFF",
+              padding: "8px 24px",
+              height: "auto",
+            }}
+          >
+            Eliminar
+          </Button>
+        </div>
+      </Modal>
+    </>
+  )
+}
