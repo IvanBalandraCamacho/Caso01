@@ -26,7 +26,7 @@ import {
 import { Button, Layout, Typography, Modal, Input, Upload, Dropdown, App } from "antd"
 import { useState, useEffect, useRef } from "react"
 import { useWorkspaceContext } from "@/context/WorkspaceContext"
-import { fetchWorkspaceDocuments, deleteDocumentApi } from "@/lib/api"
+import { fetchWorkspaceDocuments, deleteDocumentApi, uploadDocumentApi } from "@/lib/api"
 import type { DocumentPublic } from "@/types/api"
 
 const { Sider } = Layout
@@ -70,7 +70,12 @@ export default function Sidebar() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [workspaceName, setWorkspaceName] = useState("")
   const [additionalContext, setAdditionalContext] = useState("")
-  const [fileList, setFileList] = useState<UploadFile[]>([])
+  const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [documentStatus, setDocumentStatus] = useState<"idle" | "uploading" | "processing" | "completed">("idle");
+  const [uploadedDocumentIds, setUploadedDocumentIds] = useState<string[]>([]);
+  const [createdWorkspaceId, setCreatedWorkspaceId] = useState<string | null>(null);
+  const [wsConnection, setWsConnection] = useState<WebSocket | null>(null);
   const [selectedItem, setSelectedItem] = useState<string | null>(null)
 
   const [isRenameModalOpen, setIsRenameModalOpen] = useState(false)
@@ -224,6 +229,7 @@ export default function Sidebar() {
     setCurrentEditItem(item)
     setEditContext("")
     setExistingDocuments([])
+    setFileList([])
     setIsEditModalOpen(true)
     
     // Cargar documentos del workspace
@@ -263,19 +269,48 @@ export default function Sidebar() {
   }
 
   const confirmEdit = async () => {
-    if (!currentEditItem) return
+    if (!currentEditItem) return;
     
+    setIsUploading(true);
     try {
       if (currentEditItem.type === "workspace") {
-        await updateWorkspaceApi(currentEditItem.key, { instructions: editContext })
+        // 1. Update workspace context
+        await updateWorkspaceApi(currentEditItem.key, { instructions: editContext });
+
+        // 2. Upload new files if any
+        if (fileList.length > 0) {
+          const uploadPromises = fileList.map(async (file) => {
+            if (!file.originFileObj) return;
+            const formData = new FormData();
+            formData.append("file", file.originFileObj);
+            
+            try {
+              await uploadDocumentApi(currentEditItem.key, formData);
+              return { success: true };
+            } catch (error) {
+              console.error(`Error uploading ${file.name}:`, error);
+              return { success: false };
+            }
+          });
+
+          await Promise.all(uploadPromises);
+        }
+
+        // 3. Refresh documents list
+        const docs = await fetchWorkspaceDocuments(currentEditItem.key);
+        setExistingDocuments(docs);
       }
     } catch (error) {
-      console.error("Error editing:", error)
+      console.error("Error editing:", error);
+      message.error("Error al actualizar el workspace");
+    } finally {
+      setIsUploading(false);
     }
     
-    setIsEditModalOpen(false)
-    setCurrentEditItem(null)
-    setEditContext("")
+    setIsEditModalOpen(false);
+    setCurrentEditItem(null);
+    setEditContext("");
+    setFileList([]);
   }
 
   const confirmDelete = async () => {
@@ -335,27 +370,133 @@ export default function Sidebar() {
   }
 
   const handleCloseModal = () => {
+    // No permitir cerrar si está subiendo o procesando
+    if (isUploading || documentStatus === "processing") {
+      return;
+    }
     setIsModalOpen(false)
     setWorkspaceName("")
     setAdditionalContext("")
     setFileList([])
+    setDocumentStatus("idle")
+    setUploadedDocumentIds([])
+    setCreatedWorkspaceId(null)
+    if (wsConnection) {
+      wsConnection.close()
+      setWsConnection(null)
+    }
   }
 
   const handleCreateWorkspace = async () => {
+    setIsUploading(true);
+    setDocumentStatus("uploading");
+    
     try {
+      // 1. Create workspace first
       const newWorkspace = await createWorkspaceApi({
         name: workspaceName,
         description: additionalContext || undefined,
         instructions: additionalContext || undefined,
-      })
-      handleCloseModal()
-      router.push(`/workspace/${newWorkspace.id}`)
+      });
+
+      setCreatedWorkspaceId(newWorkspace.id);
+
+      // 2. Upload files if any
+      if (fileList.length > 0) {
+        const uploadedIds: string[] = [];
+        
+        for (const file of fileList) {
+          if (!file.originFileObj) continue;
+          const formData = new FormData();
+          formData.append("file", file.originFileObj);
+          
+          try {
+            const uploadedDoc = await uploadDocumentApi(newWorkspace.id, formData);
+            uploadedIds.push(uploadedDoc.id);
+          } catch (error) {
+            console.error(`Error uploading ${file.name}:`, error);
+            message.error(`Error al subir ${file.name}`);
+          }
+        }
+
+        setUploadedDocumentIds(uploadedIds);
+        setIsUploading(false);
+
+        // 3. Si se subieron archivos, esperar a que terminen de procesarse
+        if (uploadedIds.length > 0) {
+          setDocumentStatus("processing");
+          
+          // Setup WebSocket to track document processing
+          const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/api/v1/ws/notifications";
+          const ws = new WebSocket(wsUrl);
+          
+          ws.onopen = () => {
+            console.log("✅ WebSocket conectado para tracking de documentos");
+          };
+
+          ws.onmessage = (event) => {
+            try {
+              const data = JSON.parse(event.data);
+              
+              // Check if this notification is for one of our documents
+              if (data.document_id && uploadedIds.includes(data.document_id)) {
+                if (data.status === "COMPLETED") {
+                  // Remove from pending list
+                  const stillPending = uploadedIds.filter(id => id !== data.document_id);
+                  
+                  // If all documents are processed, navigate
+                  if (stillPending.length === 0) {
+                    setDocumentStatus("completed");
+                    ws.close();
+                    
+                    setTimeout(() => {
+                      handleCloseModal();
+                      router.push(`/workspace/${newWorkspace.id}`);
+                    }, 500);
+                  }
+                } else if (data.status === "ERROR") {
+                  message.error(`Error al procesar documento`);
+                  // Continue anyway, don't block the user
+                  ws.close();
+                  handleCloseModal();
+                  router.push(`/workspace/${newWorkspace.id}`);
+                }
+              }
+            } catch (err) {
+              console.error("Error parseando mensaje WS:", err);
+            }
+          };
+
+          ws.onerror = (err) => {
+            console.error("Error en WebSocket:", err);
+            // Continue anyway if WS fails
+            handleCloseModal();
+            router.push(`/workspace/${newWorkspace.id}`);
+          };
+
+          setWsConnection(ws);
+          return;
+        }
+      }
+
+      // 4. Si no hay archivos, navegar directamente
+      setIsUploading(false);
+      setDocumentStatus("completed");
+      handleCloseModal();
+      router.push(`/workspace/${newWorkspace.id}`);
     } catch (error) {
-      console.error("Error creating workspace:", error)
+      console.error("Error creating workspace:", error);
+      message.error("Error al crear el workspace");
+      setIsUploading(false);
+      setDocumentStatus("idle");
     }
   }
 
   const handleRemoveFile = (file: UploadFile) => {
+    // No permitir eliminar archivos durante la subida o procesamiento
+    if (isUploading || documentStatus === "processing") {
+      return;
+    }
     setFileList(fileList.filter((f) => f.uid !== file.uid))
   }
 
@@ -972,6 +1113,7 @@ export default function Sidebar() {
             placeholder="Ej: Proyecto Marketing Q1"
             value={workspaceName}
             onChange={(e) => setWorkspaceName(e.target.value)}
+            disabled={isUploading || documentStatus === "processing"}
             style={{
               background: "#2A2A2D",
               border: "1px solid #3A3A3D",
@@ -1027,11 +1169,22 @@ export default function Sidebar() {
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <FileOutlined style={{ color: "#888888", fontSize: "14px" }} />
-                    <Text style={{ color: "#E3E3E3", fontSize: "13px" }}>{file.name}</Text>
+                    <div>
+                      <Text style={{ color: "#E3E3E3", fontSize: "13px" }}>{file.name}</Text>
+                      {documentStatus === "processing" && (
+                        <div style={{ fontSize: "11px", color: "#faad14", marginTop: "2px" }}>
+                          ⏱ Procesando...
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <DeleteOutlined
                     onClick={() => handleRemoveFile(file)}
-                    style={{ color: "#666666", fontSize: "14px", cursor: "pointer" }}
+                    style={{ 
+                      color: isUploading || documentStatus === "processing" ? "#444444" : "#666666", 
+                      fontSize: "14px", 
+                      cursor: isUploading || documentStatus === "processing" ? "not-allowed" : "pointer" 
+                    }}
                   />
                 </div>
               ))}
@@ -1048,6 +1201,7 @@ export default function Sidebar() {
             placeholder="Describe el propósito del workspace, instrucciones especiales o información relevante para la IA..."
             value={additionalContext}
             onChange={(e) => setAdditionalContext(e.target.value)}
+            disabled={isUploading || documentStatus === "processing"}
             rows={4}
             style={{
               background: "#2A2A2D",
@@ -1065,30 +1219,37 @@ export default function Sidebar() {
         <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
           <Button
             onClick={handleCloseModal}
+            disabled={isUploading || documentStatus === "processing"}
             style={{
               background: "transparent",
               border: "1px solid #3A3A3D",
               borderRadius: "8px",
-              color: "#888888",
+              color: isUploading || documentStatus === "processing" ? "#666666" : "#888888",
               padding: "8px 20px",
               height: "auto",
+              cursor: isUploading || documentStatus === "processing" ? "not-allowed" : "pointer",
             }}
           >
             Cancelar
           </Button>
           <Button
             onClick={handleCreateWorkspace}
-            disabled={!workspaceName.trim()}
+            disabled={!workspaceName.trim() || isUploading || documentStatus === "processing"}
+            loading={isUploading || documentStatus === "processing"}
             style={{
-              background: workspaceName.trim() ? "#E53935" : "#3A3A3D",
+              background: workspaceName.trim() && !isUploading && documentStatus !== "processing" ? "#E53935" : "#3A3A3D",
               border: "none",
               borderRadius: "8px",
-              color: workspaceName.trim() ? "#FFFFFF" : "#666666",
+              color: workspaceName.trim() && !isUploading && documentStatus !== "processing" ? "#FFFFFF" : "#666666",
               padding: "8px 20px",
               height: "auto",
             }}
           >
-            Crear Workspace
+            {documentStatus === "processing" 
+              ? "Procesando documentos..." 
+              : isUploading 
+                ? "Subiendo archivos..." 
+                : "Crear Workspace"}
           </Button>
         </div>
       </Modal>
@@ -1164,7 +1325,11 @@ export default function Sidebar() {
       <Modal
         title={null}
         open={isEditModalOpen}
-        onCancel={() => setIsEditModalOpen(false)}
+        onCancel={() => {
+          setIsEditModalOpen(false);
+          setFileList([]);
+          setEditContext("");
+        }}
         footer={null}
         centered
         width={500}
@@ -1390,7 +1555,11 @@ export default function Sidebar() {
 
         <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
           <Button
-            onClick={() => setIsEditModalOpen(false)}
+            onClick={() => {
+              setIsEditModalOpen(false);
+              setFileList([]);
+              setEditContext("");
+            }}
             style={{
               background: "transparent",
               border: "1px solid #3A3A3D",
@@ -1404,16 +1573,18 @@ export default function Sidebar() {
           </Button>
           <Button
             onClick={confirmEdit}
+            disabled={isUploading}
+            loading={isUploading}
             style={{
-              background: "#E53935",
+              background: isUploading ? "#3A3A3D" : "#E53935",
               border: "none",
               borderRadius: "8px",
-              color: "#FFFFFF",
+              color: isUploading ? "#666666" : "#FFFFFF",
               padding: "8px 24px",
               height: "auto",
             }}
           >
-            Guardar cambios
+            {isUploading ? "Guardando..." : "Guardar cambios"}
           </Button>
         </div>
       </Modal>
