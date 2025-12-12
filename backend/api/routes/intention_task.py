@@ -223,33 +223,9 @@ def requirements_matrix_chat(
 
     # Construir prompt simple
     prompt = f"""
-Actúa como un analista de requisitos extremadamente preciso y perfeccionista. 
-Tu única tarea será EXTRAER del documento adjunto los requisitos funcionales y no funcionales tal como aparecen escritos.
-
- INSTRUCCIONES:
-1. SOLO debes copiar los requisitos funcionales y no funcionales que ya estén escritos en el documento.
-2. NO debes inventar, interpretar, completar, resumir ni corregir nada.
-3. Cada requisito debe mostrarse de forma 100% textual, idéntico al documento, incluyendo comas, puntos, errores ortográficos o cualquier detalle.
-4. Si un requisito aparece numerado, con viñeta o con un título junto a él, también debes conservarlo exactamente como aparece.
-5. NO extraigas información implícita. Solo lo que esté explícitamente escrito como requisito.
-
- FORMATO DE ENTREGA:
-Muestra los requisitos tal cual, sin modificar su orden, en las siguientes secciones:
-
-###  Requisitos Funcionales 
-- Texto EXACTO del documento
-- Texto EXACTO…
-
-###  Requisitos No Funcionales 
-- Texto EXACTO del documento
-- Texto EXACTO…
-
- Si el documento NO contiene alguno de estos tipos, debes escribir literalmente:
-> “El documento no presenta requisitos funcionales de forma explícita” 
-o 
-> “El documento no presenta requisitos no funcionales de forma explícita”
-
- Objetivo absoluto: **copia exacta palabra por palabra.**
+    OBJETIVO: Generar los requerimientos funcionales y no funcionales.
+    A TENER EN CUENTA: Analiza todo el documento RFP/RFI. Los requerimientos funcionales no son de proceso son del sistema, normalmente está especificado en alguna parte del documento .
+    IMPORTANTE: Devuelveme los requermientos funcionales y no funcionales tal cual está en el documento.
     """
     
     # Construir prompt completo
@@ -355,8 +331,10 @@ def legal_risks_chat(
 
     # Construir prompt simple
     prompt = f"""
-    Identifica los riesgos legales o regulatorios asociados
-    al documento adjunto.
+    Analiza exclusivamente la información contenida en el documento proporcionado y no utilices conocimientos externos. Identifica únicamente los riesgos legales o regulatorios que se desprenden explícitamente del contenido del documento.
+    Describe los riesgos de manera concreta, específica y basada en cláusulas, obligaciones o condiciones que puedan generar sanciones, multas, terminación anticipada, ejecución de garantías, incumplimientos normativos o responsabilidades legales.
+    No inventes riesgos ni generalices. No incluyas recomendaciones, explicaciones teóricas ni definiciones.
+    Entrega la salida como una lista clara de riesgos legales o regulatorios identificados dentro del documento.
     """
     
     # Construir prompt completo
@@ -408,7 +386,7 @@ def specific_query_chat(
 
     # Construir prompt simple
     prompt = f"""
-   Eres un asistente especializado en analizar documentos RFP (Request For Proposal).
+Eres un asistente especializado en analizar documentos RFP (Request For Proposal).
 Debes responder estrictamente y únicamente con información contenida en el documento proporcionado.
 
 REGLAS:

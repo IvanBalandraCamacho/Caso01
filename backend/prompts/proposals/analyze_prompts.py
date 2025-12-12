@@ -49,6 +49,18 @@ class AnalyzePrompts:
         3. Para objetivo general, debe ser concreto y estratégico. Evita frases genéricas. El objetivo debe describir con precisión el propósito institucional del proyecto
         4. Para el equipo, sugiere perfiles basados en las tecnologías y alcance
         5. Retorna SOLO el JSON, sin texto adicional
+        Prohibido generar preguntas subjetivas, abiertas, opinables o que dependan de expectativas, satisfacción, evaluaciones o juicios del cliente. 
+        Cada pregunta debe tener una única respuesta correcta basada en un hecho verificable, parámetro concreto o dato exacto. 
+        Prohibido preguntar por:
+        - expectativas
+        - percepciones
+        - niveles de satisfacción
+        - métricas de éxito
+        - criterios de evaluación
+        - opiniones
+        - procesos “esperados” sin base explícita
+        - preferencias personales del cliente
+Si una pregunta no puede formularse de manera 100% objetiva y verificable, NO debe incluirse.
         6. Analiza TODO el documento RFP/RFI y genera solo preguntas objetivas, técnicas y obligatorias para evitar ambigüedad contractual, enfocándote en información faltante, ambigua o inconclusa en: alcance funcional, arquitectura, integraciones, normativas aplicables, datos sensibles, seguridad, SLAs/penalidades, volúmenes transaccionales, licenciamiento, ambientes, soporte, propiedad intelectual y restricciones operativas. Cada pregunta debe ser específica, verificable y no genérica, similar al estilo de la referencia dada. Prohibido hacer preguntas vagas. Si una duda impacta costo, plazo, responsabilidad o cumplimiento legal, destácala explícitamente con: “(impacto en costo/plazo/legalidad)”.
             Toma de referencia:
             ¿Cuál es el promedio mensual histórico de incidencias registradas por el sistema y por servicio o plataforma?
@@ -227,8 +239,11 @@ RESUMEN EJECUTIVO: genera un resumen ejecutivo estratégico que interprete la ne
 
 1.2 Análisis de Requerimientos
    NOTA: Redacta un análisis profundo, objetivo y técnico, explicando cómo los requerimientos del proyecto responden a las brechas institucionales, normativas, operacionales y tecnológicas del cliente. Describe el propósito estratégico del proyecto, impacto en la modernización, interoperabilidad, seguridad, trazabilidad y calidad del servicio. Incluye impacto si no se atienden (riesgos en costo, plazo, continuidad, seguridad, legalidad o reputación). Describe actividades obligatorias de levantamiento y validación (entrevistas, workshops, BPMN, matriz RACI, backlog, documentación estandarizada y actas). Nunca resumas ni uses frases genéricas; redacta en mínimo 8 líneas por párrafo.
-   - Requerimientos Funcionales. NOTA: Redacta requerimientos funcionales específicos, trazables y normativamente alineados, describiendo propósito, reglas de negocio, actores, restricciones, validaciones y criterios de aceptación verificables. Evita listas superficiales; cada requerimiento debe reflejar impacto operativo, normativo y en calidad del servicio. Si el RFP omite información funcional, decláralo como omisión y formula preguntas críticas sin proponer soluciones como obligación.
-   - Requerimientos Técnicos. NOTA: Redacta requerimientos técnicos profundos y verificables, describiendo arquitectura, interoperabilidad, seguridad, tecnologías permitidas, mantenibilidad, rendimiento y escalabilidad. Explica propósito, riesgos si no se cumplen y criterios de aceptación medibles (pruebas, auditoría, validaciones técnicas). Si el RFP no define tecnologías, indícalo como omisión y sólo propón recomendaciones opcionales basadas en mejores prácticas, nunca como obligación contractual.
+   - Requerimientos Funcionales. 
+   - Requerimientos Técnicos.
+    OBJETIVO: Generar los requerimientos funcionales y no funcionales.
+    A TENER EN CUENTA: Analiza todo el documento RFP/RFI. Los requerimientos funcionales no son de proceso son del sistema, normalmente está especificado en alguna parte del documento .
+    IMPORTANTE: Devuelveme los requermientos funcionales y no funcionales tal cual está en el documento.
 
 1.3 Análisis de Riesgos
    NOTA: (Identifica más de un riesgo si es posible) Redacta el análisis de riesgos en uno o mas bloques narrativo por riesgo (mínimo 10 líneas cada uno, sin viñetas, sin listas, sin frases sueltas), con redacción densa, técnica, argumentativa y contextualizada al estado actual del cliente. Cada párrafo debe explicar obligatoriamente: (1) el origen específico del riesgo basado en el sistema actual, su infraestructura, su madurez digital y su modelo de operación; (2) el impacto detallado en costo, plazo, continuidad operativa, seguridad de información, reputación institucional y cumplimiento legal; (3) el nivel de criticidad justificado con evidencia del sector público y la gestión crediticia; (4) una estrategia de mitigación que NO agregue nuevas actividades ni aumente el alcance del RFP, sino que use solo acciones posibles dentro del contrato; y (5) una contingencia verificable y medible mediante pilotos, operación paralela, validaciones legales, pruebas técnicas, auditorías, mecanismos de transición progresiva o controles formales de cumplimiento. Debe incluir riesgos tecnológicos, normativos, operacionales, de adopción y de seguridad, todos vinculados explícitamente al sistema legado y a los procesos reales del cliente.
@@ -277,7 +292,18 @@ INSTRUCCIONES FINALES PARA CUALQUIER RFP
 
 REGUNTAS SUGERIDAS
  NOTA: Analiza TODO el documento RFP/RFI y genera solo preguntas objetivas, técnicas y obligatorias para evitar ambigüedad contractual, enfocándote en información faltante, ambigua o inconclusa en: alcance funcional, arquitectura, integraciones, normativas aplicables, datos sensibles, seguridad, SLAs/penalidades, volúmenes transaccionales, licenciamiento, ambientes, soporte, propiedad intelectual y restricciones operativas. Cada pregunta debe ser específica, verificable y no genérica, similar al estilo de la referencia dada. Prohibido hacer preguntas vagas. Si una duda impacta costo, plazo, responsabilidad o cumplimiento legal, destácala explícitamente con: “(impacto en costo/plazo/legalidad)”.
-            Toma de referencia:
+     Prohibido generar preguntas subjetivas, abiertas, opinables o que dependan de expectativas, satisfacción, evaluaciones o juicios del cliente. 
+        Cada pregunta debe tener una única respuesta correcta basada en un hecho verificable, parámetro concreto o dato exacto. 
+        Prohibido preguntar por:
+        - expectativas
+        - percepciones
+        - niveles de satisfacción
+        - métricas de éxito
+        - criterios de evaluación
+        - opiniones
+        - procesos “esperados” sin base explícita
+        - preferencias personales del cliente
+             Toma de referencia:
             ¿Cuál es el promedio mensual histórico de incidencias registradas por el sistema y por servicio o plataforma?
             ¿Qué proporción corresponde a incidencias críticas, altas y medias?
             ¿La Superintendencia cuenta con herramienta propia de Service Desk o debe proveerla el oferente?

@@ -13,9 +13,11 @@ logger = logging.getLogger(__name__)
 class VectorStore:
     def __init__(self):
         self.qdrant_url = os.getenv("QDRANT_URL", "http://qdrant:6333")
-        self.collection_name = "documents"
-        self.embedding_model_name = "all-MiniLM-L6-v2"
-        self.vector_size = 384  # Size for all-MiniLM-L6-v2
+        # ACTUALIZACIÓN: Usando documents_v2 para el nuevo modelo de 768 dimensiones
+        self.collection_name = "documents_v2" 
+        # ACTUALIZACIÓN: Modelo multilingüe superior (E5 Base)
+        self.embedding_model_name = "intfloat/multilingual-e5-base"
+        self.vector_size = 768  # Size for multilingual-e5-base
 
         # Initialize Qdrant Client
         logger.info(f"VECTOR_STORE: Connecting to Qdrant at {self.qdrant_url}...")
@@ -43,8 +45,23 @@ class VectorStore:
                 )
             )
 
-    def get_embedding(self, text: str) -> List[float]:
-        """Generate embedding for a single string."""
+    def get_embedding(self, text: str, is_query: bool = False) -> List[float]:
+        """
+        Generate embedding for a single string.
+        E5 models require 'query: ' prefix for queries and 'passage: ' for documents (optional but recommended).
+        For simplicity and standard E5 usage: 
+        - Queries MUST have "query: " prefix.
+        - Documents (passages) usually used as is or with "passage: ".
+        We will use "query: " for search queries and raw text for documents (symmetric is fine for base, but prefix is better).
+        Let's stick to adding "query: " only for search queries as per E5 instructions for asymmetric tasks.
+        """
+        if is_query:
+            text = f"query: {text}"
+        else:
+            # E5 technically recommends "passage: " for documents but often works fine without if trained symmetrically.
+            # However, standard E5 practice acts as asymmetric. We'll add "passage: " to be safe and consistent.
+            text = f"passage: {text}"
+            
         embedding = self.embedding_model.encode(text, convert_to_numpy=True)
         return embedding.tolist()
 
@@ -58,12 +75,10 @@ class VectorStore:
             content = doc["content"]
             metadata = doc["metadata"]
             
-            # Generate embedding
-            vector = self.get_embedding(content)
+            # Generate embedding (is_query=False)
+            vector = self.get_embedding(content, is_query=False)
             
             # Generate deterministic ID if not provided, or use random
-            # Using deterministic ID based on content + metadata helps avoid duplicates
-            # But for simplicity and safety with updates, we'll use a UUIDv5 of the ID if present
             if "chunk_id" in metadata:
                 point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, metadata["chunk_id"]))
             else:
@@ -92,7 +107,8 @@ class VectorStore:
         """
         Search for similar documents.
         """
-        query_vector = self.get_embedding(query)
+        # Generate embedding (is_query=True)
+        query_vector = self.get_embedding(query, is_query=True)
 
         # Build filters
         must_filters = []
@@ -123,7 +139,7 @@ class VectorStore:
             query=query_vector,
             query_filter=qmodels.Filter(must=must_filters) if must_filters else None,
             limit=limit,
-            score_threshold=None, # Disable threshold for debugging
+            score_threshold=None, # Disable threshold for debugging/re-calibration
             with_payload=True
         ).points
 
@@ -157,3 +173,4 @@ class VectorStore:
 
 # Singleton instance
 vector_store = VectorStore()
+

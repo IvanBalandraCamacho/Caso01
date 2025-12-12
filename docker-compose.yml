@@ -92,7 +92,7 @@ services:
     build: ./rag-service
     container_name: ia_rag_service
     ports:
-      - "8080:8080"
+      - "8082:8080"
     env_file:
       - ./backend/.env
     environment:
