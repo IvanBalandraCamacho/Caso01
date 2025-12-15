@@ -20,6 +20,7 @@ import {
   FilePptOutlined,
   FileExcelOutlined,
 } from "@ant-design/icons"
+import { CopyIcon } from "lucide-react"
 import { Button, Input, Typography, Drawer, Upload, Popover, Modal, App } from "antd"
 import type { UploadFile } from "antd"
 import ReactMarkdown from "react-markdown"
@@ -61,11 +62,11 @@ interface MessageItemProps {
   markdownComponents: any
 }
 
-const MessageItem = memo<MessageItemProps>(({ 
-  message, 
-  hoveredMessageId, 
-  onMouseEnter, 
-  onMouseLeave, 
+const MessageItem = memo<MessageItemProps>(({
+  message,
+  hoveredMessageId,
+  onMouseEnter,
+  onMouseLeave,
   onCopyMessage,
   remarkPlugins,
   markdownComponents
@@ -94,12 +95,12 @@ const MessageItem = memo<MessageItemProps>(({
         </div>
       ) : (
         <div style={{ width: "100%", maxWidth: "90%" }}>
-          <div 
+          <div
             className="markdown-content"
-            style={{ 
-              color: "#E3E3E3", 
-              fontSize: "15px", 
-              lineHeight: "1.8" 
+            style={{
+              color: "#E3E3E3",
+              fontSize: "15px",
+              lineHeight: "1.8"
             }}
           >
             <ReactMarkdown
@@ -109,24 +110,17 @@ const MessageItem = memo<MessageItemProps>(({
               {message.content}
             </ReactMarkdown>
           </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
 
-          {hoveredMessageId === message.id && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "4px",
-                marginTop: "16px",
-              }}
-            >
-              <Button
-                type="text"
-                icon={<CopyOutlined />}
-                onClick={() => onCopyMessage(message.content)}
-                style={{ color: "#888888", fontSize: "14px" }}
-              />
-            </div>
-          )}
+
+            <Button
+              type="text"
+              icon={<CopyIcon size={16} rotate={90} />}
+              onClick={() => onCopyMessage(message.content)}
+
+              style={{ color: "#878787", display: "flex", alignItems: "center", justifyContent: "center", padding: "4px" }}
+            />
+          </div>
         </div>
       )}
     </div>
@@ -164,7 +158,7 @@ export default function ChatPage({
   const [conversationTitle, setConversationTitle] = useState("Chat")
   const { user } = useUser()
   const { sendMessage: sendChatMessage } = useChatStream()
-  
+
   // Sources from the current streaming response (separate from message content)
   const [currentSources, setCurrentSources] = useState<DocumentChunk[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
@@ -306,11 +300,11 @@ export default function ChatPage({
         try {
           await deleteDocumentApi(documentId)
           message.success('Documento eliminado correctamente')
-          
+
           // Recargar ambas listas de documentos
           const workspaceDocs = await fetchWorkspaceDocuments(id)
           setWorkspaceFiles(workspaceDocs)
-          
+
           const conversationDocs = await fetchConversationDocuments({
             workspaceId: id,
             conversationId: chatId,
@@ -330,10 +324,10 @@ export default function ChatPage({
       try {
         setIsLoadingHistory(true)
         const conversation = await fetchConversationMessages(id, chatId)
-        
+
         // Establecer el título de la conversación
         setConversationTitle(conversation.title)
-        
+
         // Convertir mensajes de la API al formato local
         if (conversation.messages && conversation.messages.length > 0) {
           const loadedMessages: Message[] = conversation.messages.map((msg) => ({
@@ -352,10 +346,10 @@ export default function ChatPage({
             timestamp: new Date(),
           }
           setMessages([userMessage])
-          
+
           // Limpiar la URL removiendo los query params
           router.replace(`/workspace/${id}/chat/${chatId}`, { scroll: false })
-          
+
           // Simular respuesta (esto debería ser reemplazado por llamada real a la API)
           setTimeout(() => {
             const aiResponse: Message = {
@@ -390,7 +384,7 @@ export default function ChatPage({
   // Scroll optimizado con throttling
   useEffect(() => {
     const now = Date.now()
-    
+
     if (isStreaming) {
       // Durante streaming, hacer scroll sin animación y con throttle
       if (now - lastScrollTimeRef.current > 100) {
@@ -477,12 +471,12 @@ export default function ChatPage({
           onComplete: (conversationId: string) => {
             console.log("Streaming completed, conversation_id:", conversationId)
             setIsStreaming(false)
-            
+
             // Mostrar el botón de propuesta solo cuando termine el streaming
             if (detectedIntentRef.current === "GENERATE_PROPOSAL") {
               setProposalGenerated(true)
             }
-            
+
             // Solo apagar loading si no se recibió ningún chunk
             if (!firstChunkReceived) {
               setIsLoading(false)
@@ -615,7 +609,7 @@ export default function ChatPage({
         accept={allowedFileTypes.join(',')}
         fileList={attachedFiles}
         beforeUpload={(file) => {
-          const isAllowed = allowedMimeTypes.includes(file.type) || 
+          const isAllowed = allowedMimeTypes.includes(file.type) ||
             allowedFileTypes.some(ext => file.name.toLowerCase().endsWith(ext))
           if (!isAllowed) {
             message.error("Solo se permiten archivos PDF, Word, PowerPoint y Excel")
@@ -826,10 +820,10 @@ export default function ChatPage({
             flexShrink: 0,
           }}
         >
-          <img 
-            src="/logo.svg" 
-            alt="Logo" 
-            style={{ height: "40px" }} 
+          <img
+            src="/logo.svg"
+            alt="Logo"
+            style={{ height: "40px" }}
           />
 
           {/* Chat Name - center */}

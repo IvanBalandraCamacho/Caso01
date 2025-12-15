@@ -23,9 +23,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const { user } = useUser()
   const router = useRouter()
   const { message: antMessage } = App.useApp()
-  
-  const { 
-    activeWorkspace, 
+
+  const {
+    activeWorkspace,
     setActiveWorkspace,
     conversations,
     isLoadingConversations,
@@ -72,11 +72,11 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     const date = new Date(dateString)
     const now = new Date()
     const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
-    
+
     if (diffDays === 0) return "Hoy"
     if (diffDays === 1) return "Ayer"
     if (diffDays < 7) return `${diffDays} días`
-    
+
     return date.toLocaleDateString("es-ES", { day: "numeric", month: "short" })
   }
 
@@ -145,10 +145,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             alignItems: "center",
           }}
         >
-          <img 
-            src="/logo.svg" 
-            alt="Logo" 
-            style={{ height: "40px" }} 
+          <img
+            src="/logo.svg"
+            alt="Logo"
+            style={{ height: "40px" }}
           />
 
           <UserMenu user={user} />
@@ -212,7 +212,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                     'application/vnd.ms-excel',
                     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                   ].includes(file.type)
-                  
+
                   if (!isValidType) {
                     antMessage.error('Solo se permiten archivos PDF, Word, PowerPoint y Excel')
                     return Upload.LIST_IGNORE
@@ -307,7 +307,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                           maxWidth: "600px",
                         }}
                       >
-                        {conversation.message_count 
+                        {conversation.message_count
                           ? `${conversation.message_count} mensaje${conversation.message_count !== 1 ? 's' : ''}`
                           : "Sin mensajes"}
                       </Text>
