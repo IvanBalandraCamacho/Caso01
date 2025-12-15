@@ -19,6 +19,8 @@ import {
   FileWordOutlined,
   FilePptOutlined,
   FileExcelOutlined,
+  LoadingOutlined,
+  DownloadOutlined,
 } from "@ant-design/icons"
 import { CopyIcon } from "lucide-react"
 import { Button, Input, Typography, Drawer, Upload, Popover, Modal, App, Spin } from "antd"
@@ -164,6 +166,12 @@ export default function ChatPage({
   // Sources from the current streaming response (separate from message content)
   const [currentSources, setCurrentSources] = useState<DocumentChunk[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false)
+
+  // Estados para preview de documentos
+  const [previewFile, setPreviewFile] = useState<DocumentPublic | null>(null)
+  const [previewModalOpen, setPreviewModalOpen] = useState(false)
+  const [previewFileUrl, setPreviewFileUrl] = useState<string | null>(null)
 
   // Estados para micrófono y grabación de voz
   const [isRecording, setIsRecording] = useState(false)
@@ -347,6 +355,57 @@ export default function ChatPage({
     })
   }
 
+  // Función para previsualizar documentos
+  const handlePreview = async (file: DocumentPublic) => {
+    try {
+      setPreviewFile(file)
+      setPreviewModalOpen(true)
+      
+      // Verificar si el archivo es visualizable (PDF o imagen)
+      const fileName = file.filename || file.name || ""
+      const fileType = fileName.toLowerCase()
+      const isPdf = fileType.includes('.pdf') || file.mime_type?.includes('pdf')
+      const isImage = fileType.includes('.png') || fileType.includes('.jpg') || fileType.includes('.jpeg') || 
+                     fileType.includes('.gif') || fileType.includes('.webp') || file.mime_type?.includes('image')
+      
+      if (!isPdf && !isImage) {
+        message.info('Este tipo de archivo no se puede previsualizar. Descárgalo para verlo.')
+        return
+      }
+
+      // Hacer fetch autenticado al endpoint de descarga
+      const token = localStorage.getItem('access_token')
+      const response = await fetch(`http://localhost:8000/api/v1/documents/${file.id}/download`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error('Error al descargar el archivo para previsualización')
+      }
+
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      setPreviewFileUrl(url)
+      
+    } catch (error) {
+      console.error('Error previewing file:', error)
+      message.error('Error al cargar la previsualización del archivo')
+      setPreviewModalOpen(false)
+    }
+  }
+
+  // Función para cerrar preview y limpiar recursos
+  const handleClosePreview = () => {
+    setPreviewModalOpen(false)
+    setPreviewFile(null)
+    if (previewFileUrl) {
+      URL.revokeObjectURL(previewFileUrl)
+      setPreviewFileUrl(null)
+    }
+  }
+
   // Cargar historial de la conversación desde la API
   useEffect(() => {
     const loadConversationHistory = async () => {
@@ -368,6 +427,7 @@ export default function ChatPage({
           setMessages(loadedMessages)
         } else if (initialMessage) {
           // Si no hay mensajes pero hay un mensaje inicial (nuevo chat)
+          // Solo mostrar el mensaje inicial, no crear respuesta automática
           const userMessage: Message = {
             id: "1",
             role: "user",
@@ -379,16 +439,8 @@ export default function ChatPage({
           // Limpiar la URL removiendo los query params
           router.replace(`/workspace/${id}/chat/${chatId}`, { scroll: false })
 
-          // Simular respuesta (esto debería ser reemplazado por llamada real a la API)
-          setTimeout(() => {
-            const aiResponse: Message = {
-              id: "2",
-              role: "assistant",
-              content: "¡Hola! He recibido tu mensaje. ¿En qué puedo ayudarte?",
-              timestamp: new Date(),
-            }
-            setMessages((prev) => [...prev, aiResponse])
-          }, 1000)
+          // El usuario puede enviar este mensaje usando handleSendMessage normalmente
+          // No crear respuesta automática para evitar duplicados
         }
       } catch (error) {
         console.error("Error loading conversation history:", error)
@@ -439,11 +491,15 @@ export default function ChatPage({
       timestamp: new Date(),
     }
 
+    // Guardar referencia de archivos antes de limpiar
+    const filesToUpload = [...attachedFiles]
+    
     setMessages((prev) => [...prev, newUserMessage])
     const currentMessage = inputMessage
     setInputMessage("")
     setAttachedFiles([]) // Limpiar archivos de UI inmediatamente
     setIsLoading(true)
+    setIsUploadingFiles(filesToUpload.length > 0) // Mostrar estado de subida
     setProposalGenerated(false)
     detectedIntentRef.current = null
     setCurrentSources([])
@@ -451,8 +507,8 @@ export default function ChatPage({
 
     try {
       // 1. Subir archivos si existen
-      if (attachedFiles.length > 0) {
-        for (const fileItem of attachedFiles) {
+      if (filesToUpload.length > 0) {
+        for (const fileItem of filesToUpload) {
           if (fileItem.originFileObj) {
             try {
               await uploadDocumentToConversation({
@@ -467,6 +523,7 @@ export default function ChatPage({
             }
           }
         }
+        setIsUploadingFiles(false)
       }
 
       // 2. Enviar mensaje de texto
@@ -769,6 +826,15 @@ export default function ChatPage({
                 padding: "10px 12px",
                 background: "#2A2A2D",
                 borderRadius: "8px",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+              onClick={() => handlePreview(file)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "#3A3A3D"
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "#2A2A2D"
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1, minWidth: 0 }}>
@@ -1126,7 +1192,23 @@ export default function ChatPage({
 
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   {/* Mostrar micrófono si no hay texto, enviar si hay texto */}
-                  {!inputMessage.trim() ? (
+                  {isUploadingFiles ? (
+                    <Button
+                      type="text"
+                      icon={<LoadingOutlined style={{ fontSize: "16px" }} />}
+                      disabled
+                      style={{
+                        color: "#888888",
+                        background: "#3A3A3D",
+                        width: "40px",
+                        height: "40px",
+                        borderRadius: "50%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    />
+                  ) : !inputMessage.trim() ? (
                     <Button
                       type="text"
                       icon={<AudioOutlined style={{ fontSize: "18px" }} />}
@@ -1219,6 +1301,139 @@ export default function ChatPage({
             Entendido
           </Button>
         </div>
+      </Modal>
+
+      {/* Modal de previsualización de documentos */}
+      <Modal
+        title={null}
+        open={previewModalOpen}
+        onCancel={handleClosePreview}
+        footer={null}
+        centered
+        width="80%"
+        styles={{
+          mask: { background: "rgba(0, 0, 0, 0.8)" },
+          header: { background: "#1E1E21", borderBottom: "1px solid #2A2A2D" },
+          body: { background: "#1E1E21", padding: "0" },
+          content: { background: "#1E1E21" },
+        }}
+        style={{ background: "#1E1E21", borderRadius: "16px", border: "1px solid #2A2A2D" }}
+        closeIcon={<span style={{ color: "#666666", fontSize: "18px" }}>×</span>}
+      >
+        {previewFile && (
+          <div style={{ display: "flex", flexDirection: "column", height: "80vh" }}>
+            {/* Header del modal */}
+            <div style={{ 
+              padding: "16px 20px", 
+              borderBottom: "1px solid #2A2A2D",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                {getFileIcon(previewFile.file_type)}
+                <Text style={{ color: "#FFFFFF", fontSize: "16px", fontWeight: 500 }}>
+                  {previewFile.file_name}
+                </Text>
+              </div>
+              <Text style={{ color: "#888888", fontSize: "12px" }}>
+                Previsualización
+              </Text>
+            </div>
+            
+            {/* Contenido del preview */}
+            <div style={{ 
+              flex: 1, 
+              display: "flex", 
+              alignItems: "center", 
+              justifyContent: "center", 
+              background: "#000000",
+              padding: "20px"
+            }}>
+              {previewFileUrl ? (
+                (() => {
+                  const fileName = (previewFile.filename || previewFile.name || "").toLowerCase()
+                  const isPdf = fileName.includes('.pdf') || previewFile.mime_type?.includes('pdf')
+                  const isImage = fileName.includes('.png') || fileName.includes('.jpg') || fileName.includes('.jpeg') || 
+                                 fileName.includes('.gif') || fileName.includes('.webp') || previewFile.mime_type?.includes('image')
+                  
+                  if (isPdf) {
+                    return (
+                      <iframe
+                        src={previewFileUrl}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          border: "none",
+                          borderRadius: "8px",
+                          background: "#FFFFFF"
+                        }}
+                        title={`Preview de ${previewFile.file_name}`}
+                      />
+                    )
+                  } else if (isImage) {
+                    return (
+                      <img
+                        src={previewFileUrl}
+                        alt={`Preview de ${previewFile.file_name}`}
+                        style={{
+                          maxWidth: "100%",
+                          maxHeight: "100%",
+                          objectFit: "contain",
+                          borderRadius: "8px"
+                        }}
+                      />
+                    )
+                  } else {
+                    return (
+                      <div style={{ textAlign: "center", color: "#888888" }}>
+                        <Text style={{ color: "#888888" }}>
+                          Tipo de archivo no soportado para previsualización
+                        </Text>
+                      </div>
+                    )
+                  }
+                })()
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Spin size="large" />
+                  <Text style={{ color: "#888888", marginLeft: "12px" }}>
+                    Cargando previsualización...
+                  </Text>
+                </div>
+              )}
+            </div>
+            
+            {/* Footer con botón de descarga */}
+            <div style={{ 
+              padding: "16px 20px", 
+              borderTop: "1px solid #2A2A2D",
+              display: "flex",
+              justifyContent: "center"
+            }}>
+              <Button
+                type="primary"
+                onClick={() => {
+                  // Descargar el archivo
+                  const link = document.createElement('a')
+                  link.href = previewFileUrl!
+                  link.download = previewFile.file_name
+                  link.click()
+                }}
+                icon={<DownloadOutlined />}
+                style={{
+                  background: "#E31837",
+                  borderColor: "#E31837",
+                  borderRadius: "8px",
+                  height: "40px",
+                  padding: "0 24px",
+                }}
+              >
+                Descargar archivo
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   )

@@ -101,8 +101,8 @@ export default function ChatArea() {
 
         const chatId = uuidv4()
         setSelectedModel(model)
-        // Mantenemos ruta rápida para texto, ya que la carga de archivos es la que OBLIGA a tener ID real
-        router.push(`/chat/${chatId}?message=${encodeURIComponent(message)}`)
+        // Redirección a la ruta correcta del workspace
+        router.push(`/workspace/${activeWorkspace.id}/chat/${chatId}?message=${encodeURIComponent(message)}`)
       }
     }
   }, [activeWorkspace, message, model, attachedFiles, router, setSelectedModel, modal, antMessage])
