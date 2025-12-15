@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useSearchParams, useRouter } from "next/navigation"
-import { use, useState, useRef, useEffect, useMemo, memo } from "react"
+import { use, useState, useRef, useEffect, useMemo, memo, useCallback } from "react"
 import {
   SendOutlined,
   PlusOutlined,
@@ -30,6 +30,8 @@ import { UserMenu } from "@/components/UserMenu"
 import { useUser } from "@/hooks/useUser"
 import { useChatStream } from "@/hooks/useChatStream"
 import { fetchConversationMessages, fetchConversationDocuments, fetchWorkspaceDocuments, deleteDocumentApi } from "@/lib/api"
+import { useNotificationsWS, type NotificationMessage } from "@/hooks/useNotificationsWS"
+import { useUploadDocumentToConversation } from "@/hooks/useApi"
 import type { DocumentPublic, DocumentChunk } from "@/types/api"
 
 const { Text } = Typography
@@ -286,6 +288,33 @@ export default function ChatPage({
     loadDocuments()
   }, [id, chatId])
 
+  // Configuración de WebSocket para notificaciones
+  const handleWSNotification = useCallback((msg: NotificationMessage) => {
+    // Si la notificación es sobre documentos de esta conversación o workspace, recargar
+    if (msg.type === "document_status") {
+      if (msg.status === "COMPLETED" || msg.status === "FAILED" || msg.status === "PROCESSING") {
+        // Recargar documentos
+        fetchWorkspaceDocuments(id).then(setWorkspaceFiles)
+        fetchConversationDocuments({
+          workspaceId: id,
+          conversationId: chatId,
+        }).then(setChatFiles)
+
+        if (msg.status === "COMPLETED") {
+          message.success(`Documento procesado: ${msg.message || "Listo"}`)
+        } else if (msg.status === "FAILED") {
+          message.error(`Error al procesar documento: ${msg.error || "Error desconocido"}`)
+        }
+      }
+    }
+  }, [id, chatId, message])
+
+  useNotificationsWS({
+    workspaceId: id,
+    onMessage: handleWSNotification,
+    enabled: true,
+  })
+
   // Función para eliminar documento
   const handleDeleteDocument = (documentId: string, fileName: string) => {
     modal.confirm({
@@ -397,8 +426,10 @@ export default function ChatPage({
     }
   }, [messages, isStreaming])
 
+  const { mutateAsync: uploadDocumentToConversation } = useUploadDocumentToConversation()
+
   const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return
+    if (!inputMessage.trim() && attachedFiles.length === 0) return
 
     messageCounterRef.current += 1
     const newUserMessage: Message = {
@@ -411,97 +442,125 @@ export default function ChatPage({
     setMessages((prev) => [...prev, newUserMessage])
     const currentMessage = inputMessage
     setInputMessage("")
+    setAttachedFiles([]) // Limpiar archivos de UI inmediatamente
     setIsLoading(true)
     setProposalGenerated(false)
     detectedIntentRef.current = null
     setCurrentSources([])
     setIsStreaming(true)
 
-    // Crear ID para el mensaje del asistente
-    messageCounterRef.current += 1
-    const assistantMessageId = `msg-${Date.now()}-${messageCounterRef.current}`
-    let firstChunkReceived = false
-
     try {
-      await sendChatMessage(
-        id,
-        {
-          query: currentMessage,
-          conversation_id: chatId,
-          model: "string",
-        },
-        {
-          // Llamado cuando recibimos contenido del asistente
-          onContentUpdate: (content: string) => {
-            // En la primera actualización, agregar el mensaje al chat
-            if (!firstChunkReceived) {
-              firstChunkReceived = true
-              setIsLoading(false)
-              const assistantMessage: Message = {
-                id: assistantMessageId,
-                role: "assistant",
-                content,
-                timestamp: new Date(),
-              }
-              setMessages((prev) => [...prev, assistantMessage])
-            } else {
-              // Actualizar contenido del mensaje existente
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === assistantMessageId
-                    ? { ...msg, content }
-                    : msg
-                )
-              )
+      // 1. Subir archivos si existen
+      if (attachedFiles.length > 0) {
+        for (const fileItem of attachedFiles) {
+          if (fileItem.originFileObj) {
+            try {
+              await uploadDocumentToConversation({
+                workspaceId: id,
+                conversationId: chatId,
+                file: fileItem.originFileObj,
+              })
+              message.success(`Archivo ${fileItem.name} subido correctamente`)
+            } catch (error) {
+              console.error(`Error uploading file ${fileItem.name}:`, error)
+              message.error(`Error al subir ${fileItem.name}`)
             }
-          },
-
-          // Llamado cuando recibimos sources/referencias
-          onSourcesUpdate: (sources: DocumentChunk[]) => {
-            setCurrentSources(sources)
-          },
-
-          // Llamado cuando detectamos intención
-          onIntentDetected: (intent: string) => {
-            // Guardar la intención en ref, pero no mostrar el botón hasta que termine
-            detectedIntentRef.current = intent
-          },
-
-          // Llamado cuando finaliza el streaming
-          onComplete: (conversationId: string) => {
-            console.log("Streaming completed, conversation_id:", conversationId)
-            setIsStreaming(false)
-
-            // Mostrar el botón de propuesta solo cuando termine el streaming
-            if (detectedIntentRef.current === "GENERATE_PROPOSAL") {
-              setProposalGenerated(true)
-            }
-
-            // Solo apagar loading si no se recibió ningún chunk
-            if (!firstChunkReceived) {
-              setIsLoading(false)
-            }
-          },
-
-          // Llamado si hay error
-          onError: (error: Error) => {
-            console.error("Error sending message:", error)
-            message.error("Error al enviar el mensaje. Inténtalo de nuevo.")
-            // Remover el mensaje del asistente si falla
-            setMessages((prev) => prev.filter((msg) => msg.id !== assistantMessageId))
-            setIsLoading(false)
-            setIsStreaming(false)
-          },
+          }
         }
-      )
+      }
+
+      // 2. Enviar mensaje de texto
+      if (currentMessage.trim()) {
+        // Crear ID para el mensaje del asistente
+        messageCounterRef.current += 1
+        const assistantMessageId = `msg-${Date.now()}-${messageCounterRef.current}`
+        let firstChunkReceived = false
+
+        await sendChatMessage(
+          id,
+          {
+            query: currentMessage,
+            conversation_id: chatId,
+            model: "string", // Deberíamos usar el modelo seleccionado si existiera selector
+          },
+          {
+            // Llamado cuando recibimos contenido del asistente
+            onContentUpdate: (content: string) => {
+              // En la primera actualización, agregar el mensaje al chat
+              if (!firstChunkReceived) {
+                firstChunkReceived = true
+                setIsLoading(false)
+                const assistantMessage: Message = {
+                  id: assistantMessageId,
+                  role: "assistant",
+                  content,
+                  timestamp: new Date(),
+                }
+                setMessages((prev) => [...prev, assistantMessage])
+              } else {
+                // Actualizar contenido del mensaje existente
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === assistantMessageId
+                      ? { ...msg, content }
+                      : msg
+                  )
+                )
+              }
+            },
+
+            // Llamado cuando recibimos sources/referencias
+            onSourcesUpdate: (sources: DocumentChunk[]) => {
+              setCurrentSources(sources)
+            },
+
+            // Llamado cuando detectamos intención
+            onIntentDetected: (intent: string) => {
+              // Guardar la intención en ref, pero no mostrar el botón hasta que termine
+              detectedIntentRef.current = intent
+            },
+
+            // Llamado cuando finaliza el streaming
+            onComplete: (conversationId: string) => {
+              console.log("Streaming completed, conversation_id:", conversationId)
+              setIsStreaming(false)
+
+              // Mostrar el botón de propuesta solo cuando termine el streaming
+              if (detectedIntentRef.current === "GENERATE_PROPOSAL") {
+                setProposalGenerated(true)
+              }
+
+              // Solo apagar loading si no se recibió ningún chunk
+              if (!firstChunkReceived) {
+                setIsLoading(false)
+              }
+            },
+
+            // Llamado si hay error
+            onError: (error: Error) => {
+              console.error("Error sending message:", error)
+              message.error("Error al enviar el mensaje. Inténtalo de nuevo.")
+              // Remover el mensaje del asistente si falla
+              setMessages((prev) => prev.filter((msg) => msg.id !== assistantMessageId))
+              setIsLoading(false)
+              setIsStreaming(false)
+            },
+          }
+        )
+      } else {
+        // Si solo se subieron archivos y no hay texto, terminar carga
+        setIsLoading(false)
+        setIsStreaming(false)
+      }
+
     } catch (error) {
       console.error("Error sending message:", error)
-      message.error("Error al enviar el mensaje. Inténtalo de nuevo.")
+      message.error("Error al procesar la solicitud.")
 
-      // Remover mensajes si falla
+      // Remover el mensaje de usuario si falla todo
       setMessages((prev) =>
         prev.filter(
-          (msg) => msg.id !== newUserMessage.id && msg.id !== assistantMessageId
+          (msg) => msg.id !== newUserMessage.id
         )
       )
       setIsLoading(false)

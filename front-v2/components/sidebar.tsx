@@ -28,6 +28,7 @@ import { useState, useEffect, useRef } from "react"
 import { useWorkspaceContext } from "@/context/WorkspaceContext"
 import { fetchWorkspaceDocuments, deleteDocumentApi, uploadDocumentApi } from "@/lib/api"
 import type { DocumentPublic } from "@/types/api"
+import { ChevronDown, ChevronRight } from "lucide-react"
 
 const { Sider } = Layout
 const { Text } = Typography
@@ -57,7 +58,7 @@ export default function Sidebar() {
   const router = useRouter()
   const pathname = usePathname()
   const { message, modal } = App.useApp()
-  
+
   // Cargar estado del sidebar desde localStorage
   const [collapsed, setCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -109,7 +110,7 @@ export default function Sidebar() {
     return null
   })
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
-  
+
   // Ref para rastrear el último workspace para el que se cargaron conversaciones
   const lastLoadedWorkspaceRef = useRef<string | null>(null)
 
@@ -139,8 +140,8 @@ export default function Sidebar() {
   }, [expandedWorkspace])
 
   // Usar el contexto de workspaces
-  const { 
-    workspaces, 
+  const {
+    workspaces,
     conversations,
     activeWorkspace,
     setActiveWorkspace,
@@ -167,11 +168,11 @@ export default function Sidebar() {
     key: ws.id,
     label: ws.name,
     // Solo mostrar chats si este workspace está expandido y es el activo
-    chats: (expandedWorkspace === ws.id && activeWorkspace?.id === ws.id) 
+    chats: (expandedWorkspace === ws.id && activeWorkspace?.id === ws.id)
       ? conversations.map(conv => ({
-          key: conv.id,
-          label: conv.title,
-        }))
+        key: conv.id,
+        label: conv.title,
+      }))
       : [],
   }))
 
@@ -187,7 +188,7 @@ export default function Sidebar() {
         setSelectedItem(workspaceId)
         // Collapse chats section when a workspace is open
         setChatsSectionCollapsed(true)
-        
+
         // Cargar conversaciones solo si hay workspaces y no se han cargado ya para este workspace
         const workspace = workspaces.find(ws => ws.id === workspaceId)
         if (workspace && lastLoadedWorkspaceRef.current !== workspaceId) {
@@ -231,7 +232,7 @@ export default function Sidebar() {
     setExistingDocuments([])
     setFileList([])
     setIsEditModalOpen(true)
-    
+
     // Cargar documentos del workspace
     if (item.type === "workspace") {
       setIsLoadingDocuments(true)
@@ -253,7 +254,7 @@ export default function Sidebar() {
 
   const confirmRename = async () => {
     if (!currentEditItem) return
-    
+
     try {
       if (currentEditItem.type === "workspace") {
         await updateWorkspaceApi(currentEditItem.key, { name: renameValue })
@@ -262,7 +263,7 @@ export default function Sidebar() {
     } catch (error) {
       console.error("Error renaming:", error)
     }
-    
+
     setIsRenameModalOpen(false)
     setCurrentEditItem(null)
     setRenameValue("")
@@ -270,7 +271,7 @@ export default function Sidebar() {
 
   const confirmEdit = async () => {
     if (!currentEditItem) return;
-    
+
     setIsUploading(true);
     try {
       if (currentEditItem.type === "workspace") {
@@ -283,7 +284,7 @@ export default function Sidebar() {
             if (!file.originFileObj) return;
             const formData = new FormData();
             formData.append("file", file.originFileObj);
-            
+
             try {
               await uploadDocumentApi(currentEditItem.key, formData);
               return { success: true };
@@ -306,7 +307,7 @@ export default function Sidebar() {
     } finally {
       setIsUploading(false);
     }
-    
+
     setIsEditModalOpen(false);
     setCurrentEditItem(null);
     setEditContext("");
@@ -315,7 +316,7 @@ export default function Sidebar() {
 
   const confirmDelete = async () => {
     if (!currentEditItem) return
-    
+
     try {
       if (currentEditItem.type === "workspace") {
         await deleteWorkspaceApi(currentEditItem.key)
@@ -325,7 +326,7 @@ export default function Sidebar() {
     } catch (error) {
       console.error("Error deleting:", error)
     }
-    
+
     setIsDeleteModalOpen(false)
     setCurrentEditItem(null)
   }
@@ -342,16 +343,16 @@ export default function Sidebar() {
     },
     ...(item.type === "workspace"
       ? [
-          {
-            key: "edit",
-            label: "Editar",
-            icon: <EditOutlined />,
-            onClick: (e: { domEvent: React.MouseEvent }) => {
-              e.domEvent.stopPropagation()
-              handleEdit(item)
-            },
+        {
+          key: "edit",
+          label: "Editar",
+          icon: <EditOutlined />,
+          onClick: (e: { domEvent: React.MouseEvent }) => {
+            e.domEvent.stopPropagation()
+            handleEdit(item)
           },
-        ]
+        },
+      ]
       : []),
     {
       key: "delete",
@@ -390,7 +391,7 @@ export default function Sidebar() {
   const handleCreateWorkspace = async () => {
     setIsUploading(true);
     setDocumentStatus("uploading");
-    
+
     try {
       // 1. Create workspace first
       const newWorkspace = await createWorkspaceApi({
@@ -404,12 +405,12 @@ export default function Sidebar() {
       // 2. Upload files if any
       if (fileList.length > 0) {
         const uploadedIds: string[] = [];
-        
+
         for (const file of fileList) {
           if (!file.originFileObj) continue;
           const formData = new FormData();
           formData.append("file", file.originFileObj);
-          
+
           try {
             const uploadedDoc = await uploadDocumentApi(newWorkspace.id, formData);
             uploadedIds.push(uploadedDoc.id);
@@ -425,11 +426,11 @@ export default function Sidebar() {
         // 3. Si se subieron archivos, esperar a que terminen de procesarse
         if (uploadedIds.length > 0) {
           setDocumentStatus("processing");
-          
+
           // Setup WebSocket to track document processing
           const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/api/v1/ws/notifications";
           const ws = new WebSocket(wsUrl);
-          
+
           ws.onopen = () => {
             console.log("✅ WebSocket conectado para tracking de documentos");
           };
@@ -437,18 +438,18 @@ export default function Sidebar() {
           ws.onmessage = (event) => {
             try {
               const data = JSON.parse(event.data);
-              
+
               // Check if this notification is for one of our documents
               if (data.document_id && uploadedIds.includes(data.document_id)) {
                 if (data.status === "COMPLETED") {
                   // Remove from pending list
                   const stillPending = uploadedIds.filter(id => id !== data.document_id);
-                  
+
                   // If all documents are processed, navigate
                   if (stillPending.length === 0) {
                     setDocumentStatus("completed");
                     ws.close();
-                    
+
                     setTimeout(() => {
                       handleCloseModal();
                       router.push(`/workspace/${newWorkspace.id}`);
@@ -682,38 +683,38 @@ export default function Sidebar() {
                         background: "#3A3A3D",
                       }}
                     />
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                    <span style={{ color: "#E3E3E3", fontSize: "14px" }}>
-                      <CommentOutlined />
-                    </span>
-                    <Text style={{ color: "#E3E3E3", fontSize: "14px" }}>{chat.label}</Text>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                      <span style={{ color: "#E3E3E3", fontSize: "14px" }}>
+                        <CommentOutlined />
+                      </span>
+                      <Text style={{ color: "#E3E3E3", fontSize: "14px" }}>{chat.label}</Text>
+                    </div>
+                    {(selectedItem === chat.key || hoveredItem === chat.key) && (
+                      <Dropdown
+                        menu={{ items: getDropdownItems(chatItem) }}
+                        trigger={["click"]}
+                        placement="bottomRight"
+                        popupRender={(menu) => (
+                          <div
+                            style={{
+                              background: "#2A2A2D",
+                              borderRadius: "8px",
+                              border: "1px solid #3A3A3D",
+                              overflow: "hidden",
+                            }}
+                          >
+                            {menu}
+                          </div>
+                        )}
+                      >
+                        <MoreOutlined
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ color: "#E3E3E3", fontSize: "14px", padding: "4px" }}
+                        />
+                      </Dropdown>
+                    )}
                   </div>
-                  {(selectedItem === chat.key || hoveredItem === chat.key) && (
-                    <Dropdown
-                      menu={{ items: getDropdownItems(chatItem) }}
-                      trigger={["click"]}
-                      placement="bottomRight"
-                      popupRender={(menu) => (
-                        <div
-                          style={{
-                            background: "#2A2A2D",
-                            borderRadius: "8px",
-                            border: "1px solid #3A3A3D",
-                            overflow: "hidden",
-                          }}
-                        >
-                          {menu}
-                        </div>
-                      )}
-                    >
-                      <MoreOutlined
-                        onClick={(e) => e.stopPropagation()}
-                        style={{ color: "#E3E3E3", fontSize: "14px", padding: "4px" }}
-                      />
-                    </Dropdown>
-                  )}
-                </div>
-              )
+                )
               })
             ) : (
               <div style={{ position: "relative", padding: "10px 16px 10px 40px" }}>
@@ -868,7 +869,7 @@ export default function Sidebar() {
             }}
           >
             <span style={{ color: "#888888", fontSize: "10px" }}>
-              {workspacesSectionCollapsed ? <RightOutlined /> : <DownOutlined />}
+              {workspacesSectionCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
             </span>
             <Text
               style={{
@@ -882,7 +883,7 @@ export default function Sidebar() {
             </Text>
           </div>
         )}
-        
+
         {/* Nuevo Workspace - siempre visible */}
         {!collapsed && (
           <div style={{ marginTop: "8px" }}>
@@ -941,7 +942,7 @@ export default function Sidebar() {
             }}
           >
             <span style={{ color: "#888888", fontSize: "10px" }}>
-              {chatsSectionCollapsed ? <RightOutlined /> : <DownOutlined />}
+              {chatsSectionCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
             </span>
             <Text
               style={{
@@ -1180,10 +1181,10 @@ export default function Sidebar() {
                   </div>
                   <DeleteOutlined
                     onClick={() => handleRemoveFile(file)}
-                    style={{ 
-                      color: isUploading || documentStatus === "processing" ? "#444444" : "#666666", 
-                      fontSize: "14px", 
-                      cursor: isUploading || documentStatus === "processing" ? "not-allowed" : "pointer" 
+                    style={{
+                      color: isUploading || documentStatus === "processing" ? "#444444" : "#666666",
+                      fontSize: "14px",
+                      cursor: isUploading || documentStatus === "processing" ? "not-allowed" : "pointer"
                     }}
                   />
                 </div>
@@ -1245,10 +1246,10 @@ export default function Sidebar() {
               height: "auto",
             }}
           >
-            {documentStatus === "processing" 
-              ? "Procesando documentos..." 
-              : isUploading 
-                ? "Subiendo archivos..." 
+            {documentStatus === "processing"
+              ? "Procesando documentos..."
+              : isUploading
+                ? "Subiendo archivos..."
                 : "Crear Workspace"}
           </Button>
         </div>
@@ -1365,13 +1366,13 @@ export default function Sidebar() {
             <Text style={{ color: "#888888", fontSize: "14px", display: "block", marginBottom: "8px" }}>
               Documentos Existentes
             </Text>
-            <div 
-              style={{ 
-                maxHeight: "200px", 
-                overflowY: "auto", 
-                display: "flex", 
-                flexDirection: "column", 
-                gap: "8px" 
+            <div
+              style={{
+                maxHeight: "200px",
+                overflowY: "auto",
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px"
               }}
               className="chat-scrollbar"
             >
@@ -1484,7 +1485,7 @@ export default function Sidebar() {
               Añadir archivos
             </Button>
           </Upload>
-          
+
           {/* Lista de archivos subidos */}
           {fileList.length > 0 && (
             <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>

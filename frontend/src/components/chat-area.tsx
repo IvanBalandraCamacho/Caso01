@@ -448,7 +448,7 @@ export function ChatArea() {
               console.log("ChatArea: Historial actual tiene", prevHistory.length, "mensajes");
               const lastMessage = prevHistory[prevHistory.length - 1];
               console.log("ChatArea: Último mensaje:", lastMessage?.role, "longitud:", lastMessage?.content?.length);
-              
+
               if (lastMessage && lastMessage.role === "assistant" && lastMessage.content && lastMessage.content.length > 100) {
                 // Crear proposalData básico con el contenido del mensaje
                 const basicProposalData: ProposalAnalysis = {

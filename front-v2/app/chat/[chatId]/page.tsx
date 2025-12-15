@@ -67,11 +67,11 @@ interface MessageItemProps {
   showLoadingIndicator: boolean
 }
 
-const MessageItem = memo<MessageItemProps>(({ 
-  message, 
-  hoveredMessageId, 
-  onMouseEnter, 
-  onMouseLeave, 
+const MessageItem = memo<MessageItemProps>(({
+  message,
+  hoveredMessageId,
+  onMouseEnter,
+  onMouseLeave,
   onCopyMessage,
   remarkPlugins,
   markdownComponents,
@@ -100,7 +100,7 @@ const MessageItem = memo<MessageItemProps>(({
           <Text style={{ color: "#FFFFFF", fontSize: "15px", lineHeight: "1.6" }}>{message.content}</Text>
         </div>
       ) : (
-        <div 
+        <div
           style={{ width: "100%", maxWidth: "90%" }}
           onMouseEnter={() => onMouseEnter(message.id)}
           onMouseLeave={onMouseLeave}
@@ -112,12 +112,12 @@ const MessageItem = memo<MessageItemProps>(({
               <Text style={{ color: "#AAAAAA", fontSize: "14px" }}>Generando respuesta...</Text>
             </div>
           ) : (
-            <div 
+            <div
               className="markdown-content"
-              style={{ 
-                color: "#E3E3E3", 
-                fontSize: "15px", 
-                lineHeight: "1.8" 
+              style={{
+                color: "#E3E3E3",
+                fontSize: "15px",
+                lineHeight: "1.8"
               }}
             >
               <ReactMarkdown
@@ -195,7 +195,7 @@ export default function GeneralChatPage({
   const [isRecording, setIsRecording] = useState(false)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const messageCounterRef = useRef(0)
-  
+
   // Refs para streaming
   const activeStreamRef = useRef<string | null>(null)
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
@@ -288,7 +288,7 @@ export default function GeneralChatPage({
     if (initialMessage && messages.length === 0 && activeWorkspace?.id) {
       // Enviar mensaje inicial con streaming real
       handleSendMessageWithStreaming(initialMessage)
-      
+
       // Limpiar la URL removiendo los query params
       router.replace(`/chat/${chatId}`, { scroll: false })
     }
@@ -337,7 +337,7 @@ export default function GeneralChatPage({
         }
         return newHistory
       })
-      
+
       // Extraer conversation_id si está disponible
       if ("conversation_id" in event && event.conversation_id) {
         setCurrentConversationId(event.conversation_id)
@@ -446,7 +446,7 @@ export default function GeneralChatPage({
 
   const handleSendMessage = () => {
     if (!inputMessage.trim() || isStreaming) return
-    
+
     const messageToSend = inputMessage
     setInputMessage("")
     handleSendMessageWithStreaming(messageToSend)
@@ -552,7 +552,7 @@ export default function GeneralChatPage({
         accept={allowedFileTypes.join(',')}
         fileList={attachedFiles}
         beforeUpload={(file) => {
-          const isAllowed = allowedMimeTypes.includes(file.type) || 
+          const isAllowed = allowedMimeTypes.includes(file.type) ||
             allowedFileTypes.some(ext => file.name.toLowerCase().endsWith(ext))
           if (!isAllowed) {
             message.error("Solo se permiten archivos PDF, Word, PowerPoint y Excel")
@@ -726,10 +726,10 @@ export default function GeneralChatPage({
             flexShrink: 0,
           }}
         >
-          <img 
-            src="/logo.svg" 
-            alt="Logo" 
-            style={{ height: "40px" }} 
+          <img
+            src="/logo.svg"
+            alt="Logo"
+            style={{ height: "40px" }}
           />
 
           {/* Chat Name - center */}
@@ -786,7 +786,7 @@ export default function GeneralChatPage({
                 </Text>
               </div>
             )}
-            
+
             {messages.map((msg, index) => (
               <MessageItem
                 key={msg.id}
@@ -885,10 +885,10 @@ export default function GeneralChatPage({
             >
               <TextArea
                 placeholder={
-                  !activeWorkspace 
-                    ? "Selecciona un workspace primero..." 
-                    : isRecording 
-                      ? "Escuchando..." 
+                  !activeWorkspace
+                    ? "Selecciona un workspace primero..."
+                    : isRecording
+                      ? "Escuchando..."
                       : "Escribe tu mensaje..."
                 }
                 value={inputMessage}
