@@ -21,7 +21,7 @@ import {
   FileExcelOutlined,
 } from "@ant-design/icons"
 import { CopyIcon } from "lucide-react"
-import { Button, Input, Typography, Drawer, Upload, Popover, Modal, App } from "antd"
+import { Button, Input, Typography, Drawer, Upload, Popover, Modal, App, Spin } from "antd"
 import type { UploadFile } from "antd"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -892,7 +892,9 @@ export default function ChatPage({
             {isLoading && (
               <div style={{ marginBottom: "24px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-                  <Text style={{ color: "#AAAAAA", fontSize: "14px" }}>Pensando...</Text>
+                  <Text style={{ color: "#AAAAAA", fontSize: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <Spin styles={{ indicator: { color: "#f20024" } }} /> Pensando...
+                  </Text>
                 </div>
               </div>
             )}
