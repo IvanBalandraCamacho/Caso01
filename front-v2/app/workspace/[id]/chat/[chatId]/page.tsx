@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useSearchParams, useRouter } from "next/navigation"
-import { use, useState, useRef, useEffect, useMemo, memo, useCallback } from "react"
+import { use, useState, useRef, useEffect, useMemo, memo } from "react"
 import {
   SendOutlined,
   PlusOutlined,
@@ -19,11 +19,9 @@ import {
   FileWordOutlined,
   FilePptOutlined,
   FileExcelOutlined,
-  LoadingOutlined,
-  DownloadOutlined,
+  DownOutlined,
 } from "@ant-design/icons"
-import { CopyIcon } from "lucide-react"
-import { Button, Input, Typography, Drawer, Upload, Popover, Modal, App, Spin } from "antd"
+import { Button, Input, Typography, Drawer, Upload, Popover, Modal, App, Select } from "antd"
 import type { UploadFile } from "antd"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -31,9 +29,8 @@ import Sidebar from "@/components/sidebar"
 import { UserMenu } from "@/components/UserMenu"
 import { useUser } from "@/hooks/useUser"
 import { useChatStream } from "@/hooks/useChatStream"
+import { useWorkspaceContext } from "@/context/WorkspaceContext"
 import { fetchConversationMessages, fetchConversationDocuments, fetchWorkspaceDocuments, deleteDocumentApi } from "@/lib/api"
-import { useNotificationsWS, type NotificationMessage } from "@/hooks/useNotificationsWS"
-import { useUploadDocumentToConversation } from "@/hooks/useApi"
 import type { DocumentPublic, DocumentChunk } from "@/types/api"
 
 const { Text } = Typography
@@ -66,11 +63,11 @@ interface MessageItemProps {
   markdownComponents: any
 }
 
-const MessageItem = memo<MessageItemProps>(({
-  message,
-  hoveredMessageId,
-  onMouseEnter,
-  onMouseLeave,
+const MessageItem = memo<MessageItemProps>(({ 
+  message, 
+  hoveredMessageId, 
+  onMouseEnter, 
+  onMouseLeave, 
   onCopyMessage,
   remarkPlugins,
   markdownComponents
@@ -99,12 +96,12 @@ const MessageItem = memo<MessageItemProps>(({
         </div>
       ) : (
         <div style={{ width: "100%", maxWidth: "90%" }}>
-          <div
+          <div 
             className="markdown-content"
-            style={{
-              color: "#E3E3E3",
-              fontSize: "15px",
-              lineHeight: "1.8"
+            style={{ 
+              color: "#E3E3E3", 
+              fontSize: "15px", 
+              lineHeight: "1.8" 
             }}
           >
             <ReactMarkdown
@@ -114,17 +111,24 @@ const MessageItem = memo<MessageItemProps>(({
               {message.content}
             </ReactMarkdown>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
 
-
-            <Button
-              type="text"
-              icon={<CopyIcon size={16} rotate={90} />}
-              onClick={() => onCopyMessage(message.content)}
-
-              style={{ color: "#878787", display: "flex", alignItems: "center", justifyContent: "center", padding: "4px" }}
-            />
-          </div>
+          {hoveredMessageId === message.id && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                marginTop: "16px",
+              }}
+            >
+              <Button
+                type="text"
+                icon={<CopyOutlined />}
+                onClick={() => onCopyMessage(message.content)}
+                style={{ color: "#888888", fontSize: "14px" }}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -162,16 +166,11 @@ export default function ChatPage({
   const [conversationTitle, setConversationTitle] = useState("Chat")
   const { user } = useUser()
   const { sendMessage: sendChatMessage } = useChatStream()
-
+  const { selectedModel, setSelectedModel } = useWorkspaceContext()
+  
   // Sources from the current streaming response (separate from message content)
   const [currentSources, setCurrentSources] = useState<DocumentChunk[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
-  const [isUploadingFiles, setIsUploadingFiles] = useState(false)
-
-  // Estados para preview de documentos
-  const [previewFile, setPreviewFile] = useState<DocumentPublic | null>(null)
-  const [previewModalOpen, setPreviewModalOpen] = useState(false)
-  const [previewFileUrl, setPreviewFileUrl] = useState<string | null>(null)
 
   // Estados para micrófono y grabación de voz
   const [isRecording, setIsRecording] = useState(false)
@@ -296,33 +295,6 @@ export default function ChatPage({
     loadDocuments()
   }, [id, chatId])
 
-  // Configuración de WebSocket para notificaciones
-  const handleWSNotification = useCallback((msg: NotificationMessage) => {
-    // Si la notificación es sobre documentos de esta conversación o workspace, recargar
-    if (msg.type === "document_status") {
-      if (msg.status === "COMPLETED" || msg.status === "FAILED" || msg.status === "PROCESSING") {
-        // Recargar documentos
-        fetchWorkspaceDocuments(id).then(setWorkspaceFiles)
-        fetchConversationDocuments({
-          workspaceId: id,
-          conversationId: chatId,
-        }).then(setChatFiles)
-
-        if (msg.status === "COMPLETED") {
-          message.success(`Documento procesado: ${msg.message || "Listo"}`)
-        } else if (msg.status === "FAILED") {
-          message.error(`Error al procesar documento: ${msg.error || "Error desconocido"}`)
-        }
-      }
-    }
-  }, [id, chatId, message])
-
-  useNotificationsWS({
-    workspaceId: id,
-    onMessage: handleWSNotification,
-    enabled: true,
-  })
-
   // Función para eliminar documento
   const handleDeleteDocument = (documentId: string, fileName: string) => {
     modal.confirm({
@@ -337,11 +309,11 @@ export default function ChatPage({
         try {
           await deleteDocumentApi(documentId)
           message.success('Documento eliminado correctamente')
-
+          
           // Recargar ambas listas de documentos
           const workspaceDocs = await fetchWorkspaceDocuments(id)
           setWorkspaceFiles(workspaceDocs)
-
+          
           const conversationDocs = await fetchConversationDocuments({
             workspaceId: id,
             conversationId: chatId,
@@ -355,67 +327,16 @@ export default function ChatPage({
     })
   }
 
-  // Función para previsualizar documentos
-  const handlePreview = async (file: DocumentPublic) => {
-    try {
-      setPreviewFile(file)
-      setPreviewModalOpen(true)
-      
-      // Verificar si el archivo es visualizable (PDF o imagen)
-      const fileName = file.filename || file.name || ""
-      const fileType = fileName.toLowerCase()
-      const isPdf = fileType.includes('.pdf') || file.mime_type?.includes('pdf')
-      const isImage = fileType.includes('.png') || fileType.includes('.jpg') || fileType.includes('.jpeg') || 
-                     fileType.includes('.gif') || fileType.includes('.webp') || file.mime_type?.includes('image')
-      
-      if (!isPdf && !isImage) {
-        message.info('Este tipo de archivo no se puede previsualizar. Descárgalo para verlo.')
-        return
-      }
-
-      // Hacer fetch autenticado al endpoint de descarga
-      const token = localStorage.getItem('access_token')
-      const response = await fetch(`http://localhost:8000/api/v1/documents/${file.id}/download`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error('Error al descargar el archivo para previsualización')
-      }
-
-      const blob = await response.blob()
-      const url = URL.createObjectURL(blob)
-      setPreviewFileUrl(url)
-      
-    } catch (error) {
-      console.error('Error previewing file:', error)
-      message.error('Error al cargar la previsualización del archivo')
-      setPreviewModalOpen(false)
-    }
-  }
-
-  // Función para cerrar preview y limpiar recursos
-  const handleClosePreview = () => {
-    setPreviewModalOpen(false)
-    setPreviewFile(null)
-    if (previewFileUrl) {
-      URL.revokeObjectURL(previewFileUrl)
-      setPreviewFileUrl(null)
-    }
-  }
-
   // Cargar historial de la conversación desde la API
   useEffect(() => {
     const loadConversationHistory = async () => {
       try {
         setIsLoadingHistory(true)
         const conversation = await fetchConversationMessages(id, chatId)
-
+        
         // Establecer el título de la conversación
         setConversationTitle(conversation.title)
-
+        
         // Convertir mensajes de la API al formato local
         if (conversation.messages && conversation.messages.length > 0) {
           const loadedMessages: Message[] = conversation.messages.map((msg) => ({
@@ -427,7 +348,6 @@ export default function ChatPage({
           setMessages(loadedMessages)
         } else if (initialMessage) {
           // Si no hay mensajes pero hay un mensaje inicial (nuevo chat)
-          // Solo mostrar el mensaje inicial, no crear respuesta automática
           const userMessage: Message = {
             id: "1",
             role: "user",
@@ -435,12 +355,20 @@ export default function ChatPage({
             timestamp: new Date(),
           }
           setMessages([userMessage])
-
+          
           // Limpiar la URL removiendo los query params
           router.replace(`/workspace/${id}/chat/${chatId}`, { scroll: false })
-
-          // El usuario puede enviar este mensaje usando handleSendMessage normalmente
-          // No crear respuesta automática para evitar duplicados
+          
+          // Simular respuesta (esto debería ser reemplazado por llamada real a la API)
+          setTimeout(() => {
+            const aiResponse: Message = {
+              id: "2",
+              role: "assistant",
+              content: "¡Hola! He recibido tu mensaje. ¿En qué puedo ayudarte?",
+              timestamp: new Date(),
+            }
+            setMessages((prev) => [...prev, aiResponse])
+          }, 1000)
         }
       } catch (error) {
         console.error("Error loading conversation history:", error)
@@ -465,7 +393,7 @@ export default function ChatPage({
   // Scroll optimizado con throttling
   useEffect(() => {
     const now = Date.now()
-
+    
     if (isStreaming) {
       // Durante streaming, hacer scroll sin animación y con throttle
       if (now - lastScrollTimeRef.current > 100) {
@@ -478,10 +406,8 @@ export default function ChatPage({
     }
   }, [messages, isStreaming])
 
-  const { mutateAsync: uploadDocumentToConversation } = useUploadDocumentToConversation()
-
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() && attachedFiles.length === 0) return
+    if (!inputMessage.trim()) return
 
     messageCounterRef.current += 1
     const newUserMessage: Message = {
@@ -491,133 +417,100 @@ export default function ChatPage({
       timestamp: new Date(),
     }
 
-    // Guardar referencia de archivos antes de limpiar
-    const filesToUpload = [...attachedFiles]
-    
     setMessages((prev) => [...prev, newUserMessage])
     const currentMessage = inputMessage
     setInputMessage("")
-    setAttachedFiles([]) // Limpiar archivos de UI inmediatamente
     setIsLoading(true)
-    setIsUploadingFiles(filesToUpload.length > 0) // Mostrar estado de subida
     setProposalGenerated(false)
     detectedIntentRef.current = null
     setCurrentSources([])
     setIsStreaming(true)
 
+    // Crear ID para el mensaje del asistente
+    messageCounterRef.current += 1
+    const assistantMessageId = `msg-${Date.now()}-${messageCounterRef.current}`
+    let firstChunkReceived = false
+
     try {
-      // 1. Subir archivos si existen
-      if (filesToUpload.length > 0) {
-        for (const fileItem of filesToUpload) {
-          if (fileItem.originFileObj) {
-            try {
-              await uploadDocumentToConversation({
-                workspaceId: id,
-                conversationId: chatId,
-                file: fileItem.originFileObj,
-              })
-              message.success(`Archivo ${fileItem.name} subido correctamente`)
-            } catch (error) {
-              console.error(`Error uploading file ${fileItem.name}:`, error)
-              message.error(`Error al subir ${fileItem.name}`)
-            }
-          }
-        }
-        setIsUploadingFiles(false)
-      }
-
-      // 2. Enviar mensaje de texto
-      if (currentMessage.trim()) {
-        // Crear ID para el mensaje del asistente
-        messageCounterRef.current += 1
-        const assistantMessageId = `msg-${Date.now()}-${messageCounterRef.current}`
-        let firstChunkReceived = false
-
-        await sendChatMessage(
-          id,
-          {
-            query: currentMessage,
-            conversation_id: chatId,
-            model: "string", // Deberíamos usar el modelo seleccionado si existiera selector
-          },
-          {
-            // Llamado cuando recibimos contenido del asistente
-            onContentUpdate: (content: string) => {
-              // En la primera actualización, agregar el mensaje al chat
-              if (!firstChunkReceived) {
-                firstChunkReceived = true
-                setIsLoading(false)
-                const assistantMessage: Message = {
-                  id: assistantMessageId,
-                  role: "assistant",
-                  content,
-                  timestamp: new Date(),
-                }
-                setMessages((prev) => [...prev, assistantMessage])
-              } else {
-                // Actualizar contenido del mensaje existente
-                setMessages((prev) =>
-                  prev.map((msg) =>
-                    msg.id === assistantMessageId
-                      ? { ...msg, content }
-                      : msg
-                  )
-                )
-              }
-            },
-
-            // Llamado cuando recibimos sources/referencias
-            onSourcesUpdate: (sources: DocumentChunk[]) => {
-              setCurrentSources(sources)
-            },
-
-            // Llamado cuando detectamos intención
-            onIntentDetected: (intent: string) => {
-              // Guardar la intención en ref, pero no mostrar el botón hasta que termine
-              detectedIntentRef.current = intent
-            },
-
-            // Llamado cuando finaliza el streaming
-            onComplete: (conversationId: string) => {
-              console.log("Streaming completed, conversation_id:", conversationId)
-              setIsStreaming(false)
-
-              // Mostrar el botón de propuesta solo cuando termine el streaming
-              if (detectedIntentRef.current === "GENERATE_PROPOSAL") {
-                setProposalGenerated(true)
-              }
-
-              // Solo apagar loading si no se recibió ningún chunk
-              if (!firstChunkReceived) {
-                setIsLoading(false)
-              }
-            },
-
-            // Llamado si hay error
-            onError: (error: Error) => {
-              console.error("Error sending message:", error)
-              message.error("Error al enviar el mensaje. Inténtalo de nuevo.")
-              // Remover el mensaje del asistente si falla
-              setMessages((prev) => prev.filter((msg) => msg.id !== assistantMessageId))
+      await sendChatMessage(
+        id,
+        {
+          query: currentMessage,
+          conversation_id: chatId,
+          model: "string",
+        },
+        {
+          // Llamado cuando recibimos contenido del asistente
+          onContentUpdate: (content: string) => {
+            // En la primera actualización, agregar el mensaje al chat
+            if (!firstChunkReceived) {
+              firstChunkReceived = true
               setIsLoading(false)
-              setIsStreaming(false)
-            },
-          }
-        )
-      } else {
-        // Si solo se subieron archivos y no hay texto, terminar carga
-        setIsLoading(false)
-        setIsStreaming(false)
-      }
+              const assistantMessage: Message = {
+                id: assistantMessageId,
+                role: "assistant",
+                content,
+                timestamp: new Date(),
+              }
+              setMessages((prev) => [...prev, assistantMessage])
+            } else {
+              // Actualizar contenido del mensaje existente
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantMessageId
+                    ? { ...msg, content }
+                    : msg
+                )
+              )
+            }
+          },
 
+          // Llamado cuando recibimos sources/referencias
+          onSourcesUpdate: (sources: DocumentChunk[]) => {
+            setCurrentSources(sources)
+          },
+
+          // Llamado cuando detectamos intención
+          onIntentDetected: (intent: string) => {
+            // Guardar la intención en ref, pero no mostrar el botón hasta que termine
+            detectedIntentRef.current = intent
+          },
+
+          // Llamado cuando finaliza el streaming
+          onComplete: (conversationId: string) => {
+            console.log("Streaming completed, conversation_id:", conversationId)
+            setIsStreaming(false)
+            
+            // Mostrar el botón de propuesta solo cuando termine el streaming
+            if (detectedIntentRef.current === "GENERATE_PROPOSAL") {
+              setProposalGenerated(true)
+            }
+            
+            // Solo apagar loading si no se recibió ningún chunk
+            if (!firstChunkReceived) {
+              setIsLoading(false)
+            }
+          },
+
+          // Llamado si hay error
+          onError: (error: Error) => {
+            console.error("Error sending message:", error)
+            message.error("Error al enviar el mensaje. Inténtalo de nuevo.")
+            // Remover el mensaje del asistente si falla
+            setMessages((prev) => prev.filter((msg) => msg.id !== assistantMessageId))
+            setIsLoading(false)
+            setIsStreaming(false)
+          },
+        }
+      )
     } catch (error) {
       console.error("Error sending message:", error)
-      message.error("Error al procesar la solicitud.")
+      message.error("Error al enviar el mensaje. Inténtalo de nuevo.")
 
-      // Remover el mensaje de usuario si falla todo
+      // Remover mensajes si falla
       setMessages((prev) =>
         prev.filter(
-          (msg) => msg.id !== newUserMessage.id
+          (msg) => msg.id !== newUserMessage.id && msg.id !== assistantMessageId
         )
       )
       setIsLoading(false)
@@ -725,7 +618,7 @@ export default function ChatPage({
         accept={allowedFileTypes.join(',')}
         fileList={attachedFiles}
         beforeUpload={(file) => {
-          const isAllowed = allowedMimeTypes.includes(file.type) ||
+          const isAllowed = allowedMimeTypes.includes(file.type) || 
             allowedFileTypes.some(ext => file.name.toLowerCase().endsWith(ext))
           if (!isAllowed) {
             message.error("Solo se permiten archivos PDF, Word, PowerPoint y Excel")
@@ -826,15 +719,6 @@ export default function ChatPage({
                 padding: "10px 12px",
                 background: "#2A2A2D",
                 borderRadius: "8px",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-              }}
-              onClick={() => handlePreview(file)}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "#3A3A3D"
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "#2A2A2D"
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1, minWidth: 0 }}>
@@ -945,10 +829,10 @@ export default function ChatPage({
             flexShrink: 0,
           }}
         >
-          <img
-            src="/logo.svg"
-            alt="Logo"
-            style={{ height: "40px" }}
+          <img 
+            src="/logo.svg" 
+            alt="Logo" 
+            style={{ height: "40px" }} 
           />
 
           {/* Chat Name - center */}
@@ -1017,9 +901,7 @@ export default function ChatPage({
             {isLoading && (
               <div style={{ marginBottom: "24px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-                  <Text style={{ color: "#AAAAAA", fontSize: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
-                    <Spin styles={{ indicator: { color: "#f20024" } }} /> Pensando...
-                  </Text>
+                  <Text style={{ color: "#AAAAAA", fontSize: "14px" }}>Pensando...</Text>
                 </div>
               </div>
             )}
@@ -1188,27 +1070,27 @@ export default function ChatPage({
                       }}
                     />
                   </Popover>
+
+                  <Select
+                    value={selectedModel}
+                    onChange={setSelectedModel}
+                    suffixIcon={<DownOutlined style={{ color: "#888888", fontSize: "10px" }} />}
+                    size="small"
+                    variant="borderless"
+                    style={{ 
+                      width: "140px",
+                      color: "#888888",
+                    }}
+                    options={[
+                      { label: "ChatGPT 4o-mini", value: "gpt-4o-mini" },
+                      { label: "Velvet 12B", value: "velvet-12b" },
+                    ]}
+                  />
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   {/* Mostrar micrófono si no hay texto, enviar si hay texto */}
-                  {isUploadingFiles ? (
-                    <Button
-                      type="text"
-                      icon={<LoadingOutlined style={{ fontSize: "16px" }} />}
-                      disabled
-                      style={{
-                        color: "#888888",
-                        background: "#3A3A3D",
-                        width: "40px",
-                        height: "40px",
-                        borderRadius: "50%",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    />
-                  ) : !inputMessage.trim() ? (
+                  {!inputMessage.trim() ? (
                     <Button
                       type="text"
                       icon={<AudioOutlined style={{ fontSize: "18px" }} />}
@@ -1301,139 +1183,6 @@ export default function ChatPage({
             Entendido
           </Button>
         </div>
-      </Modal>
-
-      {/* Modal de previsualización de documentos */}
-      <Modal
-        title={null}
-        open={previewModalOpen}
-        onCancel={handleClosePreview}
-        footer={null}
-        centered
-        width="80%"
-        styles={{
-          mask: { background: "rgba(0, 0, 0, 0.8)" },
-          header: { background: "#1E1E21", borderBottom: "1px solid #2A2A2D" },
-          body: { background: "#1E1E21", padding: "0" },
-          content: { background: "#1E1E21" },
-        }}
-        style={{ background: "#1E1E21", borderRadius: "16px", border: "1px solid #2A2A2D" }}
-        closeIcon={<span style={{ color: "#666666", fontSize: "18px" }}>×</span>}
-      >
-        {previewFile && (
-          <div style={{ display: "flex", flexDirection: "column", height: "80vh" }}>
-            {/* Header del modal */}
-            <div style={{ 
-              padding: "16px 20px", 
-              borderBottom: "1px solid #2A2A2D",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between"
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                {getFileIcon(previewFile.file_type)}
-                <Text style={{ color: "#FFFFFF", fontSize: "16px", fontWeight: 500 }}>
-                  {previewFile.file_name}
-                </Text>
-              </div>
-              <Text style={{ color: "#888888", fontSize: "12px" }}>
-                Previsualización
-              </Text>
-            </div>
-            
-            {/* Contenido del preview */}
-            <div style={{ 
-              flex: 1, 
-              display: "flex", 
-              alignItems: "center", 
-              justifyContent: "center", 
-              background: "#000000",
-              padding: "20px"
-            }}>
-              {previewFileUrl ? (
-                (() => {
-                  const fileName = (previewFile.filename || previewFile.name || "").toLowerCase()
-                  const isPdf = fileName.includes('.pdf') || previewFile.mime_type?.includes('pdf')
-                  const isImage = fileName.includes('.png') || fileName.includes('.jpg') || fileName.includes('.jpeg') || 
-                                 fileName.includes('.gif') || fileName.includes('.webp') || previewFile.mime_type?.includes('image')
-                  
-                  if (isPdf) {
-                    return (
-                      <iframe
-                        src={previewFileUrl}
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          border: "none",
-                          borderRadius: "8px",
-                          background: "#FFFFFF"
-                        }}
-                        title={`Preview de ${previewFile.file_name}`}
-                      />
-                    )
-                  } else if (isImage) {
-                    return (
-                      <img
-                        src={previewFileUrl}
-                        alt={`Preview de ${previewFile.file_name}`}
-                        style={{
-                          maxWidth: "100%",
-                          maxHeight: "100%",
-                          objectFit: "contain",
-                          borderRadius: "8px"
-                        }}
-                      />
-                    )
-                  } else {
-                    return (
-                      <div style={{ textAlign: "center", color: "#888888" }}>
-                        <Text style={{ color: "#888888" }}>
-                          Tipo de archivo no soportado para previsualización
-                        </Text>
-                      </div>
-                    )
-                  }
-                })()
-              ) : (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Spin size="large" />
-                  <Text style={{ color: "#888888", marginLeft: "12px" }}>
-                    Cargando previsualización...
-                  </Text>
-                </div>
-              )}
-            </div>
-            
-            {/* Footer con botón de descarga */}
-            <div style={{ 
-              padding: "16px 20px", 
-              borderTop: "1px solid #2A2A2D",
-              display: "flex",
-              justifyContent: "center"
-            }}>
-              <Button
-                type="primary"
-                onClick={() => {
-                  // Descargar el archivo
-                  const link = document.createElement('a')
-                  link.href = previewFileUrl!
-                  link.download = previewFile.file_name
-                  link.click()
-                }}
-                icon={<DownloadOutlined />}
-                style={{
-                  background: "#E31837",
-                  borderColor: "#E31837",
-                  borderRadius: "8px",
-                  height: "40px",
-                  padding: "0 24px",
-                }}
-              >
-                Descargar archivo
-              </Button>
-            </div>
-          </div>
-        )}
       </Modal>
     </div>
   )

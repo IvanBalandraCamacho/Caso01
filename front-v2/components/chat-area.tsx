@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { PlusOutlined, RocketOutlined, DownOutlined, SendOutlined, InfoCircleOutlined, UploadOutlined, DownloadOutlined, FilePdfOutlined, FileWordOutlined, LoadingOutlined, AudioOutlined, PaperClipOutlined, CloseOutlined } from "@ant-design/icons"
+import { PlusOutlined, RocketOutlined, DownOutlined, SendOutlined, InfoCircleOutlined, UploadOutlined, DownloadOutlined, FilePdfOutlined, FileWordOutlined, LoadingOutlined } from "@ant-design/icons"
 import { Button, Select, Typography, Input, Upload, App, Modal, Spin, Descriptions, Tag, Divider } from "antd"
 import type { UploadProps, UploadFile } from "antd"
 import { useState, useCallback, memo } from "react"
@@ -16,7 +16,7 @@ const { Text, Title } = Typography
 const { TextArea } = Input
 
 export default function ChatArea() {
-  const [model, setModel] = useState("velvet-8b")
+  const [model, setModel] = useState("gpt-4o-mini")
   const [message, setMessage] = useState("")
   const { user } = useUser()
   const router = useRouter()
@@ -35,17 +35,7 @@ export default function ChatArea() {
     setMessage(e.target.value)
   }, [])
 
-  // Estados para archivos adjuntos y voz
-  const [attachedFiles, setAttachedFiles] = useState<UploadFile[]>([])
-  const [isRecording, setIsRecording] = useState(false)
-  const [isCreatingConversation, setIsCreatingConversation] = useState(false)
-
-  // Refs para reconocimiento de voz
-  const recognitionRef = useState<any>(null)
-
-
-
-  const handleSendMessage = useCallback(async () => {
+  const handleSendMessage = useCallback(() => {
     if (!activeWorkspace?.id) {
       modal.info({
         title: "Función sin implementar",
@@ -61,104 +51,14 @@ export default function ChatArea() {
       })
       return
     }
-
-    if (message.trim() || attachedFiles.length > 0) {
-      // Caso 1: Hay archivos adjuntos - Debemos crear la conversación y subir archivos antes de redirigir
-      if (attachedFiles.length > 0) {
-        setIsCreatingConversation(true)
-        try {
-          // Import dynamic para evitar conflictos de SSR si fuera necesario, aunque aquí es client component
-          const { createConversationApi, uploadDocumentToConversation } = await import("@/lib/api")
-
-          // 1. Crear conversación real en backend
-          const title = message.trim().substring(0, 50) || "Nueva conversación con archivos"
-          const newConversation = await createConversationApi(activeWorkspace.id, title)
-
-          // 2. Subir cada archivo
-          for (const file of attachedFiles) {
-            if (file.originFileObj) {
-              const formData = new FormData()
-              formData.append("file", file.originFileObj)
-              await uploadDocumentToConversation(
-                activeWorkspace.id,
-                newConversation.id,
-                formData
-              )
-            }
-          }
-
-          setSelectedModel(model)
-          router.push(`/workspace/${activeWorkspace.id}/chat/${newConversation.id}?message=${encodeURIComponent(message)}`)
-
-        } catch (error) {
-          console.error("Error creating conversation with files:", error)
-          antMessage.error("Error al iniciar la conversación con archivos")
-        } finally {
-          setIsCreatingConversation(false)
-        }
-      }
-      else {
-
-        const chatId = uuidv4()
-        setSelectedModel(model)
-        // Redirección a la ruta correcta del workspace
-        router.push(`/workspace/${activeWorkspace.id}/chat/${chatId}?message=${encodeURIComponent(message)}`)
-      }
+    
+    if (message.trim()) {
+      const chatId = uuidv4()
+      // Guardar el modelo seleccionado en el contexto
+      setSelectedModel(model)
+      router.push(`/chat/${chatId}?message=${encodeURIComponent(message)}`)
     }
-  }, [activeWorkspace, message, model, attachedFiles, router, setSelectedModel, modal, antMessage])
-
-  const toggleRecording = useCallback(() => {
-    if (isRecording) {
-      // Detener grabación
-      // @ts-ignore
-      if (window.recognition) {
-        // @ts-ignore
-        window.recognition.stop()
-      }
-      setIsRecording(false)
-    } else {
-      // Iniciar grabación
-      // @ts-ignore
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-      if (!SpeechRecognition) {
-        antMessage.error("Tu navegador no soporta reconocimiento de voz")
-        return
-      }
-
-      const recognition = new SpeechRecognition()
-      recognition.lang = "es-ES"
-      recognition.continuous = true
-      recognition.interimResults = true
-
-      recognition.onresult = (event: any) => {
-        let finalTranscript = ""
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript
-          if (event.results[i].isFinal) {
-            finalTranscript += transcript
-          }
-        }
-        if (finalTranscript) {
-          setMessage((prev) => prev + (prev ? " " : "") + finalTranscript)
-        }
-      }
-
-      recognition.onerror = (event: any) => {
-        console.error("Speech recognition error", event.error)
-        setIsRecording(false)
-      }
-
-      recognition.onend = () => {
-        setIsRecording(false)
-      }
-
-      // @ts-ignore
-      window.recognition = recognition
-      recognition.start()
-      setIsRecording(true)
-    }
-  }, [isRecording, antMessage])
-
+  }, [activeWorkspace, message, model, router, setSelectedModel, modal])
 
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -174,7 +74,7 @@ export default function ChatArea() {
     }
 
     setIsAnalyzing(true)
-
+    
     try {
       const token = localStorage.getItem('access_token')
       const formData = new FormData()
@@ -265,10 +165,10 @@ export default function ChatArea() {
         }}
       >
         {/* Logo */}
-        <img
-          src="/logo.svg"
-          alt="Logo"
-          style={{ height: "40px" }}
+        <img 
+          src="/logo.svg" 
+          alt="Logo" 
+          style={{ height: "40px" }} 
         />
 
         {/* User Menu */}
@@ -338,41 +238,12 @@ export default function ChatArea() {
               marginBottom: "20px",
             }}
           >
-            {/* Attached files display */}
-            {attachedFiles.length > 0 && (
-              <div style={{ marginBottom: "12px", display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                {attachedFiles.map((file) => (
-                  <Tag
-                    key={file.uid}
-                    closable
-                    onClose={() => {
-                      setAttachedFiles(prev => prev.filter(f => f.uid !== file.uid))
-                    }}
-                    style={{
-                      background: "#2A2A2D",
-                      border: "1px solid #3A3A3D",
-                      color: "#E3E3E3",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px",
-                      padding: "4px 8px",
-                      borderRadius: "6px"
-                    }}
-                  >
-                    <PaperClipOutlined />
-                    {file.name}
-                  </Tag>
-                ))}
-              </div>
-            )}
-
             <TextArea
-              placeholder={isRecording ? "Escuchando..." : "Preguntale a Velvet 8b."}
+              placeholder="Preguntale a ChatGPT o Velvet..."
               value={message}
               onChange={handleMessageChange}
               onKeyDown={handleKeyPress}
               autoSize={{ minRows: 1, maxRows: 4 }}
-              disabled={isCreatingConversation}
               style={{
                 background: "transparent",
                 border: "none",
@@ -402,23 +273,15 @@ export default function ChatArea() {
             >
               {/* Plus button - File Upload */}
               <Upload
-                multiple
                 showUploadList={false}
-                beforeUpload={(file) => {
-                  setAttachedFiles(prev => [...prev, {
-                    uid: file.uid,
-                    name: file.name,
-                    status: 'done',
-                    originFileObj: file as any
-                  }])
-                  return false
-                }}
+                beforeUpload={() => false}
+                accept="*/*"
               >
                 <Button
                   type="text"
                   icon={<PlusOutlined style={{ fontSize: "18px" }} />}
                   style={{
-                    color: attachedFiles.length > 0 ? "#E31837" : "#888888",
+                    color: "#888888",
                     background: "transparent",
                     border: "none",
                     padding: 0,
@@ -429,24 +292,6 @@ export default function ChatArea() {
                 />
               </Upload>
 
-              {/* Microphone button */}
-              <Button
-                type="text"
-                icon={<AudioOutlined style={{ fontSize: "18px" }} />}
-                onClick={toggleRecording}
-                style={{
-                  color: isRecording ? "#FFFFFF" : "#888888",
-                  background: isRecording ? "#E31837" : "transparent",
-                  border: "none",
-                  padding: "0 8px",
-                  height: "32px",
-                  borderRadius: "16px",
-                  display: "flex",
-                  alignItems: "center",
-                  animation: isRecording ? "pulse 2s infinite" : "none",
-                }}
-              />
-
               {/* Spacer */}
               <div style={{ flex: 1 }} />
 
@@ -455,27 +300,26 @@ export default function ChatArea() {
                 value={model}
                 onChange={setModel}
                 suffixIcon={<DownOutlined style={{ color: "#888888", fontSize: "10px" }} />}
-                style={{ width: "120px" }}
+                style={{ width: "150px" }}
                 variant="borderless"
                 styles={{
                   popup: { root: { background: "#1A1A1C" } },
                 }}
                 classNames={{ popup: { root: "dark-select-dropdown" } }}
                 options={[
-                  { label: "Velvet 8B", value: "velvet-8b" },
-                  { label: "Velvet 10B", value: "velvet-10b" },
+                  { label: "ChatGPT 4o-mini", value: "gpt-4o-mini" },
+                  { label: "Velvet 12B", value: "velvet-12b" },
                 ]}
               />
 
               <Button
                 type="text"
                 shape="circle"
-                icon={isCreatingConversation ? <LoadingOutlined /> : <SendOutlined style={{ fontSize: "16px" }} />}
+                icon={<SendOutlined style={{ fontSize: "16px" }} />}
                 onClick={handleSendMessage}
-                disabled={isCreatingConversation || (!message.trim() && attachedFiles.length === 0)}
                 style={{
-                  color: (message.trim() || attachedFiles.length > 0) ? "#FFFFFF" : "#888888",
-                  background: (message.trim() || attachedFiles.length > 0) ? "#E31837" : "#2A2A2D",
+                  color: message.trim() ? "#FFFFFF" : "#888888",
+                  background: message.trim() ? "#E31837" : "#2A2A2D",
                   width: "36px",
                   height: "36px",
                   flexShrink: 0,
@@ -566,12 +410,12 @@ export default function ChatArea() {
                 'application/msword',
                 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
               ].includes(file.type)
-
+              
               if (!isValidType) {
                 antMessage.error('Solo se permiten archivos PDF y Word')
                 return Upload.LIST_IGNORE
               }
-
+              
               const uploadFile: UploadFile = {
                 uid: file.uid || '-1',
                 name: file.name,
@@ -599,9 +443,9 @@ export default function ChatArea() {
       {/* Modal para mostrar resultados del análisis */}
       <Modal
         title={
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
             gap: '12px',
             color: '#FFFFFF',
             fontSize: '18px',
@@ -624,12 +468,12 @@ export default function ChatArea() {
         open={isResultModalOpen}
         onCancel={() => setIsResultModalOpen(false)}
         width={900}
-        style={{
+        style={{ 
           top: 20,
-          paddingBottom: 0
+          paddingBottom: 0 
         }}
         styles={{
-          body: {
+          body: { 
             background: '#0D1117',
             padding: '24px'
           },
@@ -695,8 +539,8 @@ export default function ChatArea() {
         ]}
       >
         {analysisResult && (
-          <div style={{
-            maxHeight: "70vh",
+          <div style={{ 
+            maxHeight: "70vh", 
             overflowY: "auto",
             background: '#0D1117',
             color: '#CCCCCC'
@@ -709,21 +553,21 @@ export default function ChatArea() {
               marginBottom: '24px',
               border: '1px solid #2D2D2D'
             }}>
-              <div style={{
-                display: 'grid',
+              <div style={{ 
+                display: 'grid', 
                 gridTemplateColumns: '1fr 1fr',
                 gap: '24px'
               }}>
                 <div>
-                  <Text style={{
-                    color: '#888888',
+                  <Text style={{ 
+                    color: '#888888', 
                     fontSize: '12px',
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px'
                   }}>
                     Cliente
                   </Text>
-                  <div style={{
+                  <div style={{ 
                     fontSize: '18px',
                     fontWeight: 600,
                     color: '#E31837',
@@ -732,18 +576,18 @@ export default function ChatArea() {
                     {analysisResult.cliente}
                   </div>
                 </div>
-
+                
                 {analysisResult.alcance_economico && (
                   <div>
-                    <Text style={{
-                      color: '#888888',
+                    <Text style={{ 
+                      color: '#888888', 
                       fontSize: '12px',
                       textTransform: 'uppercase',
                       letterSpacing: '0.5px'
                     }}>
                       Alcance Económico
                     </Text>
-                    <div style={{
+                    <div style={{ 
                       fontSize: '18px',
                       fontWeight: 600,
                       color: '#00C851',
@@ -771,7 +615,7 @@ export default function ChatArea() {
                     background: '#E31837',
                     borderRadius: '2px'
                   }} />
-                  <Text style={{
+                  <Text style={{ 
                     color: '#FFFFFF',
                     fontSize: '16px',
                     fontWeight: 600
@@ -779,12 +623,12 @@ export default function ChatArea() {
                     Fechas y Plazos
                   </Text>
                 </div>
-                <div style={{
-                  display: 'grid',
+                <div style={{ 
+                  display: 'grid', 
                   gap: '12px'
                 }}>
                   {analysisResult.fechas_y_plazos.map((plazo: any, index: number) => (
-                    <div key={index} style={{
+                    <div key={index} style={{ 
                       background: '#1A1A1C',
                       border: '1px solid #2D2D2D',
                       borderRadius: '8px',
@@ -824,7 +668,7 @@ export default function ChatArea() {
                     background: '#E31837',
                     borderRadius: '2px'
                   }} />
-                  <Text style={{
+                  <Text style={{ 
                     color: '#FFFFFF',
                     fontSize: '16px',
                     fontWeight: 600
@@ -832,14 +676,14 @@ export default function ChatArea() {
                     Objetivo General
                   </Text>
                 </div>
-                <div style={{
+                <div style={{ 
                   background: '#1A1A1C',
                   border: '1px solid #2D2D2D',
                   borderRadius: '8px',
                   padding: '20px'
                 }}>
                   {analysisResult.objetivo_general.map((obj: string, index: number) => (
-                    <div key={index} style={{
+                    <div key={index} style={{ 
                       display: 'flex',
                       alignItems: 'flex-start',
                       gap: '12px',
@@ -877,7 +721,7 @@ export default function ChatArea() {
                     background: '#E31837',
                     borderRadius: '2px'
                   }} />
-                  <Text style={{
+                  <Text style={{ 
                     color: '#FFFFFF',
                     fontSize: '16px',
                     fontWeight: 600
@@ -885,7 +729,7 @@ export default function ChatArea() {
                     Tecnologías Requeridas
                   </Text>
                 </div>
-                <div style={{
+                <div style={{ 
                   display: 'flex',
                   flexWrap: 'wrap',
                   gap: '8px'
@@ -921,7 +765,7 @@ export default function ChatArea() {
                     background: '#E31837',
                     borderRadius: '2px'
                   }} />
-                  <Text style={{
+                  <Text style={{ 
                     color: '#FFFFFF',
                     fontSize: '16px',
                     fontWeight: 600
@@ -929,14 +773,14 @@ export default function ChatArea() {
                     Preguntas Sugeridas
                   </Text>
                 </div>
-                <div style={{
+                <div style={{ 
                   background: '#1A1A1C',
                   border: '1px solid #2D2D2D',
                   borderRadius: '8px',
                   padding: '20px'
                 }}>
                   {analysisResult.preguntas_sugeridas.map((pregunta: string, index: number) => (
-                    <div key={index} style={{
+                    <div key={index} style={{ 
                       display: 'flex',
                       alignItems: 'flex-start',
                       gap: '12px',
@@ -974,7 +818,7 @@ export default function ChatArea() {
                     background: '#E31837',
                     borderRadius: '2px'
                   }} />
-                  <Text style={{
+                  <Text style={{ 
                     color: '#FFFFFF',
                     fontSize: '16px',
                     fontWeight: 600
@@ -982,7 +826,7 @@ export default function ChatArea() {
                     Equipo Sugerido
                   </Text>
                 </div>
-                <div style={{
+                <div style={{ 
                   display: 'grid',
                   gap: '16px'
                 }}>
@@ -1014,8 +858,8 @@ export default function ChatArea() {
                           {miembro.nombre.charAt(0)}
                         </div>
                         <div>
-                          <Text strong style={{
-                            fontSize: '18px',
+                          <Text strong style={{ 
+                            fontSize: '18px', 
                             color: '#FFFFFF',
                             display: 'block'
                           }}>
@@ -1026,11 +870,11 @@ export default function ChatArea() {
                           </Text>
                         </div>
                       </div>
-
+                      
                       <div style={{ display: 'grid', gap: '12px' }}>
                         <div>
-                          <Text style={{
-                            color: '#888888',
+                          <Text style={{ 
+                            color: '#888888', 
                             fontSize: '12px',
                             textTransform: 'uppercase',
                             letterSpacing: '0.5px'
@@ -1047,11 +891,11 @@ export default function ChatArea() {
                             {miembro.experiencia}
                           </Tag>
                         </div>
-
+                        
                         {miembro.skills?.length > 0 && (
                           <div>
-                            <Text style={{
-                              color: '#888888',
+                            <Text style={{ 
+                              color: '#888888', 
                               fontSize: '12px',
                               textTransform: 'uppercase',
                               letterSpacing: '0.5px',
@@ -1060,7 +904,7 @@ export default function ChatArea() {
                             }}>
                               Skills
                             </Text>
-                            <div style={{
+                            <div style={{ 
                               display: 'flex',
                               flexWrap: 'wrap',
                               gap: '6px'
