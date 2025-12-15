@@ -46,11 +46,14 @@ def get_conversations(
         )
     
     # Obtener conversaciones con PREFETCH de mensajes (elimina N+1 queries)
-    conversations = db.query(Conversation).options(
-        joinedload(Conversation.messages)
-    ).filter(
+    conversations = db.query(Conversation).filter(
         Conversation.workspace_id == workspace_id
     ).order_by(Conversation.updated_at.desc()).all()
+    
+    result = []
+    for conv in conversations:
+        # Cuenta rápida directa en BD
+        message_count = db.query(Message).filter(Message.conversation_id == conv.id).count()
     
     # Agregar conteo de mensajes (ya prefetched, no genera query adicional)
     result = []

@@ -1852,23 +1852,25 @@ export default function Sidebar() {
         }
         open={isResultModalOpen}
         onCancel={() => setIsResultModalOpen(false)}
-        width={900}
+        width={1000}
         style={{
           top: 20,
           paddingBottom: 0
         }}
         styles={{
           body: {
-            background: '#0D1117',
-            padding: '24px'
+            background: '#1A1A1A',
+            padding: '32px',
+            maxHeight: '80vh',
+            overflow: 'hidden'
           },
           header: {
-            background: '#1A1A1C',
-            borderBottom: '1px solid #2D2D2D',
-            padding: '16px 24px'
+            background: '#18181b',
+            borderBottom: '1px solid #27272a',
+            padding: '20px 32px'
           },
           content: {
-            background: '#0D1117',
+            background: '#1A1A1A',
             padding: 0
           }
         }}
@@ -1877,9 +1879,9 @@ export default function Sidebar() {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            background: '#1A1A1C',
-            padding: '16px 24px',
-            borderTop: '1px solid #2D2D2D'
+            background: '#18181b',
+            padding: '20px 32px',
+            borderTop: '1px solid #27272a'
           }}>
             <div style={{ color: '#888', fontSize: '13px' }}>
               {analysisResult?.cliente && `Cliente: ${analysisResult.cliente}`}
@@ -1890,428 +1892,219 @@ export default function Sidebar() {
                 icon={<FileWordOutlined />}
                 loading={isDownloading}
                 onClick={() => handleDownloadDocument('docx')}
+                className="h-10 px-6 rounded-lg font-medium"
                 style={{
-                  background: '#2B579A',
-                  borderColor: '#2B579A',
-                  color: '#FFFFFF',
-                  borderRadius: '8px',
-                  height: '36px',
-                  padding: '0 16px',
-                  fontWeight: 500
+                  background: '#1E3A8A',
+                  borderColor: '#1E3A8A',
+                  color: '#FFFFFF'
                 }}
               >
-                Descargar Word
-              </Button>,
+                Word
+              </Button>
               <Button
                 key="pdf"
                 icon={<FilePdfOutlined />}
                 loading={isDownloading}
                 onClick={() => handleDownloadDocument('pdf')}
+                className="h-10 px-6 rounded-lg font-medium"
                 style={{
-                  background: '#E31837',
-                  borderColor: '#E31837',
-                  color: '#FFFFFF',
-                  borderRadius: '8px',
-                  height: '36px',
-                  padding: '0 16px',
-                  fontWeight: 500
+                  background: '#7F1D1D',
+                  borderColor: '#7F1D1D',
+                  color: '#FFFFFF'
                 }}
               >
-                Descargar PDF
+                PDF
               </Button>
             </div>
           </div>
         ]}
       >
         {analysisResult && (
-          <div style={{
-            maxHeight: "70vh",
-            overflowY: "auto",
-            background: '#0D1117',
-            color: '#CCCCCC'
-          }}>
-            {/* Información Principal */}
-            <div style={{
-              background: 'linear-gradient(135deg, #1A1A1C 0%, #2D2D2D 100%)',
-              borderRadius: '12px',
-              padding: '24px',
-              marginBottom: '24px',
-              border: '1px solid #2D2D2D'
-            }}>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '24px'
-              }}>
+          <div className="max-h-[70vh] overflow-y-auto overflow-x-hidden space-y-6 pr-2">
+            {/* Hero Section - Cliente y Presupuesto */}
+            <div className="bg-gradient-to-br from-zinc-900/80 to-zinc-900/40 border border-zinc-800 rounded-2xl p-8">
+              <div className="grid md:grid-cols-2 gap-8">
+                {/* Cliente */}
                 <div>
-                  <Text style={{
-                    color: '#888888',
-                    fontSize: '12px',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>
-                    Cliente
-                  </Text>
-                  <div style={{
-                    fontSize: '18px',
-                    fontWeight: 600,
-                    color: '#E31837',
-                    marginTop: '4px'
-                  }}>
-                    {analysisResult.cliente}
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <span className="text-zinc-400 text-xs font-medium uppercase tracking-wider">
+                      Cliente
+                    </span>
                   </div>
+                  <h2 className="text-white text-2xl font-bold">
+                    {analysisResult.cliente}
+                  </h2>
                 </div>
-
+                
+                {/* Presupuesto */}
                 {analysisResult.alcance_economico && (
-                  <div>
-                    <Text style={{
-                      color: '#888888',
-                      fontSize: '12px',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
-                    }}>
-                      Alcance Económico
-                    </Text>
-                    <div style={{
-                      fontSize: '18px',
-                      fontWeight: 600,
-                      color: '#00C851',
-                      marginTop: '4px'
-                    }}>
-                      {analysisResult.alcance_economico.moneda} {analysisResult.alcance_economico.presupuesto}
+                  <div className="md:text-right">
+                    <div className="flex items-center gap-2 mb-3 md:justify-end">
+                      <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                      <span className="text-zinc-400 text-xs font-medium uppercase tracking-wider">
+                        Presupuesto Total
+                      </span>
                     </div>
+                    <div className="text-emerald-400 text-3xl font-bold font-mono">
+                      {analysisResult.alcance_economico.moneda?.split('(')[0].trim()} {analysisResult.alcance_economico.presupuesto}
+                    </div>
+                    <p className="text-zinc-500 text-sm mt-1">
+                      {analysisResult.alcance_economico.moneda?.match(/\((.*?)\)/)?.[1] || ''}
+                    </p>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Fechas y Plazos */}
-            {analysisResult.fechas_y_plazos?.length > 0 && (
-              <div style={{ marginBottom: '24px' }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '16px'
-                }}>
-                  <div style={{
-                    width: '4px',
-                    height: '20px',
-                    background: '#E31837',
-                    borderRadius: '2px'
-                  }} />
-                  <Text style={{
-                    color: '#FFFFFF',
-                    fontSize: '16px',
-                    fontWeight: 600
-                  }}>
-                    Fechas y Plazos
-                  </Text>
-                </div>
-                <div style={{
-                  display: 'grid',
-                  gap: '12px'
-                }}>
-                  {analysisResult.fechas_y_plazos.map((plazo: any, index: number) => (
-                    <div key={index} style={{
-                      background: '#1A1A1C',
-                      border: '1px solid #2D2D2D',
-                      borderRadius: '8px',
-                      padding: '16px'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <Text strong style={{ color: '#FFFFFF', minWidth: '120px' }}>
-                          {plazo.tipo}:
-                        </Text>
-                        <Tag color="blue" style={{
-                          background: '#2F54EB',
-                          borderColor: '#2F54EB',
-                          color: '#FFFFFF',
-                          borderRadius: '6px'
-                        }}>
-                          {plazo.valor}
-                        </Tag>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Objetivo General */}
+            {/* Objetivo Principal */}
             {analysisResult.objetivo_general?.length > 0 && (
-              <div style={{ marginBottom: '24px' }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '16px'
-                }}>
-                  <div style={{
-                    width: '4px',
-                    height: '20px',
-                    background: '#E31837',
-                    borderRadius: '2px'
-                  }} />
-                  <Text style={{
-                    color: '#FFFFFF',
-                    fontSize: '16px',
-                    fontWeight: 600
-                  }}>
-                    Objetivo General
-                  </Text>
+              <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 bg-red-500/10 rounded-lg flex items-center justify-center">
+                    <div className="w-3 h-3 bg-red-500 rounded"></div>
+                  </div>
+                  <h3 className="text-white text-base font-semibold">Objetivo del Proyecto</h3>
                 </div>
-                <div style={{
-                  background: '#1A1A1C',
-                  border: '1px solid #2D2D2D',
-                  borderRadius: '8px',
-                  padding: '20px'
-                }}>
+                <div className="space-y-3">
                   {analysisResult.objetivo_general.map((obj: string, index: number) => (
-                    <div key={index} style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '12px',
-                      marginBottom: '12px'
-                    }}>
-                      <div style={{
-                        width: '6px',
-                        height: '6px',
-                        background: '#E31837',
-                        borderRadius: '50%',
-                        marginTop: '8px',
-                        flexShrink: 0
-                      }} />
-                      <Text style={{ color: '#CCCCCC', lineHeight: '1.6' }}>
-                        {obj}
-                      </Text>
+                    <p key={index} className="text-zinc-300 text-base leading-relaxed pl-10">
+                      {obj}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Timeline de Plazos */}
+            {analysisResult.fechas_y_plazos?.length > 0 && (
+              <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 bg-blue-500/10 rounded-lg flex items-center justify-center">
+                    <div className="w-3 h-3 bg-blue-500 rounded"></div>
+                  </div>
+                  <h3 className="text-white text-base font-semibold">Plazos del Proyecto</h3>
+                </div>
+                <div className="grid md:grid-cols-2 gap-4">
+                  {analysisResult.fechas_y_plazos.map((plazo: any, index: number) => (
+                    <div key={index} className="bg-zinc-800/30 border border-zinc-700/50 rounded-lg p-4">
+                      <div className="text-zinc-400 text-xs font-medium mb-2">
+                        {plazo.tipo}
+                      </div>
+                      <div className="text-white text-lg font-semibold">
+                        {plazo.valor}
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Tecnologías Requeridas */}
+            {/* Tecnologías */}
             {analysisResult.tecnologias_requeridas?.length > 0 && (
-              <div style={{ marginBottom: '24px' }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '16px'
-                }}>
-                  <div style={{
-                    width: '4px',
-                    height: '20px',
-                    background: '#E31837',
-                    borderRadius: '2px'
-                  }} />
-                  <Text style={{
-                    color: '#FFFFFF',
-                    fontSize: '16px',
-                    fontWeight: 600
-                  }}>
-                    Tecnologías Requeridas
-                  </Text>
+              <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 bg-emerald-500/10 rounded-lg flex items-center justify-center">
+                    <div className="w-3 h-3 bg-emerald-500 rounded"></div>
+                  </div>
+                  <h3 className="text-white text-base font-semibold">Stack Tecnológico</h3>
                 </div>
-                <div style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: '8px'
-                }}>
+                <div className="flex flex-wrap gap-2">
                   {analysisResult.tecnologias_requeridas.map((tech: string, index: number) => (
-                    <Tag key={index} style={{
-                      background: 'linear-gradient(135deg, #00C851, #00E676)',
-                      border: '1px solid #00C851',
-                      color: '#FFFFFF',
-                      borderRadius: '16px',
-                      padding: '4px 12px',
-                      fontWeight: 500
-                    }}>
+                    <span key={index} className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-lg text-sm font-medium">
                       {tech}
-                    </Tag>
+                    </span>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Preguntas Sugeridas */}
+            {/* Preguntas Clave */}
             {analysisResult.preguntas_sugeridas?.length > 0 && (
-              <div style={{ marginBottom: '24px' }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '16px'
-                }}>
-                  <div style={{
-                    width: '4px',
-                    height: '20px',
-                    background: '#E31837',
-                    borderRadius: '2px'
-                  }} />
-                  <Text style={{
-                    color: '#FFFFFF',
-                    fontSize: '16px',
-                    fontWeight: 600
-                  }}>
-                    Preguntas Sugeridas
-                  </Text>
+              <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 bg-amber-500/10 rounded-lg flex items-center justify-center">
+                    <div className="w-3 h-3 bg-amber-500 rounded"></div>
+                  </div>
+                  <h3 className="text-white text-base font-semibold">Preguntas Clave para el Cliente</h3>
                 </div>
-                <div style={{
-                  background: '#1A1A1C',
-                  border: '1px solid #2D2D2D',
-                  borderRadius: '8px',
-                  padding: '20px'
-                }}>
+                <div className="space-y-3">
                   {analysisResult.preguntas_sugeridas.map((pregunta: string, index: number) => (
-                    <div key={index} style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '12px',
-                      marginBottom: '12px'
-                    }}>
-                      <div style={{
-                        color: '#FFA726',
-                        fontSize: '14px',
-                        marginTop: '2px',
-                        flexShrink: 0
-                      }}>
-                        Q{index + 1}:
+                    <div key={index} className="flex items-start gap-3 p-3 bg-zinc-800/30 border border-zinc-700/50 rounded-lg">
+                      <div className="flex-shrink-0 w-6 h-6 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-400 text-xs font-bold mt-0.5">
+                        {index + 1}
                       </div>
-                      <Text style={{ color: '#CCCCCC', lineHeight: '1.6' }}>
+                      <p className="text-zinc-300 text-sm leading-relaxed flex-1">
                         {pregunta}
-                      </Text>
+                      </p>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Equipo Sugerido */}
+            {/* Equipo Propuesto */}
             {analysisResult.equipo_sugerido?.length > 0 && (
-              <div style={{ marginBottom: '24px' }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '16px'
-                }}>
-                  <div style={{
-                    width: '4px',
-                    height: '20px',
-                    background: '#E31837',
-                    borderRadius: '2px'
-                  }} />
-                  <Text style={{
-                    color: '#FFFFFF',
-                    fontSize: '16px',
-                    fontWeight: 600
-                  }}>
-                    Equipo Sugerido
-                  </Text>
+              <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6">
+                <div className="flex items-center gap-2 mb-5">
+                  <div className="w-8 h-8 bg-purple-500/10 rounded-lg flex items-center justify-center">
+                    <div className="w-3 h-3 bg-purple-500 rounded"></div>
+                  </div>
+                  <h3 className="text-white text-base font-semibold">Equipo Propuesto</h3>
                 </div>
-                <div style={{
-                  display: 'grid',
-                  gap: '16px'
-                }}>
-                  {analysisResult.equipo_sugerido.map((miembro: any, index: number) => (
-                    <div key={index} style={{
-                      background: 'linear-gradient(135deg, #1A1A1C, #2D2D2D)',
-                      border: '1px solid #2D2D2D',
-                      borderRadius: '12px',
-                      padding: '20px'
-                    }}>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '16px',
-                        marginBottom: '16px'
-                      }}>
-                        <div style={{
-                          width: '48px',
-                          height: '48px',
-                          background: 'linear-gradient(135deg, #E31837, #FF4757)',
-                          borderRadius: '12px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#FFFFFF',
-                          fontSize: '18px',
-                          fontWeight: 600
-                        }}>
-                          {miembro.nombre.charAt(0)}
+                <div className="grid md:grid-cols-2 gap-4">
+                  {analysisResult.equipo_sugerido.map((miembro: any, index: number) => {
+                    const avatarColors = [
+                      'bg-gradient-to-br from-blue-500 to-blue-600',
+                      'bg-gradient-to-br from-purple-500 to-purple-600',
+                      'bg-gradient-to-br from-pink-500 to-pink-600',
+                      'bg-gradient-to-br from-orange-500 to-orange-600',
+                      'bg-gradient-to-br from-teal-500 to-teal-600',
+                    ];
+                    
+                    return (
+                      <div key={index} className="bg-zinc-800/40 border border-zinc-700/50 rounded-xl p-5 hover:border-zinc-600 transition-all">
+                        {/* Header */}
+                        <div className="flex items-start gap-4 mb-4">
+                          <div className={`w-12 h-12 ${avatarColors[index % avatarColors.length]} rounded-xl flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-lg`}>
+                            {miembro.nombre.charAt(0)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-white font-semibold text-base mb-1">
+                              {miembro.nombre}
+                            </h4>
+                            <p className="text-zinc-400 text-sm leading-snug">
+                              {miembro.rol}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <Text strong style={{
-                            fontSize: '18px',
-                            color: '#FFFFFF',
-                            display: 'block'
-                          }}>
-                            {miembro.nombre}
-                          </Text>
-                          <Text style={{ color: '#888888' }}>
-                            {miembro.rol}
-                          </Text>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'grid', gap: '12px' }}>
-                        <div>
-                          <Text style={{
-                            color: '#888888',
-                            fontSize: '12px',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.5px'
-                          }}>
-                            Experiencia
-                          </Text>
-                          <Tag color="orange" style={{
-                            background: '#FFA726',
-                            borderColor: '#FFA726',
-                            color: '#FFFFFF',
-                            borderRadius: '6px',
-                            marginTop: '4px'
-                          }}>
+                        
+                        {/* Experiencia */}
+                        <div className="mb-4">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-lg text-xs font-medium">
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/>
+                            </svg>
                             {miembro.experiencia}
-                          </Tag>
+                          </span>
                         </div>
-
+                        
+                        {/* Skills */}
                         {miembro.skills?.length > 0 && (
                           <div>
-                            <Text style={{
-                              color: '#888888',
-                              fontSize: '12px',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.5px',
-                              marginBottom: '8px',
-                              display: 'block'
-                            }}>
-                              Skills
-                            </Text>
-                            <div style={{
-                              display: 'flex',
-                              flexWrap: 'wrap',
-                              gap: '6px'
-                            }}>
+                            <p className="text-zinc-500 text-xs font-medium mb-2">Habilidades</p>
+                            <div className="flex flex-wrap gap-1.5">
                               {miembro.skills.map((skill: string, idx: number) => (
-                                <Tag key={idx} style={{
-                                  background: 'linear-gradient(135deg, #26C6DA, #00ACC1)',
-                                  border: '1px solid #26C6DA',
-                                  color: '#FFFFFF',
-                                  borderRadius: '14px',
-                                  padding: '2px 10px',
-                                  fontSize: '12px'
-                                }}>
+                                <span key={idx} className="px-2.5 py-1 bg-zinc-700/50 text-zinc-300 rounded-md text-xs">
                                   {skill}
-                                </Tag>
+                                </span>
                               ))}
                             </div>
                           </div>
                         )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}

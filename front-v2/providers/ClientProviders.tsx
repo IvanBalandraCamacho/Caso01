@@ -1,6 +1,6 @@
 "use client";
 
-import { ConfigProvider, App } from "antd";
+import { ConfigProvider, App, theme } from "antd";
 import { ToastInitializer } from "@/components/ToastInitializer";
 
 interface ClientProvidersProps {
@@ -17,6 +17,7 @@ export function ClientProviders({ children }: ClientProvidersProps) {
   return (
     <ConfigProvider
       theme={{
+        algorithm: theme.darkAlgorithm,
         token: {
           colorBgBase: "#000000",
           colorTextBase: "#FFFFFF",
