@@ -20,6 +20,8 @@ import {
   FilePptOutlined,
   FileExcelOutlined,
   DownOutlined,
+  DownloadOutlined,
+  LoadingOutlined,
 } from "@ant-design/icons"
 import { Button, Input, Typography, Drawer, Upload, Popover, Modal, App, Select } from "antd"
 import type { UploadFile } from "antd"
@@ -30,7 +32,7 @@ import { UserMenu } from "@/components/UserMenu"
 import { useUser } from "@/hooks/useUser"
 import { useChatStream } from "@/hooks/useChatStream"
 import { useWorkspaceContext } from "@/context/WorkspaceContext"
-import { fetchConversationMessages, fetchConversationDocuments, fetchWorkspaceDocuments, deleteDocumentApi } from "@/lib/api"
+import { fetchConversationMessages, fetchConversationDocuments, fetchWorkspaceDocuments, deleteDocumentApi, downloadProposalFromMarkdown } from "@/lib/api"
 import type { DocumentPublic, DocumentChunk } from "@/types/api"
 
 const { Text } = Typography
@@ -250,6 +252,8 @@ export default function ChatPage({
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false)
   const [showProposalModal, setShowProposalModal] = useState(false)
   const [proposalGenerated, setProposalGenerated] = useState(false)
+  const [proposalMarkdown, setProposalMarkdown] = useState<string>('')
+  const [isDownloadingProposal, setIsDownloadingProposal] = useState(false)
 
   const getFileIcon = (fileType: string) => {
     const type = fileType.toLowerCase()
@@ -483,6 +487,14 @@ export default function ChatPage({
             
             // Mostrar el botón de propuesta solo cuando termine el streaming
             if (detectedIntentRef.current === "GENERATE_PROPOSAL") {
+              // Guardar el contenido del último mensaje (que es la propuesta)
+              setMessages((prev) => {
+                const lastMessage = prev[prev.length - 1]
+                if (lastMessage && lastMessage.role === "assistant") {
+                  setProposalMarkdown(lastMessage.content)
+                }
+                return prev
+              })
               setProposalGenerated(true)
             }
             
@@ -528,6 +540,40 @@ export default function ChatPage({
   const handleCopyMessage = (content: string) => {
     navigator.clipboard.writeText(content)
     message.success("Copiado al portapapeles")
+  }
+
+  // Handler para descargar propuesta
+  const handleDownloadProposal = async () => {
+    if (!proposalMarkdown) {
+      message.error("No hay contenido de propuesta para descargar")
+      return
+    }
+
+    setIsDownloadingProposal(true)
+    try {
+      const blob = await downloadProposalFromMarkdown(
+        proposalMarkdown,
+        "Propuesta_Comercial",
+        "docx"
+      )
+
+      // Crear enlace de descarga
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `Propuesta_Comercial_${new Date().toISOString().split('T')[0]}.docx`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+
+      message.success("Propuesta descargada exitosamente")
+    } catch (error) {
+      console.error("Error al descargar propuesta:", error)
+      message.error("Error al descargar la propuesta")
+    } finally {
+      setIsDownloadingProposal(false)
+    }
   }
 
   // Función para iniciar/detener grabación de voz
@@ -934,7 +980,9 @@ export default function ChatPage({
                   </div>
                   <Button
                     type="primary"
-                    onClick={() => setShowProposalModal(true)}
+                    icon={isDownloadingProposal ? <LoadingOutlined /> : <DownloadOutlined />}
+                    loading={isDownloadingProposal}
+                    onClick={handleDownloadProposal}
                     style={{
                       background: "#E31837",
                       borderColor: "#E31837",
@@ -943,7 +991,7 @@ export default function ChatPage({
                       padding: "0 20px",
                     }}
                   >
-                    Descargar
+                    {isDownloadingProposal ? "Descargando..." : "Descargar"}
                   </Button>
                 </div>
               </div>

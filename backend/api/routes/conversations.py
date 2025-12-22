@@ -13,7 +13,6 @@ from typing import Dict, Any, Optional
 import json
 from datetime import datetime
 import logging
-
 # Configurar logger
 logger = logging.getLogger(__name__)
 

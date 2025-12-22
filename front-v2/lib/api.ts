@@ -917,6 +917,28 @@ export const generateProposalDocumentApi = async (
   return data;
 };
 
+/**
+ * Download a proposal document from markdown content
+ * POST /api/v1/conversations/proposals/download
+ */
+export const downloadProposalFromMarkdown = async (
+  rawMarkdown: string,
+  cliente: string = "Propuesta",
+  format: "docx" | "pdf" = "docx",
+): Promise<Blob> => {
+  const { data } = await api.post(
+    `/conversations/proposals/download?format=${format}`,
+    {
+      raw_markdown: rawMarkdown,
+      cliente: cliente,
+    },
+    {
+      responseType: "blob",
+    },
+  );
+  return data;
+};
+
 // ============================================
 // TIVIT SERVICES API FUNCTIONS
 // ============================================
