@@ -38,7 +38,7 @@ class ProposalsServiceImpl(ProposalsService):
         workspace_instructions : str
     ):
         try:
-            prompt = AnalyzePrompts.create_analysis_prompt()
+            prompt = AnalyzePrompts.create_markdown_analysis_prompt()
             full_prompt = f"""
                 prompt : {prompt}
                 pregunta: {query}

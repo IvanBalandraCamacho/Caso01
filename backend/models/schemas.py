@@ -2,6 +2,7 @@ from pydantic import BaseModel, validator
 from datetime import datetime, timezone # <-- AÑADIR timezone
 import uuid
 import mimetypes
+from typing import Dict, Any, Optional
 from fastapi import UploadFile
 
 # --- Workspace Schemas ---
@@ -185,6 +186,10 @@ class DownloadableDocumentResponse(BaseModel):
     format: str
     word_count: int
     message: str
+
+class ProposalDownloadRequest(BaseModel):
+    raw_markdown: str
+    cliente: Optional[str] = "documento"
 
 
 # --- User Schemas (Autenticación) ---

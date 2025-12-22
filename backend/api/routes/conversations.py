@@ -4,12 +4,18 @@ from models import database, schemas
 from models.conversation import Conversation, Message
 from models import workspace as workspace_model
 from models import document as document_model
+from core import document_service
 from core.auth import get_current_active_user
 from models.user import User
 from core.rag_client import rag_client
 from core.config import settings
+from typing import Dict, Any, Optional
 import json
 from datetime import datetime
+import logging
+
+# Configurar logger
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -326,3 +332,74 @@ async def delete_conversation(
     db.commit()
     
     return None
+
+@router.post(
+    "/conversations/proposals/download",
+    summary="Generar documento de propuesta desde Markdown",
+    description="Genera un documento Word o PDF utilizando el texto de la propuesta en formato Markdown."
+)
+async def download_proposal_document(
+    request_data: schemas.ProposalDownloadRequest,
+    format: str = "docx"
+):
+    """
+    Genera un documento con la propuesta comercial a partir del texto en formato Markdown.
+    
+    Args:
+        request_data: Datos del análisis de la propuesta
+        format: Formato del documento ("docx" o "pdf")
+        
+    Returns:
+        Documento generado como FileResponse (bytes)
+        
+    Raises:
+        HTTPException 400: Si el formato no es válido
+        HTTPException 500: Si hay error en la generación
+    """
+    
+    try:
+
+        raw_markdown = request_data.raw_markdown
+
+        if not raw_markdown:
+            logger.error("No se proporcionó el texto de la propuesta en formato Markdown.")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No se proporcionó el texto de la propuesta en formato Markdown. El campo raw_markdown es obligatorio."
+            )
+        
+        # Validar formato
+        if format.lower() not in ["docx", "pdf"]:
+            logger.error("Formato no soportado: %s", format)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Formato no soportado: {format}. Use 'docx' o 'pdf'."
+            )
+        
+        # Generar documento
+        doc_bytes = document_service.generate_from_text(raw_markdown, format=format)
+        
+        # Determinar media type y extensión según formato
+        if format.lower() == "pdf":
+            media_type = "application/pdf"
+            filename = f"Propuesta_{request_data.cliente.replace(' ', '_')}.pdf"
+        else:  # docx
+            media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            filename = f"Propuesta_{request_data.cliente.replace(' ', '_')}.docx"
+        
+        return Response(
+            content=doc_bytes, 
+            media_type=media_type,
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al generar documento ({format}): {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al generar el documento: {str(e)}"
+        )
