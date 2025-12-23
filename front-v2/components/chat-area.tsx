@@ -51,7 +51,7 @@ export default function ChatArea() {
       })
       return
     }
-    
+
     if (message.trim()) {
       const chatId = uuidv4()
       // Guardar el modelo seleccionado en el contexto
@@ -74,7 +74,7 @@ export default function ChatArea() {
     }
 
     setIsAnalyzing(true)
-    
+
     try {
       const token = localStorage.getItem('access_token')
       const formData = new FormData()
@@ -165,10 +165,10 @@ export default function ChatArea() {
         }}
       >
         {/* Logo */}
-        <img 
-          src="/logo.svg" 
-          alt="Logo" 
-          style={{ height: "40px" }} 
+        <img
+          src="/logo.svg"
+          alt="Logo"
+          style={{ height: "40px" }}
         />
 
         {/* User Menu */}
@@ -410,12 +410,12 @@ export default function ChatArea() {
                 'application/msword',
                 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
               ].includes(file.type)
-              
+
               if (!isValidType) {
                 antMessage.error('Solo se permiten archivos PDF y Word')
                 return Upload.LIST_IGNORE
               }
-              
+
               const uploadFile: UploadFile = {
                 uid: file.uid || '-1',
                 name: file.name,
@@ -443,9 +443,9 @@ export default function ChatArea() {
       {/* Modal para mostrar resultados del análisis */}
       <Modal
         title={
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
             gap: '12px',
             color: '#FFFFFF',
             fontSize: '18px',
@@ -468,12 +468,12 @@ export default function ChatArea() {
         open={isResultModalOpen}
         onCancel={() => setIsResultModalOpen(false)}
         width={1000}
-        style={{ 
+        style={{
           top: 20,
-          paddingBottom: 0 
+          paddingBottom: 0
         }}
         styles={{
-          body: { 
+          body: {
             background: '#1A1A1A',
             padding: '32px',
             maxHeight: '80vh',
@@ -551,7 +551,8 @@ export default function ChatArea() {
                     {analysisResult.cliente}
                   </h2>
                 </div>
-                
+
+                {/* Presupuesto */}
                 {/* Presupuesto */}
                 {analysisResult.alcance_economico && (
                   <div className="md:text-right">
@@ -561,12 +562,32 @@ export default function ChatArea() {
                         Presupuesto Total
                       </span>
                     </div>
-                    <div className="text-emerald-400 text-3xl font-bold font-mono">
-                      {analysisResult.alcance_economico.moneda?.split('(')[0].trim()} {analysisResult.alcance_economico.presupuesto}
-                    </div>
-                    <p className="text-zinc-500 text-sm mt-1">
-                      {analysisResult.alcance_economico.moneda?.match(/\((.*?)\)/)?.[1] || ''}
-                    </p>
+                    {[
+                      "no especificado",
+                      "no especificada",
+                    ].includes(
+                      analysisResult.alcance_economico.presupuesto
+                        ?.toLowerCase()
+                        .trim()
+                    ) ? (
+                      <div className="text-emerald-400 text-3xl font-bold font-mono">
+                        No especificado
+                      </div>
+                    ) : (
+                      <>
+                        <div className="text-emerald-400 text-3xl font-bold font-mono">
+                          {analysisResult.alcance_economico.moneda
+                            ?.split("(")[0]
+                            .trim()}{" "}
+                          {analysisResult.alcance_economico.presupuesto}
+                        </div>
+                        <p className="text-zinc-500 text-sm mt-1">
+                          {analysisResult.alcance_economico.moneda?.match(
+                            /\((.*?)\)/
+                          )?.[1] || ""}
+                        </p>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -676,7 +697,7 @@ export default function ChatArea() {
                       'bg-gradient-to-br from-orange-500 to-orange-600',
                       'bg-gradient-to-br from-teal-500 to-teal-600',
                     ];
-                    
+
                     return (
                       <div key={index} className="bg-zinc-800/40 border border-zinc-700/50 rounded-xl p-5 hover:border-zinc-600 transition-all">
                         {/* Header */}
@@ -693,17 +714,17 @@ export default function ChatArea() {
                             </p>
                           </div>
                         </div>
-                        
+
                         {/* Experiencia */}
                         <div className="mb-4">
                           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-lg text-xs font-medium">
                             <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/>
+                              <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" />
                             </svg>
                             {miembro.experiencia}
                           </span>
                         </div>
-                        
+
                         {/* Skills */}
                         {miembro.skills?.length > 0 && (
                           <div>

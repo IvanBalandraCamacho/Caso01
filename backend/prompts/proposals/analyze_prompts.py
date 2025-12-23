@@ -46,7 +46,7 @@ class AnalyzePrompts:
         INSTRUCCIONES:
         1. Extrae ÚNICAMENTE la información presente en el documento
         2. Si algo no está especificado, usa "No especificado" o arrays vacíos
-        3. Para objetivo general, debe ser concreto y estratégico. Evita frases genéricas. El objetivo debe describir con precisión el propósito institucional del proyecto
+        3. Para el campo "objetivo_general", genera un único elemento en el array. Este texto debe ser un **Resumen Ejecutivo Conciso que combine el Propósito Institucional del proyecto, su Alcance funcional más importante y la Limitación o Restricción contractual más relevante. Este resumen debe tener una longitud máxima de 4 oraciones (aproximadamente 300 caracteres) para ser legible en una interfaz de usuario rápida.
         4. Para el equipo, sugiere perfiles basados en las tecnologías y alcance
         5. Retorna SOLO el JSON, sin texto adicional
         Prohibido generar preguntas subjetivas, abiertas, opinables o que dependan de expectativas, satisfacción, evaluaciones o juicios del cliente. 
