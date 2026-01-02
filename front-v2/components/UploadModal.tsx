@@ -21,6 +21,7 @@ import {
 } from "@ant-design/icons";
 import type { UploadProps, UploadFile } from "antd";
 import { uploadDocumentApi, uploadDocumentToConversation } from "@/lib/api";
+import { DocumentPublic } from "@/types/api";
 
 const { Dragger } = Upload;
 const { Text, Title } = Typography;
@@ -152,7 +153,7 @@ export function UploadModal({
           const formData = new FormData();
           formData.append("file", file.originFileObj);
 
-          let result;
+          let result: DocumentPublic;
           if (conversationId) {
             result = await uploadDocumentToConversation(
               workspaceId,
