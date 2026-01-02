@@ -10,6 +10,9 @@ __pycache__/
 .venv/
 venv/
 
+#Instrucciones
+instructions.md
+claude.md
 # Config y entorno
 .env
 *.env

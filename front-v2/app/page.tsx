@@ -1,17 +1,154 @@
+"use client"
+
+import React, { useState, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import Sidebar from "@/components/sidebar"
-import ChatArea from "@/components/chat-area"
+import { UserMenu } from "@/components/UserMenu"
+import { useUser } from "@/hooks/useUser"
+import { 
+  Paperclip, 
+  SendHorizontal, 
+  Mic, 
+} from "lucide-react"
+import { DashboardStats, TodoList, UpcomingDeadlines, ComplianceScore } from "@/components/ui/DashboardWidgets"
+import { AnalysisTemplates } from "@/components/ui/AnalysisTemplates"
+import { LayoutGrid } from "lucide-react"
 
 export default function Home() {
+  const { user } = useUser()
+  const router = useRouter()
+  const [message, setMessage] = useState("")
+  const [showTemplates, setShowTemplates] = useState(false)
+
+  const handleSendMessage = useCallback(() => {
+    if (!message.trim()) return
+    console.log("Enviando mensaje:", message)
+  }, [message])
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      handleSendMessage()
+    }
+  }
+
   return (
-    <div
-      style={{
-        display: "flex",
-        minHeight: "100vh",
-        background: "#000000",
-      }}
-    >
+    <div className="flex h-screen bg-[#131314] text-white overflow-hidden font-sans">
+      {/* Sidebar Navigation */}
       <Sidebar />
-      <ChatArea />
+
+      {/* Main Content Area */}
+      <main className="flex-1 flex flex-col h-full relative overflow-hidden">
+        
+        {/* Top Right User Menu */}
+        <header className="absolute top-0 right-0 p-6 z-20 flex gap-4 items-center">
+          <button 
+            onClick={() => setShowTemplates(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-[#1E1F20] hover:bg-zinc-800 border border-zinc-800 rounded-xl text-sm font-medium transition-colors"
+          >
+            <LayoutGrid size={16} className="text-[#E31837]" />
+            Plantillas
+          </button>
+          <UserMenu user={user} />
+        </header>
+
+        {/* Scrollable Container for Hero + Dashboard */}
+        <div className="flex-1 overflow-y-auto scrollbar-hide">
+          <div className="flex flex-col items-center w-full max-w-7xl mx-auto px-4 sm:px-8 py-12">
+            
+            {/* 1. HERO SECTION (aprox 30% pantalla visualmente) */}
+            <div className="w-full max-w-4xl text-center mb-10 mt-8 animate-fade-in-up">
+              <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-3">
+                <span className="bg-gradient-to-r from-[#E31837] to-[#FF6B00] bg-clip-text text-transparent">
+                  Hola, {user?.full_name?.split(' ')[0] || "Usuario"}
+                </span>
+              </h1>
+              <p className="text-xl text-zinc-400 font-medium mb-8">
+                ¿Qué vamos a analizar hoy?
+              </p>
+
+              {/* Gemini Input Bar */}
+              <div className="relative group w-full">
+                <div className="relative bg-[#1E1F20] rounded-3xl shadow-lg border border-white/5 transition-all duration-300 focus-within:ring-1 focus-within:ring-[#E31837]/50 focus-within:bg-[#252627]">
+                  <textarea
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Escribe tu consulta aquí..."
+                    className="w-full bg-transparent text-lg text-white placeholder-zinc-500 px-6 py-5 pr-32 rounded-3xl outline-none resize-none min-h-[80px] max-h-[160px] scrollbar-hide"
+                    style={{ fieldSizing: "content" } as React.CSSProperties}
+                  />
+                  
+                  {/* Action Buttons inside Input */}
+                  <div className="absolute bottom-3 right-3 flex items-center gap-2">
+                    <button 
+                      className="p-2 text-zinc-400 hover:text-[#E31837] hover:bg-white/5 rounded-full transition-colors"
+                      aria-label="Adjuntar archivo"
+                    >
+                      <Paperclip size={20} />
+                    </button>
+                    <button 
+                      className="p-2 text-zinc-400 hover:text-[#E31837] hover:bg-white/5 rounded-full transition-colors"
+                      aria-label="Usar micrófono"
+                    >
+                      <Mic size={20} />
+                    </button>
+                    {message.trim() && (
+                      <button 
+                        onClick={handleSendMessage}
+                        className="p-2 bg-[#E31837] text-white rounded-full hover:bg-[#c41530] transition-colors shadow-md"
+                        aria-label="Enviar mensaje"
+                      >
+                        <SendHorizontal size={20} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. DASHBOARD GRID (Widgets recuperados) */}
+            <div className="w-full animate-fade-in-up delay-100 pb-12">
+              <h2 className="text-xl font-semibold text-zinc-300 mb-6 pl-1 border-l-4 border-[#E31837]">
+                Resumen Ejecutivo
+              </h2>
+
+              {/* Stats Row */}
+              <div className="mb-6">
+                <DashboardStats 
+                  token={typeof window !== 'undefined' ? localStorage.getItem('access_token') || undefined : undefined}
+                  autoFetch={true}
+                />
+              </div>
+
+              {/* Widgets Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Left Column: Todo List */}
+                <div className="lg:col-span-1 h-full">
+                  <TodoList />
+                </div>
+
+                {/* Middle Column: Deadlines */}
+                <div className="lg:col-span-1 h-full">
+                  <UpcomingDeadlines />
+                </div>
+
+                {/* Right Column: Compliance or other widgets */}
+                <div className="lg:col-span-1 flex flex-col gap-6">
+                  <ComplianceScore score={75} />
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        {/* Templates Modal */}
+        <AnalysisTemplates 
+          open={showTemplates} 
+          onClose={() => setShowTemplates(false)} 
+        />
+      </main>
     </div>
   )
 }

@@ -24,8 +24,8 @@ interface DashboardStatsProps {
   documentCount?: number
   analysisCount?: number
   completionRate?: number
-  token?: string // Token de autenticación para hacer las llamadas
-  autoFetch?: boolean // Si debe obtener datos automáticamente
+  token?: string
+  autoFetch?: boolean
 }
 
 export function DashboardStats({
@@ -60,7 +60,6 @@ export function DashboardStats({
     }
   }
 
-  // Usar datos reales si están disponibles, sino usar props
   const displayWorkspaceCount = realData?.total_workspaces ?? workspaceCount
   const displayDocumentCount = realData?.total_documents ?? documentCount
   const displayAnalysisCount = realData?.rfps_processed ?? analysisCount
@@ -77,7 +76,7 @@ export function DashboardStats({
   const getTrendColor = () => {
     if (displayTrend === 'up') return '#10B981'
     if (displayTrend === 'down') return '#EF4444'
-    return '#6B7280'
+    return '#94A3B8'
   }
 
   const stats = [
@@ -86,29 +85,12 @@ export function DashboardStats({
       value: displayWorkspaceCount,
       icon: <FileTextOutlined />,
       color: '#E31837',
-      gradient: 'linear-gradient(135deg, #E31837 0%, #C41530 100%)',
       change: `${getTrendIcon()} ${Math.abs(displayTrendPercentage)}%`,
       changeColor: getTrendColor(),
-      tooltipTitle: '📁 Workspaces Activos',
       tooltip: (
-        <div style={{ maxWidth: '280px' }}>
-          <div style={{ marginBottom: '8px', fontWeight: 600, fontSize: '13px' }}>
-            ¿Qué son los Workspaces?
-          </div>
-          <div style={{ fontSize: '12px', lineHeight: '1.6', color: 'rgba(255,255,255,0.85)' }}>
-            Espacios de trabajo donde organizas tus proyectos, clientes y documentos. 
-            Cada workspace es independiente y permite gestionar análisis de RFPs de forma aislada.
-          </div>
-          <div style={{ 
-            marginTop: '10px', 
-            paddingTop: '10px', 
-            borderTop: '1px solid rgba(255,255,255,0.1)',
-            fontSize: '11px',
-            color: 'rgba(255,255,255,0.6)',
-            fontStyle: 'italic'
-          }}>
-            💡 Tip: Crea un workspace por cliente o proyecto
-          </div>
+        <div className="p-1">
+          <p className="font-semibold mb-1">¿Qué son los Workspaces?</p>
+          <p className="text-zinc-400 text-xs">Espacios de trabajo donde organizas tus proyectos, clientes y documentos.</p>
         </div>
       ),
     },
@@ -117,28 +99,12 @@ export function DashboardStats({
       value: displayDocumentCount,
       icon: <FileCheck size={20} />,
       color: '#FF6B00',
-      gradient: 'linear-gradient(135deg, #FF6B00 0%, #E31837 100%)',
       change: `${getTrendIcon()} ${Math.abs(displayTrendPercentage)}%`,
       changeColor: getTrendColor(),
-      tooltipTitle: '📄 Documentos Analizados',
       tooltip: (
-        <div style={{ maxWidth: '280px' }}>
-          <div style={{ marginBottom: '8px', fontWeight: 600, fontSize: '13px' }}>
-            Todos tus documentos procesados
-          </div>
-          <div style={{ fontSize: '12px', lineHeight: '1.6', color: 'rgba(255,255,255,0.85)' }}>
-            Total de archivos que has subido y el sistema ha procesado: PDFs, documentos Word, hojas Excel, etc.
-          </div>
-          <div style={{ 
-            marginTop: '8px', 
-            padding: '8px', 
-            background: 'rgba(255,107,0,0.1)',
-            borderRadius: '6px',
-            fontSize: '11px',
-            lineHeight: '1.5'
-          }}>
-            <strong>Incluye:</strong> Contratos, propuestas, RFPs, anexos técnicos, términos de referencia
-          </div>
+        <div className="p-1">
+          <p className="font-semibold mb-1">Todos tus documentos</p>
+          <p className="text-zinc-400 text-xs">Total de archivos que has subido y el sistema ha procesado.</p>
         </div>
       ),
     },
@@ -147,30 +113,12 @@ export function DashboardStats({
       value: displayAnalysisCount,
       icon: <Target size={20} />,
       color: '#3B82F6',
-      gradient: 'linear-gradient(135deg, #3B82F6 0%, #1E40AF 100%)',
       change: `↑ 15%`,
       changeColor: '#10B981',
-      tooltipTitle: '🎯 RFPs Procesados',
       tooltip: (
-        <div style={{ maxWidth: '300px' }}>
-          <div style={{ marginBottom: '8px', fontWeight: 600, fontSize: '13px' }}>
-            Análisis inteligente con IA
-          </div>
-          <div style={{ fontSize: '12px', lineHeight: '1.6', color: 'rgba(255,255,255,0.85)', marginBottom: '10px' }}>
-            RFPs que han sido completamente analizados mediante inteligencia artificial.
-          </div>
-          <div style={{ 
-            fontSize: '11px',
-            lineHeight: '1.7',
-            color: 'rgba(255,255,255,0.75)'
-          }}>
-            <strong>La IA extrae:</strong><br/>
-            • Cliente y datos de contacto<br/>
-            • Presupuesto y fechas límite<br/>
-            • Requisitos técnicos y funcionales<br/>
-            • Equipo requerido y experiencia<br/>
-            • Criterios de evaluación
-          </div>
+        <div className="p-1">
+          <p className="font-semibold mb-1">Análisis inteligente</p>
+          <p className="text-zinc-400 text-xs">RFPs que han sido completamente analizados mediante IA.</p>
         </div>
       ),
     },
@@ -179,45 +127,12 @@ export function DashboardStats({
       value: `${displayCompletionRate}%`,
       icon: <TrophyOutlined />,
       color: '#10B981',
-      gradient: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
       change: '↑ 8%',
       changeColor: '#10B981',
-      tooltipTitle: '🏆 Tasa de Éxito',
       tooltip: (
-        <div style={{ maxWidth: '280px' }}>
-          <div style={{ marginBottom: '8px', fontWeight: 600, fontSize: '13px' }}>
-            Efectividad del procesamiento
-          </div>
-          <div style={{ fontSize: '12px', lineHeight: '1.6', color: 'rgba(255,255,255,0.85)', marginBottom: '10px' }}>
-            Porcentaje de documentos procesados exitosamente sin errores o problemas.
-          </div>
-          <div style={{ 
-            display: 'flex',
-            gap: '8px',
-            fontSize: '11px',
-            marginTop: '8px'
-          }}>
-            <div style={{ 
-              flex: 1,
-              padding: '6px 8px',
-              background: 'rgba(16,185,129,0.1)',
-              borderRadius: '4px',
-              textAlign: 'center'
-            }}>
-              <div style={{ color: '#10B981', fontWeight: 600 }}>✓ Éxito</div>
-              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '10px' }}>Procesado OK</div>
-            </div>
-            <div style={{ 
-              flex: 1,
-              padding: '6px 8px',
-              background: 'rgba(239,68,68,0.1)',
-              borderRadius: '4px',
-              textAlign: 'center'
-            }}>
-              <div style={{ color: '#EF4444', fontWeight: 600 }}>✗ Error</div>
-              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '10px' }}>Falló OCR</div>
-            </div>
-          </div>
+        <div className="p-1">
+          <p className="font-semibold mb-1">Efectividad</p>
+          <p className="text-zinc-400 text-xs">Porcentaje de documentos procesados exitosamente.</p>
         </div>
       ),
     },
@@ -225,141 +140,46 @@ export function DashboardStats({
 
   if (loading && autoFetch) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
-        <Spin size="large" />
+      <div className="flex justify-center p-10">
+        <Spin />
       </div>
     )
   }
 
   return (
-    <div style={{ 
-      display: 'grid', 
-      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-      gap: '20px',
-      marginBottom: '32px',
-    }}>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
       {stats.map((stat, index) => (
         <div
           key={index}
-          className="hover-lift"
-          style={{
-            background: 'rgba(26, 26, 28, 0.6)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(255, 255, 255, 0.05)',
-            borderRadius: '16px',
-            padding: '24px',
-            position: 'relative',
-            overflow: 'hidden',
-            cursor: 'pointer',
-            transition: 'all 0.3s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = 'rgba(227, 24, 55, 0.3)'
-            e.currentTarget.style.transform = 'translateY(-4px)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)'
-            e.currentTarget.style.transform = 'translateY(0)'
-          }}
+          className="bg-[#1E1F20] border border-zinc-800 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-200 group"
         >
-          {/* Gradient top border */}
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: '3px',
-            background: stat.gradient,
-          }} />
-
-          {/* Icon */}
-          <div style={{
-            width: '48px',
-            height: '48px',
-            borderRadius: '12px',
-            background: stat.gradient,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: '16px',
-            color: '#FFFFFF',
-            fontSize: '20px',
-            boxShadow: `0 4px 12px ${stat.color}40`,
-          }}>
-            {stat.icon}
+          <div className="flex justify-between items-start mb-4">
+            <div 
+              className="w-10 h-10 rounded-xl flex items-center justify-center text-white"
+              style={{ backgroundColor: stat.color }}
+            >
+              {stat.icon}
+            </div>
+            <Tooltip title={stat.tooltip} color="#252627">
+              <QuestionCircleOutlined className="text-zinc-400 hover:text-zinc-200 cursor-help" />
+            </Tooltip>
           </div>
-
-          {/* Value */}
-          <div style={{
-            fontSize: '32px',
-            fontWeight: 700,
-            color: '#FFFFFF',
-            marginBottom: '8px',
-            lineHeight: 1,
-          }}>
-            {stat.value}
-          </div>
-
-          {/* Title and Change */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}>
-              <span style={{
-                fontSize: '14px',
-                color: '#888888',
-                fontWeight: 500,
-              }}>
+          
+          <div className="space-y-1">
+            <h3 className="text-3xl font-bold text-white">
+              {stat.value}
+            </h3>
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-zinc-400">
                 {stat.title}
               </span>
-              <Tooltip 
-                title={stat.tooltip} 
-                placement="top"
-                styles={{
-                  container: {
-                    background: 'rgba(20, 20, 22, 0.98)',
-                    backdropFilter: 'blur(20px)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '12px',
-                    padding: '14px 16px',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-                  }
-                }}
-                color="transparent"
+              <span 
+                className="text-xs font-bold"
+                style={{ color: stat.changeColor }}
               >
-                <QuestionCircleOutlined style={{
-                  fontSize: '14px',
-                  color: '#999999',
-                  cursor: 'help',
-                  transition: 'all 0.2s ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = stat.color
-                  e.currentTarget.style.transform = 'scale(1.15)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = '#999999'
-                  e.currentTarget.style.transform = 'scale(1)'
-                }}
-                />
-              </Tooltip>
+                {stat.change}
+              </span>
             </div>
-            <span style={{
-              fontSize: '12px',
-              color: stat.changeColor,
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-            }}>
-              {stat.change}
-            </span>
           </div>
         </div>
       ))}
@@ -372,23 +192,15 @@ export function TodoList() {
   const [newTodo, setNewTodo] = useState('')
   const [isAdding, setIsAdding] = useState(false)
 
-  // Cargar todos del localStorage
   useEffect(() => {
     const savedTodos = localStorage.getItem('userTodos')
     if (savedTodos) {
-      try {
-        setTodos(JSON.parse(savedTodos))
-      } catch (e) {
-        console.error('Error loading todos:', e)
-      }
+      try { setTodos(JSON.parse(savedTodos)) } catch (e) { console.error(e) }
     }
   }, [])
 
-  // Guardar todos en localStorage
   useEffect(() => {
-    if (todos.length > 0 || localStorage.getItem('userTodos')) {
-      localStorage.setItem('userTodos', JSON.stringify(todos))
-    }
+    localStorage.setItem('userTodos', JSON.stringify(todos))
   }, [todos])
 
   const addTodo = () => {
@@ -400,281 +212,78 @@ export function TodoList() {
   }
 
   const toggleTodo = (id: number) => {
-    setTodos(todos.map(todo => 
-      todo.id === id ? { ...todo, completed: !todo.completed } : todo
-    ))
+    setTodos(todos.map(todo => todo.id === id ? { ...todo, completed: !todo.completed } : todo))
   }
 
   const deleteTodo = (id: number) => {
     setTodos(todos.filter(todo => todo.id !== id))
   }
 
-  const incompleteTodos = todos.filter(t => !t.completed).length
-  const completedTodos = todos.filter(t => !t.completed).length
-
   return (
-    <div style={{
-      background: 'rgba(26, 26, 28, 0.6)',
-      backdropFilter: 'blur(20px)',
-      border: '1px solid rgba(255, 255, 255, 0.05)',
-      borderRadius: '16px',
-      padding: '24px',
-      position: 'relative',
-      overflow: 'hidden',
-    }}>
-      {/* Gradient top border */}
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: '3px',
-        background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
-      }} />
-
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: '20px',
-      }}>
-        <div style={{ flex: 1 }}>
-          <h3 style={{
-            fontSize: '18px',
-            fontWeight: 600,
-            color: '#FFFFFF',
-            margin: 0,
-            marginBottom: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-          }}>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
-            }}>
-              <CheckCircleOutlined style={{ color: '#FFFFFF', fontSize: '18px' }} />
-            </div>
-            Lista de Tareas
-          </h3>
-          <div style={{ 
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginLeft: '46px',
-          }}>
-            <span style={{ 
-              color: '#888888', 
-              fontSize: '13px',
-            }}>
-              {incompleteTodos}
-            </span>
-            <span style={{
-              padding: '2px 8px',
-              borderRadius: '6px',
-              background: 'rgba(16, 185, 129, 0.1)',
-              color: '#10B981',
-              fontSize: '11px',
-              fontWeight: 600,
-            }}>
-              PENDIENTE{incompleteTodos !== 1 ? 'S' : ''}
-            </span>
-          </div>
-        </div>
-        <Button
-          type="primary"
-          size="middle"
-          icon={<PlusOutlined />}
+    <div className="bg-[#1E1F20] border border-zinc-800 rounded-2xl p-6 shadow-sm h-full flex flex-col">
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+          <CheckCircleOutlined className="text-[#10B981]" />
+          Tareas
+        </h3>
+        <Button 
+          type="text" 
+          icon={<PlusOutlined />} 
           onClick={() => setIsAdding(true)}
-          className="hover-shine"
-          style={{
-            background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
-            border: 'none',
-            borderRadius: '10px',
-            height: '36px',
-            fontWeight: 600,
-            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
-          }}
+          className="text-[#10B981] hover:bg-[#10B981]/10 rounded-lg"
         >
-          Agregar
+          Nueva
         </Button>
       </div>
 
       {isAdding && (
-        <div style={{ 
-          marginBottom: '20px',
-          padding: '16px',
-          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%)',
-          borderRadius: '12px',
-          border: '1px solid rgba(16, 185, 129, 0.2)',
-        }}>
+        <div className="mb-4 space-y-2">
           <Input
-            placeholder="✍️ Escribe tu tarea..."
+            placeholder="¿Qué hay que hacer?"
             value={newTodo}
             onChange={(e) => setNewTodo(e.target.value)}
             onPressEnter={addTodo}
+            className="bg-zinc-900 border-zinc-800 text-white rounded-xl"
             autoFocus
-            style={{
-              background: 'rgba(255, 255, 255, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              color: '#FFFFFF',
-              marginBottom: '12px',
-              borderRadius: '10px',
-              height: '40px',
-              fontSize: '14px',
-            }}
           />
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <Button 
-              size="middle" 
-              onClick={addTodo} 
-              type="primary"
-              style={{
-                flex: 1,
-                background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
-                border: 'none',
-                borderRadius: '8px',
-                height: '36px',
-                fontWeight: 600,
-              }}
-            >
-              Guardar
-            </Button>
-            <Button 
-              size="middle" 
-              onClick={() => { setIsAdding(false); setNewTodo('') }}
-              style={{
-                borderRadius: '8px',
-                height: '36px',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                color: '#FFFFFF',
-              }}
-            >
-              Cancelar
-            </Button>
+          <div className="flex gap-2">
+            <Button size="small" type="primary" onClick={addTodo} className="bg-[#10B981] border-none rounded-lg flex-1">Añadir</Button>
+            <Button size="small" onClick={() => setIsAdding(false)} className="rounded-lg flex-1">Cancelar</Button>
           </div>
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
+      <div className="space-y-2 overflow-y-auto pr-1 flex-1">
         {todos.length === 0 ? (
-          <div style={{
-            textAlign: 'center',
-            padding: '50px 20px',
-            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.03) 0%, rgba(5, 150, 105, 0.03) 100%)',
-            borderRadius: '16px',
-            border: '2px dashed rgba(16, 185, 129, 0.2)',
-          }}>
-            <div style={{ 
-              fontSize: '64px', 
-              marginBottom: '16px',
-              filter: 'drop-shadow(0 4px 8px rgba(16, 185, 129, 0.2))',
-            }}>✅</div>
-            <h4 style={{ 
-              color: '#FFFFFF', 
-              fontSize: '16px', 
-              marginBottom: '8px',
-              fontWeight: 600,
-            }}>
-              Sin tareas pendientes
-            </h4>
-            <p style={{ 
-              color: '#999999', 
-              fontSize: '13px', 
-              margin: 0,
-              lineHeight: '1.6',
-            }}>
-              Haz clic en <strong style={{ color: '#10B981' }}>Agregar</strong> para crear tu primera tarea
-            </p>
+          <div className="text-center py-10 text-zinc-500 text-sm italic">
+            No hay tareas pendientes
           </div>
         ) : (
           todos.map((todo) => (
             <div
               key={todo.id}
-              className="hover-lift"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '14px',
-                padding: '14px 16px',
-                background: todo.completed 
-                  ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(5, 150, 105, 0.08) 100%)'
-                  : 'rgba(255, 255, 255, 0.03)',
-                border: `1px solid ${todo.completed ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
-                borderRadius: '10px',
-                transition: 'all 0.3s ease',
-                cursor: 'pointer',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = todo.completed ? 'rgba(16, 185, 129, 0.5)' : 'rgba(255, 255, 255, 0.15)'
-                e.currentTarget.style.background = todo.completed
-                  ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.12) 100%)'
-                  : 'rgba(255, 255, 255, 0.05)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = todo.completed ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255, 255, 255, 0.08)'
-                e.currentTarget.style.background = todo.completed
-                  ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(5, 150, 105, 0.08) 100%)'
-                  : 'rgba(255, 255, 255, 0.03)'
-              }}
+              className={`group flex items-center gap-3 p-3 rounded-xl transition-colors ${
+                todo.completed ? 'bg-zinc-900/50' : 'bg-zinc-900'
+              }`}
             >
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '22px',
-                height: '22px',
-                borderRadius: '6px',
-                background: todo.completed ? '#10B981' : 'rgba(255, 255, 255, 0.08)',
-                border: todo.completed ? 'none' : '2px solid rgba(255, 255, 255, 0.2)',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-              }}
-              onClick={() => toggleTodo(todo.id)}
+              <div 
+                onClick={() => toggleTodo(todo.id)}
+                className={`w-5 h-5 rounded-md border-2 cursor-pointer flex items-center justify-center transition-all ${
+                  todo.completed ? 'bg-[#10B981] border-[#10B981]' : 'border-zinc-700'
+                }`}
               >
-                {todo.completed && <CheckCircleOutlined style={{ color: '#FFFFFF', fontSize: '12px' }} />}
+                {todo.completed && <CheckCircleOutlined className="text-white text-[10px]" />}
               </div>
-              <span style={{
-                flex: 1,
-                color: todo.completed ? '#888888' : '#FFFFFF',
-                fontSize: '14px',
-                textDecoration: todo.completed ? 'line-through' : 'none',
-                lineHeight: '1.5',
-                fontWeight: todo.completed ? 400 : 500,
-              }}>
+              <span className={`flex-1 text-sm ${todo.completed ? 'line-through text-zinc-500' : 'text-zinc-300'}`}>
                 {todo.text}
               </span>
               <Button
                 type="text"
                 danger
                 size="small"
-                icon={<DeleteOutlined />}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  deleteTodo(todo.id)
-                }}
-                style={{ 
-                  padding: '6px 10px', 
-                  height: 'auto',
-                  borderRadius: '6px',
-                  opacity: 0.6,
-                  transition: 'all 0.2s ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.opacity = '1'
-                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.opacity = '0.6'
-                  e.currentTarget.style.background = 'transparent'
-                }}
+                icon={<DeleteOutlined className="text-xs" />}
+                onClick={() => deleteTodo(todo.id)}
+                className="opacity-0 group-hover:opacity-100 transition-opacity"
               />
             </div>
           ))
@@ -685,179 +294,52 @@ export function TodoList() {
 }
 
 export function ComplianceScore({ score = 0 }: { score?: number }) {
-  const getColor = (score: number) => {
-    if (score >= 80) return '#10B981'
-    if (score >= 60) return '#F59E0B'
+  const getColor = (s: number) => {
+    if (s >= 80) return '#10B981'
+    if (s >= 60) return '#F59E0B'
     return '#EF4444'
   }
 
-  const getStatus = (score: number) => {
-    if (score === 0) return 'Sin datos'
-    if (score >= 80) return 'Excelente'
-    if (score >= 60) return 'Bueno'
-    return 'Necesita Mejora'
-  }
-
   return (
-    <div style={{
-      background: 'rgba(26, 26, 28, 0.6)',
-      backdropFilter: 'blur(20px)',
-      border: '1px solid rgba(255, 255, 255, 0.05)',
-      borderRadius: '16px',
-      padding: '24px',
-      marginBottom: '24px',
-    }}>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '20px',
-      }}>
-        <h3 style={{
-          fontSize: '18px',
-          fontWeight: 600,
-          color: '#FFFFFF',
-          margin: 0,
-        }}>
-          Score de Cumplimiento
-        </h3>
-        <Tag color={score > 0 ? getColor(score) : 'default'} style={{ 
-          fontSize: '14px',
-          padding: '4px 12px',
-          borderRadius: '6px',
-          border: 'none',
-        }}>
-          {getStatus(score)}
-        </Tag>
-      </div>
-
-      {score === 0 ? (
-        <div style={{
-          textAlign: 'center',
-          padding: '40px 20px',
-          background: 'rgba(255, 255, 255, 0.02)',
-          borderRadius: '12px',
-          border: '1px dashed rgba(255, 255, 255, 0.1)',
-        }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>📊</div>
-          <h4 style={{ color: '#FFFFFF', fontSize: '14px', marginBottom: '8px' }}>
-            Sin score disponible
-          </h4>
-          <p style={{ color: '#999999', fontSize: '12px', margin: 0 }}>
-            El score de cumplimiento se calculará cuando tengas proyectos activos
-          </p>
-        </div>
-      ) : (
-        <>
-          <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-            <div style={{
-              fontSize: '48px',
-              fontWeight: 700,
-              background: `linear-gradient(135deg, ${getColor(score)}, ${getColor(score)}CC)`,
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              marginBottom: '8px',
-            }}>
-              {score}%
-            </div>
-            <p style={{ color: '#999999', fontSize: '14px', margin: 0 }}>
-              De los requisitos obligatorios cumplidos
-            </p>
-          </div>
-
+    <div className="bg-[#1E1F20] border border-zinc-800 rounded-2xl p-6 shadow-sm">
+      <h3 className="text-lg font-bold text-white mb-6">Cumplimiento</h3>
+      
+      <div className="flex flex-col items-center justify-center py-4">
+        <div className="relative flex items-center justify-center mb-4">
           <Progress 
+            type="circle" 
             percent={score} 
-            strokeColor={{
-              '0%': getColor(score),
-              '100%': `${getColor(score)}CC`,
-            }}
-            railColor="rgba(255, 255, 255, 0.1)"
-            showInfo={false}
-            size={12}
-            style={{ marginBottom: '16px' }}
+            strokeColor={getColor(score)}
+            railColor="rgba(148, 163, 184, 0.1)"
+            size={120}
+            strokeWidth={10}
+            format={(p) => (
+              <span className="text-2xl font-bold dark:text-white">{p}%</span>
+            )}
           />
-
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: '12px',
-            marginTop: '20px',
-          }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ 
-                fontSize: '20px', 
-                fontWeight: 600, 
-                color: '#10B981',
-                marginBottom: '4px',
-              }}>
-                0
-              </div>
-              <div style={{ fontSize: '12px', color: '#999999' }}>
-                Cumplidos
-              </div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ 
-                fontSize: '20px', 
-                fontWeight: 600, 
-                color: '#F59E0B',
-                marginBottom: '4px',
-              }}>
-                0
-              </div>
-              <div style={{ fontSize: '12px', color: '#999999' }}>
-                Parciales
-              </div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ 
-                fontSize: '20px', 
-                fontWeight: 600, 
-                color: '#EF4444',
-                marginBottom: '4px',
-              }}>
-                0
-              </div>
-              <div style={{ fontSize: '12px', color: '#999999' }}>
-                Pendientes
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+        </div>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center">
+          Requisitos obligatorios cumplidos
+        </p>
+      </div>
     </div>
   )
 }
 
 export function UpcomingDeadlines() {
   const [deadlines, setDeadlines] = useState<Array<{
-    id: number
-    title: string
-    date: string
-    time?: string
-    type: 'entrega' | 'reunion'
+    id: number; title: string; date: string; time?: string; type: 'entrega' | 'reunion'
   }>>([])
   const [isAdding, setIsAdding] = useState(false)
   const [newDeadline, setNewDeadline] = useState({ title: '', date: '', time: '', type: 'entrega' as 'entrega' | 'reunion' })
 
-  // Cargar deadlines del localStorage
   useEffect(() => {
     const saved = localStorage.getItem('userDeadlines')
-    if (saved) {
-      try {
-        setDeadlines(JSON.parse(saved))
-      } catch (e) {
-        console.error('Error loading deadlines:', e)
-      }
-    }
+    if (saved) { try { setDeadlines(JSON.parse(saved)) } catch (e) { console.error(e) } }
   }, [])
 
-  // Guardar deadlines en localStorage
   useEffect(() => {
-    if (deadlines.length > 0 || localStorage.getItem('userDeadlines')) {
-      localStorage.setItem('userDeadlines', JSON.stringify(deadlines))
-    }
+    localStorage.setItem('userDeadlines', JSON.stringify(deadlines))
   }, [deadlines])
 
   const addDeadline = () => {
@@ -868,384 +350,59 @@ export function UpcomingDeadlines() {
     }
   }
 
-  const deleteDeadline = (id: number) => {
-    setDeadlines(deadlines.filter(d => d.id !== id))
-  }
-
-  const getDaysLeft = (dateStr: string) => {
-    const today = dayjs()
-    const deadline = dayjs(dateStr)
-    return deadline.diff(today, 'day')
-  }
-
-  const getPriorityColor = (daysLeft: number) => {
-    if (daysLeft <= 3) return '#EF4444'
-    if (daysLeft <= 7) return '#F59E0B'
-    return '#3B82F6'
-  }
-
-  const sortedDeadlines = [...deadlines].sort((a, b) => 
-    new Date(a.date).getTime() - new Date(b.date).getTime()
-  )
-
   return (
-    <div style={{
-      background: 'rgba(26, 26, 28, 0.6)',
-      backdropFilter: 'blur(20px)',
-      border: '1px solid rgba(255, 255, 255, 0.05)',
-      borderRadius: '16px',
-      padding: '24px',
-      position: 'relative',
-      overflow: 'hidden',
-    }}>
-      {/* Gradient top border */}
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: '3px',
-        background: 'linear-gradient(135deg, #E31837 0%, #C41530 100%)',
-      }} />
-
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: '20px',
-      }}>
-        <div style={{ flex: 1 }}>
-          <h3 style={{
-            fontSize: '18px',
-            fontWeight: 600,
-            color: '#FFFFFF',
-            margin: 0,
-            marginBottom: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-          }}>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #E31837 0%, #C41530 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(227, 24, 55, 0.3)',
-            }}>
-              <Calendar size={18} style={{ color: '#FFFFFF' }} />
-            </div>
-            Próximas Fechas Límite
-          </h3>
-          <div style={{ 
-            marginLeft: '46px',
-            color: '#888888',
-            fontSize: '13px',
-          }}>
-            {sortedDeadlines.length} recordatorio{sortedDeadlines.length !== 1 ? 's' : ''}
-          </div>
-        </div>
-        <Button
-          type="primary"
-          size="middle"
-          icon={<PlusOutlined />}
+    <div className="bg-[#1E1F20] border border-zinc-800 rounded-2xl p-6 shadow-sm h-full flex flex-col">
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+          <Calendar size={18} className="text-[#E31837]" />
+          Próximas Fechas
+        </h3>
+        <Button 
+          type="text" 
+          icon={<PlusOutlined />} 
           onClick={() => setIsAdding(true)}
-          className="hover-shine"
-          style={{
-            background: 'linear-gradient(135deg, #E31837 0%, #C41530 100%)',
-            border: 'none',
-            borderRadius: '10px',
-            height: '36px',
-            fontWeight: 600,
-            boxShadow: '0 4px 12px rgba(227, 24, 55, 0.2)',
-          }}
+          className="text-[#E31837] hover:bg-[#E31837]/10 rounded-lg"
         >
-          Agregar
+          Añadir
         </Button>
       </div>
 
       {isAdding && (
-        <div style={{
-          marginBottom: '20px',
-          padding: '18px',
-          background: 'linear-gradient(135deg, rgba(227, 24, 55, 0.05) 0%, rgba(196, 21, 48, 0.05) 100%)',
-          borderRadius: '12px',
-          border: '1px solid rgba(227, 24, 55, 0.2)',
-        }}>
+        <div className="mb-4 p-4 bg-zinc-900 rounded-xl space-y-3">
           <Input
-            placeholder="📌 Título del recordatorio..."
+            placeholder="Título..."
             value={newDeadline.title}
             onChange={(e) => setNewDeadline({ ...newDeadline, title: e.target.value })}
-            style={{
-              background: 'rgba(255, 255, 255, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              color: '#FFFFFF',
-              marginBottom: '12px',
-              borderRadius: '10px',
-              height: '40px',
-              fontSize: '14px',
-            }}
+            className="bg-zinc-950 border-zinc-800 text-white"
           />
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
-            <DatePicker
-              placeholder="📅 Fecha"
-              onChange={(date) => setNewDeadline({ ...newDeadline, date: date ? date.format('YYYY-MM-DD') : '' })}
-              style={{ 
-                flex: 1,
-                height: '40px',
-                borderRadius: '10px',
-              }}
-            />
-            <TimePicker
-              placeholder="🕐 Hora (opcional)"
-              format="HH:mm"
-              onChange={(time) => setNewDeadline({ ...newDeadline, time: time ? time.format('HH:mm') : '' })}
-              style={{ 
-                flex: 1,
-                height: '40px',
-                borderRadius: '10px',
-              }}
-            />
-          </div>
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
-            <Button
-              size="middle"
-              type={newDeadline.type === 'entrega' ? 'primary' : 'default'}
-              onClick={() => setNewDeadline({ ...newDeadline, type: 'entrega' })}
-              style={{
-                flex: 1,
-                height: '40px',
-                borderRadius: '10px',
-                background: newDeadline.type === 'entrega' 
-                  ? 'linear-gradient(135deg, #3B82F6 0%, #1E40AF 100%)'
-                  : 'rgba(255, 255, 255, 0.05)',
-                border: newDeadline.type === 'entrega' ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
-                color: '#FFFFFF',
-                fontWeight: 600,
-              }}
-            >
-              📦 Entrega
-            </Button>
-            <Button
-              size="middle"
-              type={newDeadline.type === 'reunion' ? 'primary' : 'default'}
-              onClick={() => setNewDeadline({ ...newDeadline, type: 'reunion' })}
-              style={{
-                flex: 1,
-                height: '40px',
-                borderRadius: '10px',
-                background: newDeadline.type === 'reunion'
-                  ? 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)'
-                  : 'rgba(255, 255, 255, 0.05)',
-                border: newDeadline.type === 'reunion' ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
-                color: '#FFFFFF',
-                fontWeight: 600,
-              }}
-            >
-              👥 Reunión
-            </Button>
-          </div>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <Button 
-              size="middle" 
-              onClick={addDeadline} 
-              type="primary"
-              style={{
-                flex: 1,
-                background: 'linear-gradient(135deg, #E31837 0%, #C41530 100%)',
-                border: 'none',
-                borderRadius: '8px',
-                height: '36px',
-                fontWeight: 600,
-              }}
-            >
-              Guardar
-            </Button>
-            <Button 
-              size="middle" 
-              onClick={() => { setIsAdding(false); setNewDeadline({ title: '', date: '', time: '', type: 'entrega' }) }}
-              style={{
-                borderRadius: '8px',
-                height: '36px',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                color: '#FFFFFF',
-              }}
-            >
-              Cancelar
-            </Button>
+          <DatePicker 
+            className="w-full" 
+            onChange={(date) => setNewDeadline({ ...newDeadline, date: date ? date.format('YYYY-MM-DD') : '' })} 
+          />
+          <div className="flex gap-2">
+            <Button type="primary" onClick={addDeadline} className="bg-[#E31837] border-none flex-1">Guardar</Button>
+            <Button onClick={() => setIsAdding(false)} className="flex-1">Cancelar</Button>
           </div>
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '350px', overflowY: 'auto' }}>
-        {sortedDeadlines.length === 0 ? (
-          <div style={{
-            textAlign: 'center',
-            padding: '50px 20px',
-            background: 'linear-gradient(135deg, rgba(227, 24, 55, 0.03) 0%, rgba(196, 21, 48, 0.03) 100%)',
-            borderRadius: '16px',
-            border: '2px dashed rgba(227, 24, 55, 0.2)',
-          }}>
-            <div style={{ 
-              fontSize: '64px', 
-              marginBottom: '16px',
-              filter: 'drop-shadow(0 4px 8px rgba(227, 24, 55, 0.2))',
-            }}>📅</div>
-            <h4 style={{ 
-              color: '#FFFFFF', 
-              fontSize: '16px', 
-              marginBottom: '8px',
-              fontWeight: 600,
-            }}>
-              Sin recordatorios
-            </h4>
-            <p style={{ 
-              color: '#999999', 
-              fontSize: '13px', 
-              margin: 0,
-              lineHeight: '1.6',
-            }}>
-              Haz clic en <strong style={{ color: '#E31837' }}>Agregar</strong> para programar entregas o reuniones
-            </p>
-          </div>
+      <div className="space-y-3 overflow-y-auto flex-1">
+        {deadlines.length === 0 ? (
+          <div className="text-center py-10 text-zinc-500 text-sm italic">Sin fechas límite</div>
         ) : (
-          sortedDeadlines.map((deadline) => {
-            const daysLeft = getDaysLeft(deadline.date)
-            const color = getPriorityColor(daysLeft)
-            const isPast = daysLeft < 0
-            
-            return (
-              <div
-                key={deadline.id}
-                className="hover-lift"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '16px',
-                  background: `linear-gradient(135deg, ${color}08 0%, ${color}05 100%)`,
-                  border: `1px solid ${color}40`,
-                  borderLeft: `4px solid ${color}`,
-                  borderRadius: '12px',
-                  transition: 'all 0.3s ease',
-                  opacity: isPast ? 0.6 : 1,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = `${color}60`
-                  e.currentTarget.style.background = `linear-gradient(135deg, ${color}12 0%, ${color}08 100%)`
-                  e.currentTarget.style.opacity = '1'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = `${color}40`
-                  e.currentTarget.style.background = `linear-gradient(135deg, ${color}08 0%, ${color}05 100%)`
-                  e.currentTarget.style.opacity = isPast ? '0.6' : '1'
-                }}
-              >
-                <div style={{ flex: 1 }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    marginBottom: '8px',
-                  }}>
-                    <div style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '8px',
-                      background: deadline.type === 'entrega'
-                        ? 'linear-gradient(135deg, #3B82F6 0%, #1E40AF 100%)'
-                        : 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '16px',
-                      boxShadow: deadline.type === 'entrega'
-                        ? '0 4px 12px rgba(59, 130, 246, 0.3)'
-                        : '0 4px 12px rgba(139, 92, 246, 0.3)',
-                    }}>
-                      {deadline.type === 'entrega' ? '📦' : '👥'}
-                    </div>
-                    <div style={{
-                      fontSize: '15px',
-                      fontWeight: 600,
-                      color: '#FFFFFF',
-                      lineHeight: '1.4',
-                    }}>
-                      {deadline.title}
-                    </div>
-                  </div>
-                  <div style={{
-                    fontSize: '12px',
-                    color: '#999999',
-                    marginLeft: '42px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                  }}>
-                    <span>📅 {dayjs(deadline.date).format('DD MMM YYYY')}</span>
-                    {deadline.time && <span>• 🕐 {deadline.time}</span>}
-                  </div>
-                </div>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '16px',
-                }}>
-                  <div style={{ 
-                    textAlign: 'center',
-                    minWidth: '60px',
-                  }}>
-                    <div style={{
-                      fontSize: '24px',
-                      fontWeight: 700,
-                      color: color,
-                      marginBottom: '2px',
-                      lineHeight: 1,
-                    }}>
-                      {isPast ? '⚠️' : daysLeft}
-                    </div>
-                    <div style={{
-                      fontSize: '10px',
-                      color: '#999999',
-                      fontWeight: 600,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                    }}>
-                      {isPast ? 'Vencido' : daysLeft === 0 ? 'Hoy' : daysLeft === 1 ? 'Día' : 'Días'}
-                    </div>
-                  </div>
-                  <Button
-                    type="text"
-                    danger
-                    size="small"
-                    icon={<DeleteOutlined />}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      deleteDeadline(deadline.id)
-                    }}
-                    style={{ 
-                      padding: '8px 10px',
-                      height: 'auto',
-                      borderRadius: '8px',
-                      opacity: 0.6,
-                      transition: 'all 0.2s ease',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.opacity = '1'
-                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.opacity = '0.6'
-                      e.currentTarget.style.background = 'transparent'
-                    }}
-                  />
-                </div>
+          deadlines.map((dl) => (
+            <div key={dl.id} className="p-3 bg-zinc-900 rounded-xl border border-transparent hover:border-zinc-700 transition-all">
+              <div className="flex justify-between items-start mb-1">
+                <span className="text-sm font-bold text-zinc-200">{dl.title}</span>
+                <Tag color={dl.type === 'entrega' ? 'blue' : 'purple'} className="m-0 text-[10px] rounded-md border-none">
+                  {dl.type.toUpperCase()}
+                </Tag>
               </div>
-            )
-          })
+              <p className="text-xs text-zinc-500">
+                {dayjs(dl.date).format('DD MMM YYYY')} {dl.time && `• ${dl.time}`}
+              </p>
+            </div>
+          ))
         )}
       </div>
     </div>

@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState } from 'react'
-import { Modal, Tabs, Tag } from 'antd'
+import { Modal, Tabs, Tag, Button } from 'antd'
 import { ModernButton } from './ModernButton'
 import { 
   FileTextOutlined, 
@@ -134,186 +134,101 @@ export function AnalysisTemplates({ open, onClose, onSelect }: AnalysisTemplates
       open={open}
       onCancel={onClose}
       footer={null}
-      width={900}
+      width={850}
       centered
       styles={{
         body: {
-          padding: '40px',
-          background: '#0A0A0B',
+          padding: '32px',
+          background: '#1E1F20',
         },
         content: {
-          background: '#0A0A0B',
-          border: '1px solid rgba(227, 24, 55, 0.2)',
+          background: '#1E1F20',
+          border: '1px solid #334155',
+          borderRadius: '24px',
+          overflow: 'hidden'
         },
       }}
+      closeIcon={<span className="text-zinc-500">×</span>}
     >
-      <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-        <h2 style={{ 
-          fontSize: '28px', 
-          fontWeight: 700, 
-          color: '#FFFFFF',
-          marginBottom: '12px',
-        }}>
+      <div className="text-center mb-10">
+        <h2 className="text-2xl font-bold text-white mb-2">
           Plantillas de Análisis
         </h2>
-        <p style={{ fontSize: '16px', color: '#999999', maxWidth: '600px', margin: '0 auto' }}>
-          Selecciona una plantilla optimizada para tu tipo de RFP y acelera tu análisis
+        <p className="text-zinc-400 text-sm max-w-md mx-auto">
+          Selecciona una plantilla optimizada para tu tipo de RFP y acelera tu análisis.
         </p>
       </div>
 
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(2, 1fr)', 
-        gap: '20px',
-        marginBottom: '32px',
-      }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         {templates.map((template) => (
           <div
             key={template.id}
             onClick={() => handleSelect(template)}
-            style={{
-              background: selectedTemplate === template.id 
-                ? 'rgba(227, 24, 55, 0.1)' 
-                : 'rgba(26, 26, 28, 0.6)',
-              backdropFilter: 'blur(20px)',
-              border: selectedTemplate === template.id
-                ? `2px solid ${template.color}`
-                : '1px solid rgba(255, 255, 255, 0.05)',
-              borderRadius: '16px',
-              padding: '24px',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              position: 'relative',
-            }}
-            onMouseEnter={(e) => {
-              if (selectedTemplate !== template.id) {
-                e.currentTarget.style.borderColor = `${template.color}80`
-                e.currentTarget.style.transform = 'translateY(-4px)'
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (selectedTemplate !== template.id) {
-                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)'
-                e.currentTarget.style.transform = 'translateY(0)'
-              }
-            }}
+            className={`relative p-5 rounded-2xl cursor-pointer transition-all duration-200 border ${
+              selectedTemplate === template.id 
+                ? 'bg-zinc-800 border-[#E31837] ring-1 ring-[#E31837]' 
+                : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700'
+            }`}
           >
             {/* Selected indicator */}
             {selectedTemplate === template.id && (
-              <div style={{
-                position: 'absolute',
-                top: '12px',
-                right: '12px',
-                width: '24px',
-                height: '24px',
-                borderRadius: '50%',
-                background: template.color,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#FFFFFF',
-              }}>
-                <CheckCircleOutlined style={{ fontSize: '14px' }} />
+              <div className="absolute top-3 right-3 text-[#E31837]">
+                <CheckCircleOutlined />
               </div>
             )}
 
-            {/* Icon */}
-            <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '12px',
-              background: `${template.color}20`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: '16px',
-              color: template.color,
-              fontSize: '20px',
-            }}>
-              {template.icon}
-            </div>
-
-            {/* Header */}
-            <div style={{ marginBottom: '12px' }}>
-              <h3 style={{
-                fontSize: '18px',
-                fontWeight: 600,
-                color: '#FFFFFF',
-                marginBottom: '4px',
-              }}>
-                {template.name}
-              </h3>
-              <Tag 
-                style={{ 
-                  fontSize: '11px',
-                  padding: '2px 8px',
-                  borderRadius: '4px',
-                  background: `${template.color}20`,
-                  color: template.color,
-                  border: 'none',
-                }}
+            {/* Icon & Title */}
+            <div className="flex items-center gap-3 mb-3">
+              <div 
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm"
+                style={{ backgroundColor: template.color }}
               >
-                {template.type}
-              </Tag>
+                {template.icon}
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white leading-tight">
+                  {template.name}
+                </h3>
+                <span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">
+                  {template.type}
+                </span>
+              </div>
             </div>
 
             {/* Description */}
-            <p style={{
-              fontSize: '13px',
-              color: '#CCCCCC',
-              marginBottom: '16px',
-              lineHeight: 1.5,
-            }}>
+            <p className="text-xs text-zinc-400 mb-4 line-clamp-2 leading-relaxed">
               {template.description}
             </p>
 
-            {/* Sections */}
-            <div style={{
-              fontSize: '12px',
-              color: '#999999',
-            }}>
-              <strong style={{ color: '#FFFFFF', display: 'block', marginBottom: '8px' }}>
-                Incluye:
-              </strong>
-              <ul style={{ 
-                margin: 0, 
-                paddingLeft: '20px',
-                lineHeight: 1.8,
-              }}>
-                {template.sections.slice(0, 3).map((section, idx) => (
-                  <li key={idx}>{section}</li>
-                ))}
-                {template.sections.length > 3 && (
-                  <li style={{ color: template.color }}>
-                    +{template.sections.length - 3} más...
-                  </li>
-                )}
-              </ul>
+            {/* Sections Preview */}
+            <div className="space-y-1">
+              <span className="text-[10px] text-zinc-600 font-bold uppercase block mb-1">Incluye:</span>
+              {template.sections.slice(0, 3).map((section, idx) => (
+                <div key={idx} className="flex items-center gap-2 text-[11px] text-zinc-500">
+                  <div className="w-1 h-1 rounded-full bg-zinc-700" />
+                  <span className="truncate">{section}</span>
+                </div>
+              ))}
             </div>
           </div>
         ))}
       </div>
 
       {/* Actions */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'flex-end',
-        gap: '12px',
-      }}>
-        <ModernButton
-          variant="ghost"
+      <div className="flex justify-end gap-3">
+        <Button 
           onClick={onClose}
+          className="rounded-xl border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 px-6 h-11 font-medium"
         >
           Cancelar
-        </ModernButton>
-        <ModernButton
-          variant="gradient"
-          glow
+        </Button>
+        <Button
           disabled={!selectedTemplate}
           onClick={onClose}
+          className="rounded-xl bg-[#E31837] hover:bg-[#c41530] border-none text-white px-8 h-11 font-bold shadow-lg shadow-[#E31837]/20 disabled:opacity-50"
         >
-          Usar Plantilla Seleccionada
-        </ModernButton>
+          Usar Plantilla
+        </Button>
       </div>
     </Modal>
   )

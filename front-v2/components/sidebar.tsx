@@ -1208,7 +1208,7 @@ export default function Sidebar() {
 
       {/* Desktop Sidebar */}
       <Sider
-        width={220}
+        width={280}
         collapsedWidth={60}
         collapsed={collapsed}
         style={{
@@ -1505,7 +1505,7 @@ export default function Sidebar() {
       </Sider>
 
       {/* Spacer for fixed sidebar */}
-      <div style={{ width: collapsed ? 60 : 220, flexShrink: 0, transition: "width 0.2s" }} />
+      <div style={{ width: collapsed ? 60 : 280, flexShrink: 0, transition: "width 0.2s" }} />
 
       {/* Modal for new workspace */}
       <Modal
