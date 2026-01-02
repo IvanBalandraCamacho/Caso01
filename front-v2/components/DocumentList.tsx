@@ -75,6 +75,7 @@ export function DocumentList({
   isLoading = false,
   onDelete,
   onRefresh,
+  onPreview,
   showConversationBadge = false,
 }: DocumentListProps) {
   if (isLoading) {
@@ -126,19 +127,19 @@ export function DocumentList({
             actions={
               onDelete
                 ? [
-                    <Tooltip key="delete" title="Eliminar documento">
-                      <Button
-                        type="text"
-                        danger
-                        size="small"
-                        icon={<DeleteOutlined />}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDelete(doc.id);
-                        }}
-                      />
-                    </Tooltip>,
-                  ]
+                  <Tooltip key="delete" title="Eliminar documento">
+                    <Button
+                      type="text"
+                      danger
+                      size="small"
+                      icon={<DeleteOutlined />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(doc.id);
+                      }}
+                    />
+                  </Tooltip>,
+                ]
                 : undefined
             }
           >

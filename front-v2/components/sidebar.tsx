@@ -624,7 +624,7 @@ export default function Sidebar() {
       key: "rename",
       label: "Renombrar",
       icon: <FormOutlined />,
-      onClick: (e: { domEvent: React.MouseEvent }) => {
+      onClick: (e: any) => {
         e.domEvent.stopPropagation()
         handleRename(item)
       },
@@ -635,7 +635,7 @@ export default function Sidebar() {
           key: "edit",
           label: "Editar",
           icon: <EditOutlined />,
-          onClick: (e: { domEvent: React.MouseEvent }) => {
+          onClick: (e: any) => {
             e.domEvent.stopPropagation()
             handleEdit(item)
           },
@@ -647,7 +647,7 @@ export default function Sidebar() {
       label: "Eliminar",
       icon: <DeleteOutlined />,
       danger: true,
-      onClick: (e: { domEvent: React.MouseEvent }) => {
+      onClick: (e: any) => {
         e.domEvent.stopPropagation()
         handleDelete(item)
       },
@@ -2049,7 +2049,7 @@ export default function Sidebar() {
             background: '#1A1A1A',
             padding: 0
           }
-        }}
+        } as any}
         footer={[
           <div key="actions" style={{
             display: 'flex',

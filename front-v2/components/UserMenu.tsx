@@ -49,16 +49,16 @@ export function UserMenu({ user }: UserMenuProps) {
         mask: {
           background: "rgba(0, 0, 0, 0.75)",
         },
-      },
+      } as any,
       onOk: async () => {
         setIsLoggingOut(true);
         try {
           // Limpiar tokens del localStorage
           localStorage.removeItem("access_token");
           localStorage.removeItem("refresh_token");
-          
+
           message.success("Sesión cerrada correctamente");
-          
+
           // Redirigir al login
           router.push("/login");
         } catch (error) {

@@ -18,7 +18,7 @@ import { dt } from "@/lib/design-tokens"
 const { Text, Title } = Typography
 const { TextArea } = Input
 
-export default function ChatArea() {
+export function ChatArea() {
   const [model, setModel] = useState("gpt-4o-mini")
   const [message, setMessage] = useState("")
   const { user } = useUser()
@@ -43,7 +43,7 @@ export default function ChatArea() {
       const chatId = uuidv4()
       // Guardar el modelo seleccionado en el contexto
       setSelectedModel(model)
-      
+
       if (activeWorkspace?.id) {
         router.push(`/workspace/${activeWorkspace.id}/chat/${chatId}?message=${encodeURIComponent(message)}`)
       } else {
@@ -314,7 +314,7 @@ export default function ChatArea() {
                 aria-label="Enviar mensaje"
                 aria-disabled={!message.trim()}
                 variant={message.trim() ? "primary" : "ghost"}
-                glow={message.trim()}
+                glow={!!message.trim()}
                 style={{
                   width: "36px",
                   height: "36px",
@@ -486,7 +486,7 @@ export default function ChatArea() {
             background: '#1A1A1A',
             padding: 0
           }
-        }}
+        } as any}
         footer={[
           <div key="actions" style={{
             display: 'flex',
