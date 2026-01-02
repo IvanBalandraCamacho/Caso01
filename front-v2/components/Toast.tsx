@@ -22,12 +22,12 @@ export function setMessageApi(api: MessageInstance) {
  */
 export function useInitializeToast() {
   const { message } = App.useApp();
-  
+
   // Set the message API on mount
   if (messageApi !== message) {
     messageApi = message;
   }
-  
+
   return message;
 }
 
@@ -40,9 +40,9 @@ export function showToast(content: string, type: ToastType = "info") {
     console.warn("Toast: messageApi not initialized. Make sure useInitializeToast is called.");
     return;
   }
-  
+
   const duration = type === "welcome" ? 4 : 3;
-  
+
   switch (type) {
     case "success":
       messageApi.success(content, duration);
@@ -81,5 +81,10 @@ export const Toast = {
   warning: (content: string) => showToast(content, "warning"),
   welcome: (content: string) => showToast(content, "welcome"),
 };
+
+export const showSuccessToast = (content: string) => showToast(content, "success");
+export const showErrorToast = (content: string) => showToast(content, "error");
+export const showInfoToast = (content: string) => showToast(content, "info");
+export const showWarningToast = (content: string) => showToast(content, "warning");
 
 export default Toast;

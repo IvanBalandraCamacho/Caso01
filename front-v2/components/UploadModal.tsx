@@ -21,6 +21,7 @@ import {
 } from "@ant-design/icons";
 import type { UploadProps, UploadFile } from "antd";
 import { uploadDocumentApi, uploadDocumentToConversation } from "@/lib/api";
+import { DocumentPublic } from "@/types/api";
 
 const { Dragger } = Upload;
 const { Text, Title } = Typography;
@@ -58,7 +59,7 @@ export function UploadModal({
     if (!open || !workspaceId) return;
 
     const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/api/v1/ws/notifications";
-    
+
     console.log("🔌 UploadModal: Conectando WebSocket...", wsUrl);
     const ws = new WebSocket(wsUrl);
 
@@ -152,7 +153,7 @@ export function UploadModal({
           const formData = new FormData();
           formData.append("file", file.originFileObj);
 
-          let result;
+          let result: DocumentPublic;
           if (conversationId) {
             result = await uploadDocumentToConversation(
               workspaceId,
@@ -169,10 +170,10 @@ export function UploadModal({
             prev.map((f) =>
               f.uid === file.uid
                 ? {
-                    ...f,
-                    uploadStatus: "processing" as const,
-                    documentId: result.id,
-                  }
+                  ...f,
+                  uploadStatus: "processing" as const,
+                  documentId: result.id,
+                }
                 : f
             )
           );
@@ -188,10 +189,10 @@ export function UploadModal({
             prev.map((f) =>
               f.uid === file.uid
                 ? {
-                    ...f,
-                    uploadStatus: "error" as const,
-                    errorMessage: errorMsg,
-                  }
+                  ...f,
+                  uploadStatus: "error" as const,
+                  errorMessage: errorMsg,
+                }
                 : f
             )
           );
@@ -386,7 +387,7 @@ export function UploadModal({
           background: "rgba(0, 0, 0, 0.75)",
           backdropFilter: "blur(4px)",
         },
-      }}
+      } as any}
       closeIcon={<span style={{ color: "#666666", fontSize: "18px" }}>×</span>}
     >
       <Space direction="vertical" style={{ width: "100%" }} size="large">

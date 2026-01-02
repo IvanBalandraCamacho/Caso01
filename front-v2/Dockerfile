@@ -15,10 +15,22 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# --- IMPORTANTE: Recibir variables de entorno para el Build ---
+ARG NEXT_PUBLIC_API_BASE_URL
+ARG NEXT_PUBLIC_RAG_SERVICE_URL
+
+# Las establecemos como variables de entorno durante el build
+ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
+ENV NEXT_PUBLIC_RAG_SERVICE_URL=$NEXT_PUBLIC_RAG_SERVICE_URL
+
+# Desactivar telemetría
 ENV NEXT_TELEMETRY_DISABLED 1
+
+# Compilar
 RUN pnpm run build
 
-# 3. Production image, copy all the files and run next
+# 3. Production image
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV production
@@ -27,14 +39,13 @@ ENV NEXT_TELEMETRY_DISABLED 1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy standalone build
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs
 
-ENV PORT 8080
-EXPOSE 8080
+EXPOSE 3000
+ENV PORT 3000
 
 CMD ["node", "server.js"]

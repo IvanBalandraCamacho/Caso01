@@ -95,7 +95,7 @@ export default function Sidebar() {
   const [analysisResult, setAnalysisResult] = useState<any>(null)
   const [isResultModalOpen, setIsResultModalOpen] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
-  
+
   // New Chat with File Upload State
   const [isNewChatModalOpen, setIsNewChatModalOpen] = useState(false)
   const [newChatTitle, setNewChatTitle] = useState("")
@@ -154,17 +154,17 @@ export default function Sidebar() {
       setIsDownloading(false)
     }
   }, [analysisResult, message])
-  
+
   const handleNewChat = () => {
     // Check if we are in a workspace context (from URL or activeWorkspace)
     const workspaceIdMatches = pathname.match(/\/workspace\/([^\/]+)/);
     const workspaceId = workspaceIdMatches ? workspaceIdMatches[1] : activeWorkspace?.id;
 
     if (workspaceId) {
-       // Open New Chat Modal with file upload
-       setIsNewChatModalOpen(true); 
-       setNewChatTitle("");
-       setNewChatFile(null);
+      // Open New Chat Modal with file upload for workspace
+      setIsNewChatModalOpen(true);
+      setNewChatTitle("");
+      setNewChatFile(null);
     } else {
        // Open modal even without workspace - will create general chat
        setIsNewChatModalOpen(true); 
@@ -176,50 +176,51 @@ export default function Sidebar() {
   const handleCreateChat = async () => {
     const workspaceIdMatches = pathname.match(/\/workspace\/([^\/]+)/);
     const workspaceId = workspaceIdMatches ? workspaceIdMatches[1] : activeWorkspace?.id;
-    
+
     if (!workspaceId) {
-        message.error("No se pudo identificar el workspace activo");
-        return;
+      // If we are here, it means we are trying to create a general chat via modal (unlikely with current UI logic but safe to handle)
+      message.error("Acción solo disponible dentro de un workspace");
+      return;
     }
 
     setIsCreatingChat(true);
     try {
-        // 1. Create conversation
-        const title = newChatTitle.trim() || "Nueva Conversación";
-        const newConversation = await createConversationApi(workspaceId, title);
-        
-        // 2. Upload file if selected
-        if (newChatFile && newChatFile.originFileObj) {
-            const formData = new FormData();
-            formData.append("file", newChatFile.originFileObj);
-            
-            try {
-                await uploadDocumentToConversation(workspaceId, newConversation.id, formData);
-                message.success("Chat creado y documento subido");
-            } catch (error) {
-                console.error("Error uploading file to chat:", error);
-                message.warning("Chat creado, pero hubo un error al subir el documento");
-            }
-        } else {
-            message.success("Chat creado exitosamente");
-        }
+      // 1. Create conversation
+      const title = newChatTitle.trim() || "Nueva Conversación";
+      const newConversation = await createConversationApi(workspaceId, title);
 
-        // 3. Close modal and redirect
-        setIsNewChatModalOpen(false);
-        setNewChatTitle("");
-        setNewChatFile(null);
-        
-        // Refresh conversations
-        fetchConversations(workspaceId);
-        
-        // Redirect to new chat
-        router.push(`/workspace/${workspaceId}/chat/${newConversation.id}`);
+      // 2. Upload file if selected
+      if (newChatFile && newChatFile.originFileObj) {
+        const formData = new FormData();
+        formData.append("file", newChatFile.originFileObj);
+
+        try {
+          await uploadDocumentToConversation(workspaceId, newConversation.id, formData);
+          message.success("Chat creado y documento subido");
+        } catch (error) {
+          console.error("Error uploading file to chat:", error);
+          message.warning("Chat creado, pero hubo un error al subir el documento");
+        }
+      } else {
+        message.success("Chat creado exitosamente");
+      }
+
+      // 3. Close modal and redirect
+      setIsNewChatModalOpen(false);
+      setNewChatTitle("");
+      setNewChatFile(null);
+
+      // Refresh conversations
+      fetchConversations(workspaceId);
+
+      // Redirect to new chat
+      router.push(`/workspace/${workspaceId}/chat/${newConversation.id}`);
 
     } catch (error) {
-        console.error("Error creating chat:", error);
-        message.error("Error al crear la conversación");
+      console.error("Error creating chat:", error);
+      message.error("Error al crear la conversación");
     } finally {
-        setIsCreatingChat(false);
+      setIsCreatingChat(false);
     }
   }
 
@@ -410,7 +411,7 @@ export default function Sidebar() {
 
   const handleEdit = async (item: SidebarItem) => {
     setCurrentEditItem(item)
-    
+
     // Populate existing instructions if it's a workspace
     if (item.type === "workspace") {
       const ws = workspaces.find(w => w.id === item.key);
@@ -467,7 +468,7 @@ export default function Sidebar() {
     setIsUploading(true);
     setDocumentStatus("uploading");
     setProcessingMessage("");
-    
+
     try {
       if (currentEditItem.type === "workspace") {
         // 1. Update workspace context
@@ -476,19 +477,19 @@ export default function Sidebar() {
         // 2. Upload new files if any
         if (fileList.length > 0) {
           const uploadedIds: string[] = [];
-          
-          for (const file of fileList) {
-             if (!file.originFileObj) continue;
-             const formData = new FormData();
-             formData.append("file", file.originFileObj);
 
-             try {
-               const uploadedDoc = await uploadDocumentApi(currentEditItem.key, formData);
-               uploadedIds.push(uploadedDoc.id);
-             } catch (error) {
-               console.error(`Error uploading ${file.name}:`, error);
-               message.error(`Error al subir ${file.name}`);
-             }
+          for (const file of fileList) {
+            if (!file.originFileObj) continue;
+            const formData = new FormData();
+            formData.append("file", file.originFileObj);
+
+            try {
+              const uploadedDoc = await uploadDocumentApi(currentEditItem.key, formData);
+              uploadedIds.push(uploadedDoc.id);
+            } catch (error) {
+              console.error(`Error uploading ${file.name}:`, error);
+              message.error(`Error al subir ${file.name}`);
+            }
           }
 
           setUploadedDocumentIds(uploadedIds);
@@ -516,13 +517,13 @@ export default function Sidebar() {
 
                 // Check if this notification is for one of our documents
                 if (data.document_id && uploadedIds.includes(data.document_id)) {
-                  
+
                   if (data.status === "PROCESSING") {
-                     setProcessingMessage(data.message || "Procesando...");
+                    setProcessingMessage(data.message || "Procesando...");
                   } else if (data.status === "COMPLETED") {
                     // Remove from pending list
                     pendingIds.delete(data.document_id);
-                    
+
                     // Update the uploadedIds state (for UI if needed)
                     setUploadedDocumentIds(Array.from(pendingIds));
 
@@ -531,13 +532,13 @@ export default function Sidebar() {
                       setDocumentStatus("completed");
                       setProcessingMessage("¡Completado!");
                       ws.close();
-                      
+
                       // Refresh documents list one last time
                       const docs = await fetchWorkspaceDocuments(currentEditItem.key);
                       setExistingDocuments(docs);
 
                       message.success("Workspace actualizado y documentos procesados");
-                      
+
                       setTimeout(() => {
                         setIsEditModalOpen(false);
                         setCurrentEditItem(null);
@@ -549,20 +550,20 @@ export default function Sidebar() {
                     }
                   } else if (data.status === "ERROR") {
                     message.error(`Error al procesar documento`);
-                    
+
                     pendingIds.delete(data.document_id);
                     setUploadedDocumentIds(Array.from(pendingIds));
 
-                     if (pendingIds.size === 0) {
-                        setDocumentStatus("completed");
-                        ws.close();
-                        setIsEditModalOpen(false);
-                        setCurrentEditItem(null);
-                        setEditContext("");
-                        setFileList([]);
-                        setDocumentStatus("idle");
-                        setProcessingMessage("");
-                     }
+                    if (pendingIds.size === 0) {
+                      setDocumentStatus("completed");
+                      ws.close();
+                      setIsEditModalOpen(false);
+                      setCurrentEditItem(null);
+                      setEditContext("");
+                      setFileList([]);
+                      setDocumentStatus("idle");
+                      setProcessingMessage("");
+                    }
                   }
                 }
               } catch (err) {
@@ -595,20 +596,20 @@ export default function Sidebar() {
       console.error("Error editing:", error);
       message.error("Error al actualizar el workspace");
     } finally {
-        // Only reset if we are NOT waiting for WebSocket (processing)
-        if (documentStatus !== "processing") {
-            setIsUploading(false);
-            setDocumentStatus("idle");
-            setProcessingMessage("");
-            
-            // Only close if we didn't start a WebSocket wait (which returns early)
-            if (fileList.length === 0) {
-                setIsEditModalOpen(false);
-                setCurrentEditItem(null);
-                setEditContext("");
-                setFileList([]);
-            }
+      // Only reset if we are NOT waiting for WebSocket (processing)
+      if (documentStatus !== "processing") {
+        setIsUploading(false);
+        setDocumentStatus("idle");
+        setProcessingMessage("");
+
+        // Only close if we didn't start a WebSocket wait (which returns early)
+        if (fileList.length === 0) {
+          setIsEditModalOpen(false);
+          setCurrentEditItem(null);
+          setEditContext("");
+          setFileList([]);
         }
+      }
     }
   }
 
@@ -634,7 +635,7 @@ export default function Sidebar() {
       key: "rename",
       label: "Renombrar",
       icon: <FormOutlined />,
-      onClick: (e: { domEvent: React.MouseEvent }) => {
+      onClick: (e: any) => {
         e.domEvent.stopPropagation()
         handleRename(item)
       },
@@ -645,7 +646,7 @@ export default function Sidebar() {
           key: "edit",
           label: "Editar",
           icon: <EditOutlined />,
-          onClick: (e: { domEvent: React.MouseEvent }) => {
+          onClick: (e: any) => {
             e.domEvent.stopPropagation()
             handleEdit(item)
           },
@@ -657,7 +658,7 @@ export default function Sidebar() {
       label: "Eliminar",
       icon: <DeleteOutlined />,
       danger: true,
-      onClick: (e: { domEvent: React.MouseEvent }) => {
+      onClick: (e: any) => {
         e.domEvent.stopPropagation()
         handleDelete(item)
       },
@@ -1224,11 +1225,11 @@ export default function Sidebar() {
         }}
         trigger={null}
       >
-        <div 
-          style={{ 
-            display: "flex", 
-            flexDirection: "column", 
-            height: "100%" 
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            height: "100%"
           }}
         >
           {/* Static Header & Buttons */}
@@ -1378,13 +1379,13 @@ export default function Sidebar() {
           </div>
 
           {/* Scrollable Content Area */}
-          <div 
+          <div
             className="chat-scrollbar"
-            style={{ 
-              flexGrow: 1, 
-              overflowY: "auto", 
+            style={{
+              flexGrow: 1,
+              overflowY: "auto",
               overflowX: "hidden",
-              paddingBottom: "24px" 
+              paddingBottom: "24px"
             }}
           >
             <div style={{ marginBottom: "24px" }}>
@@ -1746,7 +1747,7 @@ export default function Sidebar() {
         onCancel={() => {
           // Prevent closing if processing
           if (isUploading || documentStatus === "processing") return;
-          
+
           setIsEditModalOpen(false);
           setFileList([]);
           setEditContext("");
@@ -1932,23 +1933,23 @@ export default function Sidebar() {
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1, minWidth: 0 }}>
                     {getFileIcon(file.name)}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                        <Text
+                      <Text
                         style={{
-                            color: "#E3E3E3",
-                            fontSize: "13px",
-                            display: "block",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
+                          color: "#E3E3E3",
+                          fontSize: "13px",
+                          display: "block",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
                         }}
-                        >
+                      >
                         {file.name}
-                        </Text>
-                        {documentStatus === "processing" && (
-                            <div style={{ fontSize: "11px", color: "#faad14", marginTop: "2px" }}>
-                            ⏱ Procesando...
-                            </div>
-                        )}
+                      </Text>
+                      {documentStatus === "processing" && (
+                        <div style={{ fontSize: "11px", color: "#faad14", marginTop: "2px" }}>
+                          ⏱ Procesando...
+                        </div>
+                      )}
                     </div>
                   </div>
                   <Button
@@ -2027,9 +2028,9 @@ export default function Sidebar() {
               height: "auto",
             }}
           >
-            {documentStatus === "processing" 
-                ? (processingMessage || "Procesando...")
-                : (isUploading ? "Subiendo..." : "Guardar cambios")}
+            {documentStatus === "processing"
+              ? (processingMessage || "Procesando...")
+              : (isUploading ? "Subiendo..." : "Guardar cambios")}
           </Button>
         </div>
       </Modal>
@@ -2140,7 +2141,7 @@ export default function Sidebar() {
             background: '#1A1A1A',
             padding: 0
           }
-        }}
+        } as any}
         footer={[
           <div key="actions" style={{
             display: 'flex',
@@ -2207,7 +2208,7 @@ export default function Sidebar() {
                     {analysisResult.cliente || 'No especificado'}
                   </h2>
                 </div>
-                
+
                 {/* Presupuesto */}
                 <div className="md:text-right">
                   <div className="flex items-center gap-2 mb-3 md:justify-end">
@@ -2362,7 +2363,7 @@ export default function Sidebar() {
                       'bg-gradient-to-br from-teal-500 to-teal-600',
                       'bg-gradient-to-br from-indigo-500 to-indigo-600',
                     ];
-                    
+
                     return (
                       <div key={index} className="bg-zinc-800/30 border border-purple-500/20 rounded-xl p-5 hover:border-purple-500/40 hover:bg-zinc-800/50 transition-all group">
                         {/* Header */}
@@ -2379,7 +2380,7 @@ export default function Sidebar() {
                             </p>
                           </div>
                         </div>
-                        
+
                         {/* Experiencia */}
                         {miembro.experiencia && (
                           <div className="mb-4">
@@ -2488,17 +2489,17 @@ export default function Sidebar() {
               {newChatFile ? "Cambiar archivo" : "Adjuntar archivo"}
             </Button>
           </Upload>
-          
+
           {newChatFile && (
             <div style={{ marginTop: "12px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#2A2A2D", padding: "8px 12px", borderRadius: "6px" }}>
-               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <FileOutlined style={{ color: "#888888" }} />
-                  <Text style={{ color: "#E3E3E3", fontSize: "13px" }}>{newChatFile.name}</Text>
-               </div>
-               <DeleteOutlined 
-                  onClick={(e) => { e.stopPropagation(); setNewChatFile(null); }}
-                  style={{ color: "#666", cursor: "pointer" }}
-               />
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <FileOutlined style={{ color: "#888888" }} />
+                <Text style={{ color: "#E3E3E3", fontSize: "13px" }}>{newChatFile.name}</Text>
+              </div>
+              <DeleteOutlined
+                onClick={(e) => { e.stopPropagation(); setNewChatFile(null); }}
+                style={{ color: "#666", cursor: "pointer" }}
+              />
             </div>
           )}
         </div>

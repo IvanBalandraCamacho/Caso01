@@ -68,11 +68,11 @@ interface MessageItemProps {
   showLoadingIndicator: boolean
 }
 
-const MessageItem = memo<MessageItemProps>(({ 
-  message, 
-  hoveredMessageId, 
-  onMouseEnter, 
-  onMouseLeave, 
+const MessageItem = memo<MessageItemProps>(({
+  message,
+  hoveredMessageId,
+  onMouseEnter,
+  onMouseLeave,
   onCopyMessage,
   remarkPlugins,
   markdownComponents,
@@ -101,7 +101,7 @@ const MessageItem = memo<MessageItemProps>(({
           <Text style={{ color: "#FFFFFF", fontSize: "15px", lineHeight: "1.6" }}>{message.content}</Text>
         </div>
       ) : (
-        <div 
+        <div
           style={{ width: "100%", maxWidth: "90%" }}
           onMouseEnter={() => onMouseEnter(message.id)}
           onMouseLeave={onMouseLeave}
@@ -113,12 +113,12 @@ const MessageItem = memo<MessageItemProps>(({
               <Text style={{ color: "#AAAAAA", fontSize: "14px" }}>Generando respuesta...</Text>
             </div>
           ) : (
-            <div 
+            <div
               className="markdown-content"
-              style={{ 
-                color: "#E3E3E3", 
-                fontSize: "15px", 
-                lineHeight: "1.8" 
+              style={{
+                color: "#E3E3E3",
+                fontSize: "15px",
+                lineHeight: "1.8"
               }}
             >
               <ReactMarkdown
@@ -181,12 +181,12 @@ export default function GeneralChatPage({
   const chatTitle = searchParams.get("title") || "Nuevo Chat"
 
   // Usar el contexto de workspaces
-  const { 
-    activeWorkspace, 
-    selectedModel, 
+  const {
+    activeWorkspace,
+    selectedModel,
     setSelectedModel,
     fetchGeneralConversations,
-    fetchConversationMessages 
+    fetchConversationMessages
   } = useWorkspaceContext()
 
   const [messages, setMessages] = useState<Message[]>([])
@@ -203,7 +203,7 @@ export default function GeneralChatPage({
   const [isRecording, setIsRecording] = useState(false)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const messageCounterRef = useRef(0)
-  
+
   // Refs para streaming
   const activeStreamRef = useRef<string | null>(null)
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
@@ -300,7 +300,7 @@ export default function GeneralChatPage({
         try {
           // Intentar cargar mensajes como chat general (workspaceId = null)
           const loadedMessages = await fetchConversationMessages(null, chatId)
-          
+
           if (loadedMessages && loadedMessages.length > 0) {
             const formattedMessages: Message[] = loadedMessages.map((msg) => ({
               id: msg.id,
@@ -327,7 +327,7 @@ export default function GeneralChatPage({
     if (initialMessage && messages.length === 0) {
       // Enviar mensaje inicial con streaming real
       handleSendMessageWithStreaming(initialMessage)
-      
+
       // Limpiar la URL removiendo los query params
       router.replace(`/chat/${chatId}`, { scroll: false })
     }
@@ -376,7 +376,7 @@ export default function GeneralChatPage({
         }
         return newHistory
       })
-      
+
       // Extraer conversation_id si está disponible
       if ("conversation_id" in event && event.conversation_id) {
         setCurrentConversationId(event.conversation_id)
@@ -439,20 +439,20 @@ export default function GeneralChatPage({
           (event: ChatStreamEvent) => {
             handleStreamEvent(event, streamId)
           },
-                  // onComplete
-                  (conversationId: string) => {
-                    if (activeStreamRef.current === streamId) {
-                      activeStreamRef.current = null
-                      setIsStreaming(false)
-                      setIsLoading(false)
-                      if (conversationId) {
-                        setCurrentConversationId(conversationId)
-                        // Refrescar lista de chats generales en el sidebar
-                        fetchGeneralConversations()
-                      }
-                    }
-                  },
-          
+          // onComplete
+          (conversationId: string) => {
+            if (activeStreamRef.current === streamId) {
+              activeStreamRef.current = null
+              setIsStreaming(false)
+              setIsLoading(false)
+              if (conversationId) {
+                setCurrentConversationId(conversationId)
+                // Refrescar lista de chats generales en el sidebar
+                fetchGeneralConversations()
+              }
+            }
+          },
+
           // onError
           (error: Error) => {
             if (activeStreamRef.current === streamId) {
@@ -529,7 +529,7 @@ export default function GeneralChatPage({
 
   const handleSendMessage = () => {
     if (!inputMessage.trim() || isStreaming) return
-    
+
     const messageToSend = inputMessage
     setInputMessage("")
     handleSendMessageWithStreaming(messageToSend)
@@ -635,7 +635,7 @@ export default function GeneralChatPage({
         accept={allowedFileTypes.join(',')}
         fileList={attachedFiles}
         beforeUpload={(file) => {
-          const isAllowed = allowedMimeTypes.includes(file.type) || 
+          const isAllowed = allowedMimeTypes.includes(file.type) ||
             allowedFileTypes.some(ext => file.name.toLowerCase().endsWith(ext))
           if (!isAllowed) {
             message.error("Solo se permiten archivos PDF, Word, PowerPoint y Excel")
@@ -778,11 +778,11 @@ export default function GeneralChatPage({
         onClose={() => setFilesDrawerOpen(false)}
         open={filesDrawerOpen}
         closable={false}
+        width={320}
         styles={{
-          wrapper: { width: 320 },
           header: { background: "#1E1E21", borderBottom: "1px solid #2A2A2D", padding: "16px" },
           body: { background: "#1E1E21", padding: "16px" },
-        }}
+        } as any}
       >
         {renderFileSection("Archivos del Chat", chatFiles)}
         {renderFileSection("Archivos Generados", generatedFiles)}
@@ -965,8 +965,8 @@ export default function GeneralChatPage({
             >
               <TextArea
                 placeholder={
-                  isRecording 
-                    ? "Escuchando..." 
+                  isRecording
+                    ? "Escuchando..."
                     : "Escribe tu mensaje..."
                 }
                 value={inputMessage}
@@ -1026,7 +1026,7 @@ export default function GeneralChatPage({
                     suffixIcon={<DownOutlined style={{ color: "#888888", fontSize: "10px" }} />}
                     size="small"
                     variant="borderless"
-                    style={{ 
+                    style={{
                       width: "140px",
                       color: "#888888",
                     }}
@@ -1094,6 +1094,6 @@ export default function GeneralChatPage({
           </div>
         </div>
       </div>
-    </div>
+    </div >
   )
 }

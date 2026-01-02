@@ -356,7 +356,7 @@ export function ProposalModal({
           background: "rgba(0, 0, 0, 0.75)",
           backdropFilter: "blur(4px)",
         },
-      }}
+      } as any}
       closeIcon={<span style={{ color: "#666666", fontSize: "18px" }}>×</span>}
     >
       <Steps

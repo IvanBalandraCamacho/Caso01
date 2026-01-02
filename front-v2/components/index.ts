@@ -1,5 +1,5 @@
 // Export all components for easy importing
-export { Sidebar } from "./sidebar";
+export { default as Sidebar } from "./sidebar";
 export { ChatArea } from "./chat-area";
 export { ThemeProvider } from "./theme-provider";
 export { Toast, showSuccessToast, showErrorToast, showInfoToast, showWarningToast } from "./Toast";

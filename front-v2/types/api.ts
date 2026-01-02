@@ -56,7 +56,7 @@ export interface WorkspaceBase {
   instructions?: string | null;
 }
 
-export interface WorkspaceCreate extends WorkspaceBase {}
+export interface WorkspaceCreate extends WorkspaceBase { }
 
 export interface WorkspaceUpdate {
   name?: string | null;
@@ -159,13 +159,19 @@ export interface ChatStreamEvent_Intent {
   conversation_id?: string;
 }
 
+export interface ChatStreamEvent_ConversationId {
+  type: 'conversation_id';
+  id: string;
+}
+
 /**
  * Union type for all streaming chat events
  */
-export type ChatStreamEvent = 
-  | ChatStreamEvent_Content 
-  | ChatStreamEvent_Sources 
-  | ChatStreamEvent_Intent;
+export type ChatStreamEvent =
+  | ChatStreamEvent_Content
+  | ChatStreamEvent_Sources
+  | ChatStreamEvent_Intent
+  | ChatStreamEvent_ConversationId;
 
 // ==============================================
 // ERROR TYPES (from OpenAPI components.schemas)

@@ -338,11 +338,11 @@ export const uploadDocumentApi = async (
       },
       onUploadProgress: onProgress
         ? (progressEvent) => {
-            const total = progressEvent.total || 0;
-            const current = progressEvent.loaded;
-            const percentCompleted = total > 0 ? Math.round((current / total) * 100) : 0;
-            onProgress(percentCompleted);
-          }
+          const total = progressEvent.total || 0;
+          const current = progressEvent.loaded;
+          const percentCompleted = total > 0 ? Math.round((current / total) * 100) : 0;
+          onProgress(percentCompleted);
+        }
         : undefined,
     },
   );
@@ -437,9 +437,12 @@ export const createConversationApi = async (
  * GET /api/v1/workspaces/{workspace_id}/conversations/{conversation_id}
  */
 export const fetchConversationMessages = async (
-  workspaceId: string,
+  workspaceId: string | null,
   conversationId: string,
 ): Promise<ConversationWithMessages> => {
+  if (!workspaceId) {
+    return fetchGeneralConversationMessages(conversationId);
+  }
   const { data } = await api.get<ConversationWithMessages>(
     `/workspaces/${workspaceId}/conversations/${conversationId}`,
   );
@@ -519,11 +522,11 @@ export const uploadDocumentToConversation = async (
       },
       onUploadProgress: onProgress
         ? (progressEvent) => {
-            const total = progressEvent.total || 0;
-            const current = progressEvent.loaded;
-            const percentCompleted = total > 0 ? Math.round((current / total) * 100) : 0;
-            onProgress(percentCompleted);
-          }
+          const total = progressEvent.total || 0;
+          const current = progressEvent.loaded;
+          const percentCompleted = total > 0 ? Math.round((current / total) * 100) : 0;
+          onProgress(percentCompleted);
+        }
         : undefined,
     },
   );
@@ -610,14 +613,14 @@ export const sendChatMessageStream = async (
 
       // Procesar líneas completas
       const lines = buffer.split("\n");
-      
+
       // Guardar la última línea incompleta en el buffer
       buffer = lines.pop() || "";
 
       // Procesar líneas completas
       for (const line of lines) {
         const trimmedLine = line.trim();
-        
+
         if (!trimmedLine || trimmedLine.startsWith(":")) {
           // Ignorar líneas vacías y comentarios SSE
           continue;
@@ -625,11 +628,11 @@ export const sendChatMessageStream = async (
 
         // Determinar el contenido JSON a parsear
         let jsonData: string;
-        
+
         if (trimmedLine.startsWith("data: ")) {
           // Formato SSE
           jsonData = trimmedLine.slice(6).trim();
-          
+
           if (jsonData === "[DONE]") {
             if (onComplete) onComplete(conversationId);
             return;
@@ -640,16 +643,16 @@ export const sendChatMessageStream = async (
         }
 
         try {
-          const parsed = JSON.parse(jsonData) as ChatStreamEvent & { 
+          const parsed = JSON.parse(jsonData) as ChatStreamEvent & {
             conversation_id?: string;
             model_used?: string;
           };
-          
+
           // Extraer conversation_id si está disponible
           if (parsed.conversation_id) {
             conversationId = parsed.conversation_id;
           }
-          
+
           // Manejar eventos con type: "intent" (también llama callback deprecated)
           if (parsed.type === "intent" && "intent" in parsed) {
             console.log("Intent detectado:", parsed.intent);
@@ -660,7 +663,7 @@ export const sendChatMessageStream = async (
             onChunk(parsed);
             continue;
           }
-          
+
           // Pasar todos los eventos al callback (content, sources, etc.)
           onChunk(parsed);
         } catch (e) {
@@ -746,14 +749,14 @@ export const sendGeneralChatMessageStream = async (
         if (!trimmedLine) continue;
 
         try {
-          const parsed = JSON.parse(trimmedLine) as ChatStreamEvent & { 
+          const parsed = JSON.parse(trimmedLine) as ChatStreamEvent & {
             conversation_id?: string;
           };
-          
+
           if (parsed.type === "conversation_id" && "id" in parsed) {
             conversationId = parsed.id as string;
           }
-          
+
           onChunk(parsed);
         } catch (e) {
           console.warn("Error parsing JSON chunk:", trimmedLine, e);
@@ -966,11 +969,11 @@ export const analyzeDocumentApi = async (
     },
     onUploadProgress: onProgress
       ? (progressEvent) => {
-          const total = progressEvent.total || 0;
-          const current = progressEvent.loaded;
-          const percentCompleted = total > 0 ? Math.round((current / total) * 100) : 0;
-          onProgress(percentCompleted);
-        }
+        const total = progressEvent.total || 0;
+        const current = progressEvent.loaded;
+        const percentCompleted = total > 0 ? Math.round((current / total) * 100) : 0;
+        onProgress(percentCompleted);
+      }
       : undefined,
   });
   return data;
@@ -1026,7 +1029,7 @@ export const fetchServicios = async (
   const params = new URLSearchParams();
   if (categoria) params.append("categoria", categoria);
   if (nivelDificultad) params.append("nivel_dificultad", nivelDificultad);
-  
+
   const query = params.toString() ? `?${params.toString()}` : "";
   const { data } = await api.get<Servicio[]>(`/servicios${query}`);
   return data;
@@ -1054,7 +1057,7 @@ export const fetchTrabajadores = async (
   if (area) params.append("area", area);
   if (rol) params.append("rol", rol);
   if (disponibilidad) params.append("disponibilidad", disponibilidad);
-  
+
   const query = params.toString() ? `?${params.toString()}` : "";
   const { data } = await api.get<Trabajador[]>(`/trabajadores${query}`);
   return data;
@@ -1184,6 +1187,28 @@ export const fetchDocumentContent = async (
     }
   );
   return data;
+};
+
+
+// ============================================
+// PROPOSAL & RFP API FUNCTIONS
+// ============================================
+
+export interface ProposalRequest {
+  workspace_id: string;
+  conversation_id?: string;
+  requirements: string;
+  context?: string;
+  output_format: string;
+}
+
+/**
+ * Analyze an RFP or proposal requirements
+ * POST /api/v1/proposal/analyze
+ */
+export const analyzeProposalApi = async (data: ProposalRequest): Promise<ProposalAnalysis> => {
+  const { data: response } = await api.post<ProposalAnalysis>("/proposal/analyze", data);
+  return response;
 };
 
 export default api;
