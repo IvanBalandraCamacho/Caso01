@@ -149,11 +149,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             alignItems: "center",
           }}
         >
-          <img
-            src="/logo.svg"
-            alt="Logo"
-            style={{ height: "40px" }}
-          />
+          <div style={{ cursor: "pointer" }} onClick={() => router.push('/')}>
+            <img
+              src="/logo.svg"
+              alt="Logo"
+              style={{ height: "40px" }}
+            />
+          </div>
 
           <UserMenu user={user} />
         </header>

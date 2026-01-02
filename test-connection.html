@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Backend Connection</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #1a1a1c; color: #fff; }
+        button { padding: 10px 20px; margin: 10px; font-size: 16px; cursor: pointer; }
+        #result { margin-top: 20px; padding: 15px; background: #2a2a2c; border-radius: 8px; }
+        .success { color: #10B981; }
+        .error { color: #EF4444; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Backend Connection</h1>
+    
+    <button onclick="testHealth()">Test Health Endpoint</button>
+    <button onclick="testRegister()">Test Register Endpoint</button>
+    
+    <div id="result"></div>
+
+    <script>
+        const API_URL = 'http://localhost:8000/api/v1';
+        
+        async function testHealth() {
+            const result = document.getElementById('result');
+            result.innerHTML = '⏳ Testing health endpoint...';
+            
+            try {
+                const response = await fetch(`${API_URL}/health`);
+                const data = await response.json();
+                result.innerHTML = `<div class="success">✅ Health check success: ${JSON.stringify(data)}</div>`;
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+        
+        async function testRegister() {
+            const result = document.getElementById('result');
+            result.innerHTML = '⏳ Testing register endpoint...';
+            
+            try {
+                const randomEmail = `test${Date.now()}@test.com`;
+                const response = await fetch(`${API_URL}/auth/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: randomEmail,
+                        password: 'Test123456!',
+                        full_name: 'Test User'
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(JSON.stringify(errorData));
+                }
+                
+                const data = await response.json();
+                result.innerHTML = `<div class="success">✅ Register success: ${JSON.stringify(data, null, 2)}</div>`;
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -73,7 +73,7 @@ export function UserMenu({ user }: UserMenuProps) {
 
   const items: MenuProps["items"] = [
     {
-      key: "profile",
+      key: "user-info",
       label: (
         <div style={{ padding: "8px 0" }}>
           <Text strong>{user?.full_name || "Usuario"}</Text>
@@ -84,6 +84,15 @@ export function UserMenu({ user }: UserMenuProps) {
         </div>
       ),
       disabled: true,
+    },
+    {
+      type: "divider",
+    },
+    {
+      key: "profile",
+      icon: <UserOutlined />,
+      label: "Mi Perfil",
+      onClick: () => router.push("/profile"),
     },
     {
       type: "divider",
@@ -125,7 +134,7 @@ export function UserMenu({ user }: UserMenuProps) {
           {initials}
         </Avatar>
         <Space orientation="vertical" size={0} style={{ textAlign: "left" }}>
-          <Text ellipsis style={{ maxWidth: 100, fontSize: "12px" }}>
+          <Text ellipsis style={{ maxWidth: 150, fontSize: "14px", fontWeight: 600, color: "#FFFFFF" }}>
             {displayName}
           </Text>
         </Space>

@@ -1,0 +1,3 @@
+Este es un documento del WORKSPACE.
+Todos los chats deben poder verlo.
+Contenido compartido globalmente.

@@ -29,7 +29,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { useWorkspaceContext } from "@/context/WorkspaceContext"
 import { fetchWorkspaceDocuments, deleteDocumentApi, uploadDocumentApi, createConversationApi, uploadDocumentToConversation } from "@/lib/api"
 import type { DocumentPublic } from "@/types/api"
-import { ArrowDown, ArrowRight, ChevronDown, ChevronRight, Rocket } from "lucide-react"
+import { ArrowDown, ArrowRight, ChevronDown, ChevronRight, Rocket, FileText } from "lucide-react"
 
 const { Sider } = Layout
 const { Text } = Typography
@@ -110,6 +110,11 @@ export default function Sidebar() {
 
     try {
       const token = localStorage.getItem('access_token')
+      if (!token) {
+        message.error("No estás autenticado. Por favor, inicia sesión nuevamente.")
+        return
+      }
+
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1"
       const response = await fetch(`${apiBaseUrl}/task/generate?format=${format}`, {
         method: "POST",
@@ -121,14 +126,20 @@ export default function Sidebar() {
       })
 
       if (!response.ok) {
-        throw new Error("Error al generar el documento")
+        const errorData = await response.json().catch(() => null)
+        const errorMessage = errorData?.detail || `Error ${response.status}: ${response.statusText}`
+        throw new Error(errorMessage)
       }
 
       const blob = await response.blob()
+      if (blob.size === 0) {
+        throw new Error("El documento generado está vacío")
+      }
+
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
-      a.download = `analisis_rfp.${format}`
+      a.download = `analisis_rfp_${analysisResult.cliente?.replace(/\s+/g, '_') || 'documento'}.${format}`
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(url)
@@ -136,8 +147,9 @@ export default function Sidebar() {
 
       message.success(`Documento ${format.toUpperCase()} descargado exitosamente`)
     } catch (error) {
-      console.error("Error:", error)
-      message.error("Error al descargar el documento. Inténtalo de nuevo.")
+      console.error("Error al descargar documento:", error)
+      const errorMsg = error instanceof Error ? error.message : "Error desconocido"
+      message.error(`Error al descargar el documento: ${errorMsg}`)
     } finally {
       setIsDownloading(false)
     }
@@ -154,8 +166,10 @@ export default function Sidebar() {
        setNewChatTitle("");
        setNewChatFile(null);
     } else {
-       // Fallback to global new chat (or redirect to home)
-       router.push("/")
+       // Open modal even without workspace - will create general chat
+       setIsNewChatModalOpen(true); 
+       setNewChatTitle("");
+       setNewChatFile(null);
     }
   }
 
@@ -1198,13 +1212,15 @@ export default function Sidebar() {
         collapsedWidth={60}
         collapsed={collapsed}
         style={{
-          background: "#1E1E21",
+          background: "linear-gradient(180deg, #0a0a0a 0%, #1a1a1c 100%)",
           height: "100vh",
           position: "fixed",
           left: 0,
           top: 0,
           zIndex: 1000,
           display: "block",
+          borderRight: "1px solid rgba(255, 255, 255, 0.05)",
+          boxShadow: "4px 0 24px rgba(0, 0, 0, 0.5)",
         }}
         trigger={null}
       >
@@ -1218,7 +1234,7 @@ export default function Sidebar() {
           {/* Static Header & Buttons */}
           <div style={{ flexShrink: 0 }}>
             {/* Header with hamburger */}
-            <div style={{ padding: "16px", display: "flex", alignItems: "center" }}>
+            <div style={{ padding: "16px", display: "flex", alignItems: "center", marginBottom: "8px" }}>
               <Button
                 type="text"
                 icon={<MenuOutlined style={{ fontSize: "18px" }} />}
@@ -1226,7 +1242,21 @@ export default function Sidebar() {
                   setCollapsed(!collapsed)
                   if (window.innerWidth < 768) setMobileOpen(!mobileOpen)
                 }}
-                style={{ color: "#E3E3E3", padding: "4px 8px" }}
+                className="transition-smooth"
+                style={{ 
+                  color: "#E3E3E3", 
+                  padding: "8px",
+                  borderRadius: "8px",
+                  background: "rgba(255, 255, 255, 0.02)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(227, 24, 55, 0.1)";
+                  e.currentTarget.style.color = "#E31837";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.02)";
+                  e.currentTarget.style.color = "#E3E3E3";
+                }}
               />
             </div>
 
@@ -1236,46 +1266,113 @@ export default function Sidebar() {
                 type="text"
                 icon={<EditOutlined style={{ fontSize: "14px" }} />}
                 onClick={handleNewChat}
+                className="transition-smooth hover-lift"
                 style={{
                   width: "100%",
                   display: "flex",
                   alignItems: "center",
                   gap: "12px",
                   justifyContent: "flex-start",
-                  padding: "10px 16px",
+                  padding: "12px 16px",
                   height: "auto",
-                  background: "#2A2A2D",
-                  border: "none",
-                  borderRadius: "8px",
-                  color: "#E3E3E3",
+                  background: "linear-gradient(135deg, rgba(227, 24, 55, 0.1) 0%, rgba(227, 24, 55, 0.05) 100%)",
+                  border: "1px solid rgba(227, 24, 55, 0.2)",
+                  borderRadius: "10px",
+                  color: "#FFFFFF",
                   fontSize: "14px",
+                  fontWeight: 600,
+                  backdropFilter: "blur(10px)",
+                  boxShadow: "0 2px 8px rgba(227, 24, 55, 0.15)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "linear-gradient(135deg, rgba(227, 24, 55, 0.2) 0%, rgba(227, 24, 55, 0.1) 100%)";
+                  e.currentTarget.style.borderColor = "rgba(227, 24, 55, 0.4)";
+                  e.currentTarget.style.boxShadow = "0 4px 16px rgba(227, 24, 55, 0.3)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "linear-gradient(135deg, rgba(227, 24, 55, 0.1) 0%, rgba(227, 24, 55, 0.05) 100%)";
+                  e.currentTarget.style.borderColor = "rgba(227, 24, 55, 0.2)";
+                  e.currentTarget.style.boxShadow = "0 2px 8px rgba(227, 24, 55, 0.15)";
                 }}
               >
                 {!collapsed && "Nuevo Chat"}
               </Button>
             </div>
 
-            <div style={{ padding: "0 12px", marginBottom: "24px" }}>
+            <div style={{ padding: "0 12px", marginBottom: "12px" }}>
               <Button
                 type="text"
                 icon={<Rocket size={16} />}
                 onClick={() => setIsRfpModalOpen(true)}
+                className="transition-smooth hover-lift"
                 style={{
                   width: "100%",
                   display: "flex",
                   alignItems: "center",
                   gap: "12px",
                   justifyContent: "flex-start",
-                  padding: "10px 16px",
+                  padding: "12px 16px",
                   height: "auto",
-                  background: "#2A2A2D",
-                  border: "none",
-                  borderRadius: "8px",
-                  color: "#E3E3E3",
+                  background: "linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%)",
+                  border: "1px solid rgba(16, 185, 129, 0.2)",
+                  borderRadius: "10px",
+                  color: "#FFFFFF",
                   fontSize: "14px",
+                  fontWeight: 600,
+                  backdropFilter: "blur(10px)",
+                  boxShadow: "0 2px 8px rgba(16, 185, 129, 0.15)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.1) 100%)";
+                  e.currentTarget.style.borderColor = "rgba(16, 185, 129, 0.4)";
+                  e.currentTarget.style.boxShadow = "0 4px 16px rgba(16, 185, 129, 0.3)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%)";
+                  e.currentTarget.style.borderColor = "rgba(16, 185, 129, 0.2)";
+                  e.currentTarget.style.boxShadow = "0 2px 8px rgba(16, 185, 129, 0.15)";
                 }}
               >
-                {!collapsed && "Analisis rapido RPF"}
+                {!collapsed && "Análisis rápido RPF"}
+              </Button>
+            </div>
+
+            {/* Nuevo Workspace button */}
+            <div style={{ padding: "0 12px", marginBottom: "24px" }}>
+              <Button
+                type="text"
+                icon={<FolderOpenOutlined style={{ fontSize: "14px" }} />}
+                onClick={handleOpenModal}
+                className="transition-smooth hover-lift"
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  justifyContent: "flex-start",
+                  padding: "12px 16px",
+                  height: "auto",
+                  background: "linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%)",
+                  border: "1px solid rgba(59, 130, 246, 0.2)",
+                  borderRadius: "10px",
+                  color: "#FFFFFF",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  backdropFilter: "blur(10px)",
+                  boxShadow: "0 2px 8px rgba(59, 130, 246, 0.15)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.1) 100%)";
+                  e.currentTarget.style.borderColor = "rgba(59, 130, 246, 0.4)";
+                  e.currentTarget.style.boxShadow = "0 4px 16px rgba(59, 130, 246, 0.3)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%)";
+                  e.currentTarget.style.borderColor = "rgba(59, 130, 246, 0.2)";
+                  e.currentTarget.style.boxShadow = "0 2px 8px rgba(59, 130, 246, 0.15)";
+                }}
+              >
+                {!collapsed && "Nuevo Workspace"}
               </Button>
             </div>
           </div>
@@ -1294,55 +1391,37 @@ export default function Sidebar() {
               {!collapsed && (
                 <div
                   onClick={() => setWorkspacesSectionCollapsed(!workspacesSectionCollapsed)}
+                  className="transition-smooth"
                   style={{
                     display: "flex",
                     alignItems: "center",
                     gap: "8px",
                     cursor: "pointer",
-                    padding: "0 16px",
-                    marginBottom: "8px",
+                    padding: "8px 16px",
+                    marginBottom: "12px",
+                    borderRadius: "8px",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.03)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
                   }}
                 >
-                  <span style={{ color: "#888888", fontSize: "10px" }}>
+                  <span style={{ color: "#999999", fontSize: "12px" }}>
                     {workspacesSectionCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
                   </span>
                   <Text
                     style={{
-                      color: "#888888",
-                      fontSize: "12px",
-                      fontWeight: 500,
-                      textTransform: "capitalize",
+                      color: "#BBBBBB",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px",
                     }}
                   >
                     Workspaces
                   </Text>
-                </div>
-              )}
-
-              {/* Nuevo Workspace - siempre visible */}
-              {!collapsed && (
-                <div style={{ marginTop: "8px" }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      padding: "10px 16px",
-                      cursor: "pointer",
-                      borderRadius: "8px",
-                      margin: "2px 8px",
-                      transition: "background 0.2s",
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "#2A2A2D")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                    onClick={handleOpenModal}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                      <span style={{ color: "#E3E3E3", fontSize: "14px" }}>
-                        <FolderOpenOutlined />
-                      </span>
-                      <Text style={{ color: "#E3E3E3", fontSize: "14px", fontWeight: 600 }}>Nuevo Workspace</Text>
-                    </div>
-                  </div>
                 </div>
               )}
 
@@ -1367,24 +1446,33 @@ export default function Sidebar() {
               {!collapsed && (
                 <div
                   onClick={() => setChatsSectionCollapsed(!chatsSectionCollapsed)}
+                  className="transition-smooth"
                   style={{
                     display: "flex",
                     alignItems: "center",
                     gap: "8px",
                     cursor: "pointer",
-                    padding: "0 16px",
-                    marginBottom: "8px",
+                    padding: "8px 16px",
+                    marginBottom: "12px",
+                    borderRadius: "8px",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.03)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
                   }}
                 >
-                  <span style={{ color: "#888888", fontSize: "10px" }}>
+                  <span style={{ color: "#999999", fontSize: "12px" }}>
                     {chatsSectionCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
                   </span>
                   <Text
                     style={{
-                      color: "#888888",
-                      fontSize: "12px",
-                      fontWeight: 500,
-                      textTransform: "capitalize",
+                      color: "#BBBBBB",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px",
                     }}
                   >
                     Chats
@@ -1394,10 +1482,17 @@ export default function Sidebar() {
               {!chatsSectionCollapsed && (
                 <div style={{ marginTop: "8px" }}>
                   {generalChats.length === 0 ? (
-                    <div style={{ padding: "16px", textAlign: "center" }}>
-                      <Text style={{ color: "#666666", fontSize: "12px" }}>
-                        Sin chats generales
-                      </Text>
+                    <div style={{ padding: "20px 16px", textAlign: "center" }}>
+                      <div style={{
+                        background: "rgba(255, 255, 255, 0.02)",
+                        border: "1px dashed rgba(255, 255, 255, 0.1)",
+                        borderRadius: "8px",
+                        padding: "16px",
+                      }}>
+                        <Text style={{ color: "#888888", fontSize: "12px", fontStyle: "italic" }}>
+                          Sin chats generales
+                        </Text>
+                      </div>
                     </div>
                   ) : (
                     generalChats.map(renderChatItem)
@@ -2094,55 +2189,81 @@ export default function Sidebar() {
         {analysisResult && (
           <div className="max-h-[70vh] overflow-y-auto overflow-x-hidden space-y-6 pr-2">
             {/* Hero Section - Cliente y Presupuesto */}
-            <div className="bg-gradient-to-br from-zinc-900/80 to-zinc-900/40 border border-zinc-800 rounded-2xl p-8">
+            <div className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-8 shadow-2xl">
               <div className="grid md:grid-cols-2 gap-8">
                 {/* Cliente */}
                 <div>
                   <div className="flex items-center gap-2 mb-3">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <span className="text-zinc-400 text-xs font-medium uppercase tracking-wider">
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/>
+                      </svg>
+                    </div>
+                    <span className="text-zinc-300 text-sm font-semibold uppercase tracking-wider">
                       Cliente
                     </span>
                   </div>
-                  <h2 className="text-white text-2xl font-bold">
-                    {analysisResult.cliente}
+                  <h2 className="text-white text-3xl font-bold bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
+                    {analysisResult.cliente || 'No especificado'}
                   </h2>
                 </div>
                 
                 {/* Presupuesto */}
-                {analysisResult.alcance_economico && (
-                  <div className="md:text-right">
-                    <div className="flex items-center gap-2 mb-3 md:justify-end">
-                      <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                      <span className="text-zinc-400 text-xs font-medium uppercase tracking-wider">
-                        Presupuesto Total
-                      </span>
+                <div className="md:text-right">
+                  <div className="flex items-center gap-2 mb-3 md:justify-end">
+                    <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd"/>
+                      </svg>
                     </div>
-                    <div className="text-emerald-400 text-3xl font-bold font-mono">
-                      {analysisResult.alcance_economico.moneda?.split('(')[0].trim()} {analysisResult.alcance_economico.presupuesto}
-                    </div>
-                    <p className="text-zinc-500 text-sm mt-1">
-                      {analysisResult.alcance_economico.moneda?.match(/\((.*?)\)/)?.[1] || ''}
-                    </p>
+                    <span className="text-zinc-300 text-sm font-semibold uppercase tracking-wider">
+                      Presupuesto Total
+                    </span>
                   </div>
-                )}
+                  {analysisResult.alcance_economico?.presupuesto && 
+                   !analysisResult.alcance_economico.presupuesto.toLowerCase().includes('no especific') ? (
+                    <>
+                      <div className="text-emerald-400 text-4xl font-bold font-mono">
+                        {analysisResult.alcance_economico.moneda?.split('(')[0].trim() || ''} {analysisResult.alcance_economico.presupuesto}
+                      </div>
+                      {analysisResult.alcance_economico.moneda?.match(/\((.*?)\)/)?.[1] && (
+                        <p className="text-zinc-400 text-sm mt-2 font-medium">
+                          {analysisResult.alcance_economico.moneda.match(/\((.*?)\)/)?.[1]}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-zinc-500 text-lg font-medium">
+                      No especificado
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
             {/* Objetivo Principal */}
             {analysisResult.objetivo_general?.length > 0 && (
-              <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-8 h-8 bg-red-500/10 rounded-lg flex items-center justify-center">
-                    <div className="w-3 h-3 bg-red-500 rounded"></div>
+              <div className="bg-gradient-to-br from-red-900/10 to-orange-900/10 border border-red-500/30 rounded-xl p-6 hover:border-red-500/50 transition-all">
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-orange-500 rounded-xl flex items-center justify-center shadow-lg">
+                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v3.57A22.952 22.952 0 0110 13a22.95 22.95 0 01-8-1.43V8a2 2 0 012-2h2zm2-1a1 1 0 011-1h2a1 1 0 011 1v1H8V5zm1 5a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd"/>
+                      <path d="M2 13.692V16a2 2 0 002 2h12a2 2 0 002-2v-2.308A24.974 24.974 0 0110 15c-2.796 0-5.487-.46-8-1.308z"/>
+                    </svg>
                   </div>
-                  <h3 className="text-white text-base font-semibold">Objetivo del Proyecto</h3>
+                  <h3 className="text-white text-lg font-bold">Objetivo del Proyecto</h3>
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {analysisResult.objetivo_general.map((obj: string, index: number) => (
-                    <p key={index} className="text-zinc-300 text-base leading-relaxed pl-10">
-                      {obj}
-                    </p>
+                    <div key={index} className="flex items-start gap-3">
+                      <div className="w-6 h-6 bg-red-500/20 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                      </div>
+                      <p className="text-zinc-200 text-base leading-relaxed flex-1">
+                        {obj}
+                      </p>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -2193,20 +2314,22 @@ export default function Sidebar() {
 
             {/* Preguntas Clave */}
             {analysisResult.preguntas_sugeridas?.length > 0 && (
-              <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-8 h-8 bg-amber-500/10 rounded-lg flex items-center justify-center">
-                    <div className="w-3 h-3 bg-amber-500 rounded"></div>
+              <div className="bg-gradient-to-br from-amber-900/10 to-yellow-900/10 border border-amber-500/30 rounded-xl p-6 hover:border-amber-500/50 transition-all">
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-yellow-500 rounded-xl flex items-center justify-center shadow-lg">
+                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"/>
+                    </svg>
                   </div>
-                  <h3 className="text-white text-base font-semibold">Preguntas Clave para el Cliente</h3>
+                  <h3 className="text-white text-lg font-bold">Preguntas Clave para el Cliente</h3>
                 </div>
                 <div className="space-y-3">
                   {analysisResult.preguntas_sugeridas.map((pregunta: string, index: number) => (
-                    <div key={index} className="flex items-start gap-3 p-3 bg-zinc-800/30 border border-zinc-700/50 rounded-lg">
-                      <div className="flex-shrink-0 w-6 h-6 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-400 text-xs font-bold mt-0.5">
+                    <div key={index} className="flex items-start gap-3 p-4 bg-amber-500/5 border border-amber-500/20 rounded-lg hover:border-amber-500/40 hover:bg-amber-500/10 transition-all group">
+                      <div className="flex-shrink-0 w-7 h-7 bg-gradient-to-br from-amber-500 to-yellow-500 rounded-lg flex items-center justify-center text-white text-sm font-bold shadow-md group-hover:scale-110 transition-transform">
                         {index + 1}
                       </div>
-                      <p className="text-zinc-300 text-sm leading-relaxed flex-1">
+                      <p className="text-zinc-200 text-sm leading-relaxed flex-1">
                         {pregunta}
                       </p>
                     </div>
@@ -2217,12 +2340,17 @@ export default function Sidebar() {
 
             {/* Equipo Propuesto */}
             {analysisResult.equipo_sugerido?.length > 0 && (
-              <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6">
-                <div className="flex items-center gap-2 mb-5">
-                  <div className="w-8 h-8 bg-purple-500/10 rounded-lg flex items-center justify-center">
-                    <div className="w-3 h-3 bg-purple-500 rounded"></div>
+              <div className="bg-gradient-to-br from-purple-900/10 to-pink-900/10 border border-purple-500/30 rounded-xl p-6 hover:border-purple-500/50 transition-all">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg">
+                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
+                    </svg>
                   </div>
-                  <h3 className="text-white text-base font-semibold">Equipo Propuesto</h3>
+                  <div className="flex-1">
+                    <h3 className="text-white text-lg font-bold">Equipo Recomendado</h3>
+                    <p className="text-zinc-400 text-sm">Roles profesionales sugeridos para el proyecto</p>
+                  </div>
                 </div>
                 <div className="grid md:grid-cols-2 gap-4">
                   {analysisResult.equipo_sugerido.map((miembro: any, index: number) => {
@@ -2232,42 +2360,53 @@ export default function Sidebar() {
                       'bg-gradient-to-br from-pink-500 to-pink-600',
                       'bg-gradient-to-br from-orange-500 to-orange-600',
                       'bg-gradient-to-br from-teal-500 to-teal-600',
+                      'bg-gradient-to-br from-indigo-500 to-indigo-600',
                     ];
                     
                     return (
-                      <div key={index} className="bg-zinc-800/40 border border-zinc-700/50 rounded-xl p-5 hover:border-zinc-600 transition-all">
+                      <div key={index} className="bg-zinc-800/30 border border-purple-500/20 rounded-xl p-5 hover:border-purple-500/40 hover:bg-zinc-800/50 transition-all group">
                         {/* Header */}
                         <div className="flex items-start gap-4 mb-4">
-                          <div className={`w-12 h-12 ${avatarColors[index % avatarColors.length]} rounded-xl flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-lg`}>
-                            {miembro.nombre.charAt(0)}
+                          <div className={`w-14 h-14 ${avatarColors[index % avatarColors.length]} rounded-xl flex items-center justify-center text-white font-bold text-xl flex-shrink-0 shadow-lg group-hover:scale-105 transition-transform`}>
+                            {miembro.nombre?.split(' ').map((n: string) => n[0]).join('').substring(0, 2) || '?'}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h4 className="text-white font-semibold text-base mb-1">
+                            <h4 className="text-white font-bold text-base mb-1.5">
                               {miembro.nombre}
                             </h4>
-                            <p className="text-zinc-400 text-sm leading-snug">
+                            <p className="text-zinc-300 text-sm leading-snug font-medium">
                               {miembro.rol}
                             </p>
                           </div>
                         </div>
                         
                         {/* Experiencia */}
-                        <div className="mb-4">
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-lg text-xs font-medium">
-                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/>
-                            </svg>
-                            {miembro.experiencia}
-                          </span>
-                        </div>
+                        {miembro.experiencia && (
+                          <div className="mb-4">
+                            <div className="inline-flex items-center gap-2 px-3.5 py-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 rounded-lg shadow-sm">
+                              <svg className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v3.57A22.952 22.952 0 0110 13a22.95 22.95 0 01-8-1.43V8a2 2 0 012-2h2zm2-1a1 1 0 011-1h2a1 1 0 011 1v1H8V5zm1 5a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd"/>
+                                <path d="M2 13.692V16a2 2 0 002 2h12a2 2 0 002-2v-2.308A24.974 24.974 0 0110 15c-2.796 0-5.487-.46-8-1.308z"/>
+                              </svg>
+                              <div className="flex items-baseline gap-1">
+                                <span className="text-amber-300 font-bold text-base">
+                                  {miembro.experiencia}
+                                </span>
+                                <span className="text-amber-400/80 text-xs font-medium">
+                                  años de experiencia
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         
                         {/* Skills */}
                         {miembro.skills?.length > 0 && (
                           <div>
-                            <p className="text-zinc-500 text-xs font-medium mb-2">Habilidades</p>
+                            <p className="text-purple-300 text-xs font-semibold mb-2.5 uppercase tracking-wider">Habilidades Clave</p>
                             <div className="flex flex-wrap gap-1.5">
                               {miembro.skills.map((skill: string, idx: number) => (
-                                <span key={idx} className="px-2.5 py-1 bg-zinc-700/50 text-zinc-300 rounded-md text-xs">
+                                <span key={idx} className="px-2.5 py-1.5 bg-purple-500/10 border border-purple-500/30 text-purple-200 rounded-md text-xs font-medium">
                                   {skill}
                                 </span>
                               ))}
@@ -2394,6 +2533,267 @@ export default function Sidebar() {
             Crear Chat
           </Button>
         </div>
+      </Modal>
+
+      {/* Modal para Análisis Rápido RFP */}
+      <Modal
+        title={null}
+        open={isRfpModalOpen}
+        onCancel={() => {
+          setIsRfpModalOpen(false)
+          setRfpFile(null)
+        }}
+        footer={null}
+        centered
+        width={500}
+        styles={modalStyles}
+        closeIcon={<span style={{ color: "#666666", fontSize: "18px" }}>×</span>}
+      >
+        {/* Header del Modal */}
+        <div style={{ marginBottom: "28px" }}>
+          <div style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            gap: "12px",
+            marginBottom: "12px" 
+          }}>
+            <div style={{
+              width: "48px",
+              height: "48px",
+              background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
+              borderRadius: "12px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 4px 12px rgba(16, 185, 129, 0.3)",
+            }}>
+              <Rocket size={24} style={{ color: "#FFFFFF" }} />
+            </div>
+            <div>
+              <Text style={{ color: "#FFFFFF", fontSize: "22px", fontWeight: 700, display: "block" }}>
+                Análisis Rápido RFP
+              </Text>
+              <Text style={{ color: "#888888", fontSize: "13px", display: "block" }}>
+                Extrae información clave automáticamente
+              </Text>
+            </div>
+          </div>
+        </div>
+
+        {/* Upload Area */}
+        <div style={{ marginBottom: "24px" }}>
+          <Text style={{ 
+            color: "#CCCCCC", 
+            fontSize: "14px", 
+            display: "block", 
+            marginBottom: "12px",
+            fontWeight: 600,
+          }}>
+            Selecciona tu documento RFP
+          </Text>
+          
+          <Upload
+            beforeUpload={(file) => {
+              const isValidType = [
+                'application/pdf',
+                'application/msword',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+              ].includes(file.type)
+
+              if (!isValidType) {
+                message.error('Solo se permiten archivos PDF y Word')
+                return Upload.LIST_IGNORE
+              }
+
+              const uploadFile: UploadFile = {
+                uid: file.uid || '-1',
+                name: file.name,
+                status: 'done',
+                originFileObj: file as any,
+              }
+              setRfpFile(uploadFile)
+              return false
+            }}
+            maxCount={1}
+            showUploadList={false}
+            style={{ width: "100%" }}
+          >
+            <div style={{
+              width: "100%",
+              minHeight: "180px",
+              border: "2px dashed rgba(16, 185, 129, 0.3)",
+              borderRadius: "12px",
+              background: "linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.02) 100%)",
+              padding: "32px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              transition: "all 0.3s ease",
+              backdropFilter: "blur(10px)",
+            }}
+            className="upload-hover"
+            >
+              {!rfpFile ? (
+                <>
+                  <div style={{
+                    width: "64px",
+                    height: "64px",
+                    background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
+                    borderRadius: "16px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: "16px",
+                    boxShadow: "0 4px 12px rgba(16, 185, 129, 0.2)",
+                  }}>
+                    <UploadOutlined style={{ fontSize: "28px", color: "#FFFFFF" }} />
+                  </div>
+                  <Text style={{ 
+                    color: "#FFFFFF", 
+                    fontSize: "16px", 
+                    fontWeight: 600,
+                    marginBottom: "8px",
+                    display: "block",
+                  }}>
+                    Arrastra tu archivo o haz click aquí
+                  </Text>
+                  <Text style={{ 
+                    color: "#888888", 
+                    fontSize: "13px",
+                    display: "block",
+                  }}>
+                    PDF, Word (DOCX) • Máximo 10MB
+                  </Text>
+                </>
+              ) : (
+                <div style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  padding: "16px",
+                  background: "rgba(16, 185, 129, 0.1)",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(16, 185, 129, 0.3)",
+                }}>
+                  <div style={{
+                    width: "40px",
+                    height: "40px",
+                    background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
+                    borderRadius: "8px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}>
+                    <FileText size={20} style={{ color: "#FFFFFF" }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ 
+                      color: "#FFFFFF", 
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      display: "block",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}>
+                      {rfpFile.name}
+                    </Text>
+                    <Text style={{ 
+                      color: "#10B981", 
+                      fontSize: "12px",
+                      display: "block",
+                    }}>
+                      ✓ Archivo seleccionado
+                    </Text>
+                  </div>
+                  <Button
+                    type="text"
+                    danger
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setRfpFile(null)
+                    }}
+                    style={{
+                      color: "#EF4444",
+                      flexShrink: 0,
+                    }}
+                  >
+                    Eliminar
+                  </Button>
+                </div>
+              )}
+            </div>
+          </Upload>
+        </div>
+
+        {/* Footer Actions */}
+        <div style={{ 
+          display: "flex", 
+          gap: "12px", 
+          justifyContent: "flex-end",
+        }}>
+          <Button
+            onClick={() => {
+              setIsRfpModalOpen(false)
+              setRfpFile(null)
+            }}
+            style={{
+              height: "42px",
+              padding: "0 24px",
+              borderRadius: "8px",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
+              background: "rgba(255, 255, 255, 0.05)",
+              color: "#CCCCCC",
+              fontWeight: 600,
+              transition: "all 0.3s ease",
+            }}
+            className="hover-lift"
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="primary"
+            loading={isAnalyzing}
+            disabled={!rfpFile}
+            onClick={handleRfpAnalysis}
+            icon={!isAnalyzing && <Rocket size={16} />}
+            style={{
+              height: "42px",
+              padding: "0 28px",
+              borderRadius: "8px",
+              border: "none",
+              background: rfpFile 
+                ? "linear-gradient(135deg, #10B981 0%, #059669 100%)"
+                : "rgba(255, 255, 255, 0.1)",
+              color: rfpFile ? "#FFFFFF" : "#666666",
+              fontWeight: 600,
+              boxShadow: rfpFile 
+                ? "0 4px 12px rgba(16, 185, 129, 0.3)" 
+                : "none",
+              transition: "all 0.3s ease",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+            className={rfpFile ? "hover-lift" : ""}
+          >
+            {isAnalyzing ? "Analizando..." : "Analizar RFP"}
+          </Button>
+        </div>
+
+        {/* Estilos CSS adicionales */}
+        <style jsx global>{`
+          .upload-hover:hover {
+            border-color: rgba(16, 185, 129, 0.6) !important;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(5, 150, 105, 0.04) 100%) !important;
+            transform: translateY(-2px);
+          }
+        `}</style>
       </Modal>
     </>
   )

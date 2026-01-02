@@ -2,8 +2,9 @@
 import { useState, FormEvent, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Typography, Spin } from "antd";
-import { EyeInvisibleOutlined, EyeOutlined, LoadingOutlined, ArrowLeftOutlined } from "@ant-design/icons";
+import { EyeInvisibleOutlined, EyeOutlined, LoadingOutlined, ArrowLeftOutlined, UserAddOutlined, SafetyOutlined, ThunderboltOutlined } from "@ant-design/icons";
 import { showToast } from "@/components/Toast";
+import { dt } from "@/lib/design-tokens";
 
 const { Text, Title } = Typography;
 
@@ -88,68 +89,153 @@ export default function RegisterPage() {
 
   return (
     <div 
+      className="bg-gradient-animated"
       style={{
         minHeight: '100vh',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '16px',
-        backgroundColor: '#000000',
+        padding: dt.spacing.md,
+        position: 'relative',
+        overflow: 'hidden',
       }}
     >
-      <div style={{ width: '100%', maxWidth: '400px' }}>
-        {/* Botón volver */}
+      {/* Partículas de fondo decorativas */}
+      <div style={{ position: 'absolute', top: '10%', left: '10%', width: '4px', height: '4px' }} className="particle" />
+      <div style={{ position: 'absolute', top: '20%', right: '15%', width: '3px', height: '3px', animationDelay: '2s' }} className="particle" />
+      <div style={{ position: 'absolute', bottom: '30%', left: '20%', width: '5px', height: '5px', animationDelay: '4s' }} className="particle" />
+      <div style={{ position: 'absolute', bottom: '15%', right: '10%', width: '3px', height: '3px', animationDelay: '6s' }} className="particle" />
+      
+      {/* Gradiente radial de acento */}
+      <div className="bg-radial-glow" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} />
+
+      <div style={{ width: '100%', maxWidth: '520px', position: 'relative', zIndex: 1 }}>
+        {/* Botón volver mejorado */}
         <Button
           type="text"
           icon={<ArrowLeftOutlined />}
           onClick={() => router.push('/login')}
+          className="transition-smooth"
           style={{
-            color: '#9CA3AF',
-            padding: 0,
+            color: dt.colors.dark.textSubtle,
+            padding: '8px 16px',
             marginBottom: '24px',
             height: 'auto',
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+            e.currentTarget.style.color = '#E31837';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+            e.currentTarget.style.color = dt.colors.dark.textSubtle;
           }}
         >
           Volver al login
         </Button>
 
         {/* Logo y título */}
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+        <div style={{ textAlign: 'center', marginBottom: dt.spacing.xl }} className="animate-fade-in-up">
           <div 
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: '64px',
-              height: '64px',
-              background: 'linear-gradient(135deg, #3B82F6 0%, #4F46E5 100%)',
-              borderRadius: '16px',
-              marginBottom: '16px',
+              width: '80px',
+              height: '80px',
+              background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+              borderRadius: '20px',
+              marginBottom: dt.spacing.lg,
+              boxShadow: '0 8px 32px rgba(16, 185, 129, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+              position: 'relative',
+            }}
+            className="hover-lift"
+          >
+            <UserAddOutlined style={{ fontSize: '40px', color: '#FFFFFF' }} />
+            <div style={{ 
+              position: 'absolute', 
+              inset: '-2px', 
+              background: 'linear-gradient(135deg, #10B981, #059669)',
+              borderRadius: '20px',
+              opacity: 0.3,
+              filter: 'blur(10px)',
+              zIndex: -1,
+            }} />
+          </div>
+          
+          <Title 
+            level={1} 
+            className="text-gradient-animated"
+            style={{ 
+              margin: `0 0 ${dt.spacing.sm} 0`,
+              fontSize: '36px',
+              fontWeight: 800,
+              letterSpacing: '-0.5px',
             }}
           >
-            <span style={{ fontSize: '32px' }}>✨</span>
-          </div>
-          <Title level={2} style={{ color: '#FFFFFF', margin: '0 0 8px 0' }}>
-            Crear una cuenta
+            Crear Cuenta
           </Title>
-          <Text style={{ color: '#9CA3AF' }}>
-            Únete al Gestor de Propuestas Inteligente
+          
+          <Text style={{ color: dt.colors.dark.textSubtle, fontSize: '16px', display: 'block', marginBottom: dt.spacing.md }}>
+            Únete a la plataforma de análisis de RFPs
           </Text>
+
+          {/* Características destacadas */}
+          <div style={{ 
+            display: 'flex', 
+            gap: dt.spacing.md, 
+            justifyContent: 'center',
+            marginTop: dt.spacing.lg,
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px',
+              padding: '8px 16px',
+              background: 'rgba(16, 185, 129, 0.1)',
+              borderRadius: '20px',
+              border: '1px solid rgba(16, 185, 129, 0.2)',
+            }}>
+              <ThunderboltOutlined style={{ color: '#10B981' }} />
+              <Text style={{ color: dt.colors.dark.textSubtle, fontSize: '12px' }}>Gratis</Text>
+            </div>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px',
+              padding: '8px 16px',
+              background: 'rgba(59, 130, 246, 0.1)',
+              borderRadius: '20px',
+              border: '1px solid rgba(59, 130, 246, 0.2)',
+            }}>
+              <SafetyOutlined style={{ color: '#3B82F6' }} />
+              <Text style={{ color: dt.colors.dark.textSubtle, fontSize: '12px' }}>Sin tarjeta</Text>
+            </div>
+          </div>
         </div>
 
-        {/* Formulario de registro */}
+        {/* Formulario de registro con glassmorphism */}
         <div 
+          className="glass-card hover-lift"
           style={{
-            background: '#1A1A1A',
-            borderRadius: '16px',
-            padding: '32px',
-            border: '1px solid #333333',
+            padding: '40px',
+            borderRadius: '24px',
           }}
         >
-          <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             {/* Nombre completo */}
-            <div>
-              <Text style={{ color: '#9CA3AF', display: 'block', marginBottom: '8px' }}>
+            <div className="transition-smooth">
+              <Text style={{ 
+                color: dt.colors.dark.text, 
+                display: 'block', 
+                marginBottom: dt.spacing.sm,
+                fontSize: '14px',
+                fontWeight: 600,
+              }}>
                 Nombre completo
               </Text>
               <Input
@@ -159,43 +245,59 @@ export default function RegisterPage() {
                 onChange={(e) => handleChange('full_name', e.target.value)}
                 disabled={isLoading}
                 required
+                className="input-enhanced transition-smooth"
                 style={{
-                  background: '#2A2A2D',
-                  border: '1px solid #3A3A3D',
-                  borderRadius: '8px',
-                  padding: '12px 16px',
-                  color: '#FFFFFF',
-                  fontSize: '14px',
+                  background: 'rgba(26, 26, 28, 0.6)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '12px',
+                  padding: '14px 18px',
+                  color: dt.colors.dark.text,
+                  fontSize: '15px',
+                  backdropFilter: 'blur(10px)',
                 }}
               />
             </div>
 
             {/* Email */}
-            <div>
-              <Text style={{ color: '#9CA3AF', display: 'block', marginBottom: '8px' }}>
-                Email
+            <div className="transition-smooth">
+              <Text style={{ 
+                color: dt.colors.dark.text, 
+                display: 'block', 
+                marginBottom: dt.spacing.sm,
+                fontSize: '14px',
+                fontWeight: 600,
+              }}>
+                Email corporativo
               </Text>
               <Input
                 type="email"
-                placeholder="tu@email.com"
+                placeholder="tu@empresa.com"
                 value={formData.email}
                 onChange={(e) => handleChange('email', e.target.value)}
                 disabled={isLoading}
                 required
+                className="input-enhanced transition-smooth"
                 style={{
-                  background: '#2A2A2D',
-                  border: '1px solid #3A3A3D',
-                  borderRadius: '8px',
-                  padding: '12px 16px',
-                  color: '#FFFFFF',
-                  fontSize: '14px',
+                  background: 'rgba(26, 26, 28, 0.6)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '12px',
+                  padding: '14px 18px',
+                  color: dt.colors.dark.text,
+                  fontSize: '15px',
+                  backdropFilter: 'blur(10px)',
                 }}
               />
             </div>
 
             {/* Password */}
-            <div>
-              <Text style={{ color: '#9CA3AF', display: 'block', marginBottom: '8px' }}>
+            <div className="transition-smooth">
+              <Text style={{ 
+                color: dt.colors.dark.text, 
+                display: 'block', 
+                marginBottom: dt.spacing.sm,
+                fontSize: '14px',
+                fontWeight: 600,
+              }}>
                 Contraseña
               </Text>
               <Input
@@ -206,28 +308,42 @@ export default function RegisterPage() {
                 disabled={isLoading}
                 required
                 minLength={8}
+                className="input-enhanced transition-smooth"
                 suffix={
                   <span 
                     onClick={() => setShowPassword(!showPassword)}
-                    style={{ cursor: 'pointer', color: '#9CA3AF' }}
+                    className="transition-smooth"
+                    style={{ 
+                      cursor: 'pointer', 
+                      color: dt.colors.dark.textSubtle,
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#10B981'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = dt.colors.dark.textSubtle}
                   >
                     {showPassword ? <EyeInvisibleOutlined /> : <EyeOutlined />}
                   </span>
                 }
                 style={{
-                  background: '#2A2A2D',
-                  border: '1px solid #3A3A3D',
-                  borderRadius: '8px',
-                  padding: '12px 16px',
-                  color: '#FFFFFF',
-                  fontSize: '14px',
+                  background: 'rgba(26, 26, 28, 0.6)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '12px',
+                  padding: '14px 18px',
+                  color: dt.colors.dark.text,
+                  fontSize: '15px',
+                  backdropFilter: 'blur(10px)',
                 }}
               />
             </div>
 
             {/* Confirmar Password */}
-            <div>
-              <Text style={{ color: '#9CA3AF', display: 'block', marginBottom: '8px' }}>
+            <div className="transition-smooth">
+              <Text style={{ 
+                color: dt.colors.dark.text, 
+                display: 'block', 
+                marginBottom: dt.spacing.sm,
+                fontSize: '14px',
+                fontWeight: 600,
+              }}>
                 Confirmar contraseña
               </Text>
               <Input
@@ -237,21 +353,29 @@ export default function RegisterPage() {
                 onChange={(e) => handleChange('confirmPassword', e.target.value)}
                 disabled={isLoading}
                 required
+                className="input-enhanced transition-smooth"
                 suffix={
                   <span 
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    style={{ cursor: 'pointer', color: '#9CA3AF' }}
+                    className="transition-smooth"
+                    style={{ 
+                      cursor: 'pointer', 
+                      color: dt.colors.dark.textSubtle,
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#10B981'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = dt.colors.dark.textSubtle}
                   >
                     {showConfirmPassword ? <EyeInvisibleOutlined /> : <EyeOutlined />}
                   </span>
                 }
                 style={{
-                  background: '#2A2A2D',
-                  border: '1px solid #3A3A3D',
-                  borderRadius: '8px',
-                  padding: '12px 16px',
-                  color: '#FFFFFF',
-                  fontSize: '14px',
+                  background: 'rgba(26, 26, 28, 0.6)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '12px',
+                  padding: '14px 18px',
+                  color: dt.colors.dark.text,
+                  fontSize: '15px',
+                  backdropFilter: 'blur(10px)',
                 }}
               />
             </div>
@@ -261,38 +385,64 @@ export default function RegisterPage() {
               type="primary"
               htmlType="submit"
               disabled={isLoading}
+              className="hover-shine transition-smooth"
               style={{
                 width: '100%',
-                height: '48px',
-                background: 'linear-gradient(135deg, #3B82F6 0%, #4F46E5 100%)',
+                height: '56px',
+                background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
                 border: 'none',
-                borderRadius: '12px',
-                fontWeight: 600,
+                borderRadius: '14px',
+                fontWeight: 700,
                 fontSize: '16px',
                 marginTop: '8px',
+                boxShadow: '0 4px 20px rgba(16, 185, 129, 0.3)',
               }}
             >
               {isLoading ? (
-                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                  <Spin indicator={<LoadingOutlined style={{ fontSize: 16, color: '#FFFFFF' }} spin />} />
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                  <Spin indicator={<LoadingOutlined style={{ fontSize: 18, color: '#FFFFFF' }} spin />} />
                   Creando cuenta...
                 </span>
               ) : (
-                'Crear Cuenta'
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  <UserAddOutlined style={{ fontSize: '18px' }} />
+                  Crear Cuenta Gratis
+                </span>
               )}
             </Button>
           </form>
 
+          {/* Divider */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '16px', 
+            margin: '32px 0 24px 0' 
+          }}>
+            <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.1)' }} />
+            <Text style={{ color: dt.colors.dark.textSubtle, fontSize: '12px' }}>o</Text>
+            <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.1)' }} />
+          </div>
+
           {/* Link a login */}
-          <div style={{ marginTop: '24px', textAlign: 'center' }}>
-            <Text style={{ color: '#9CA3AF' }}>
+          <div style={{ textAlign: 'center' }}>
+            <Text style={{ color: dt.colors.dark.textSubtle }}>
               ¿Ya tienes una cuenta?{' '}
               <span
                 onClick={() => router.push('/login')}
+                className="transition-smooth"
                 style={{ 
                   color: '#3B82F6', 
                   cursor: 'pointer',
-                  fontWeight: 500,
+                  fontWeight: 600,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = '#60A5FA';
+                  e.currentTarget.style.textDecoration = 'underline';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = '#3B82F6';
+                  e.currentTarget.style.textDecoration = 'none';
                 }}
               >
                 Inicia sesión
@@ -301,10 +451,19 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        {/* Footer */}
-        <div style={{ marginTop: '32px', textAlign: 'center' }}>
-          <Text style={{ color: '#6B7280', fontSize: '12px' }}>
-            Al crear una cuenta, aceptas nuestros términos y condiciones
+        {/* Footer mejorado */}
+        <div style={{ marginTop: '32px', textAlign: 'center' }} className="animate-fade-in-up">
+          <Text style={{ 
+            color: '#6B7280', 
+            fontSize: '13px',
+            display: 'block',
+            marginBottom: '12px',
+          }}>
+            Al crear una cuenta, aceptas nuestros{' '}
+            <span style={{ color: '#3B82F6', cursor: 'pointer' }}>términos y condiciones</span>
+          </Text>
+          <Text style={{ color: '#4B5563', fontSize: '12px' }}>
+            © 2025 Tivit AI. Todos los derechos reservados.
           </Text>
         </div>
       </div>

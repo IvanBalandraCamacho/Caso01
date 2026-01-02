@@ -442,12 +442,24 @@ def upload_document_to_workspace(
         extension = os.path.splitext(file.filename)[1]
         filename = f"{db_document.id}{extension}"
         
+        # Intentar subir a GCS si está configurado
         if settings.GCS_BUCKET_NAME:
-            # Subir a GCS
-            file_uri = upload_to_gcs(file.file, filename)
-            logger.info(f"Archivo subido a GCS: {file_uri}")
+            try:
+                file_uri = upload_to_gcs(file.file, filename)
+                if file_uri:
+                    print(f"Archivo subido a GCS: {file_uri}")
+                else:
+                    raise Exception("GCS upload returned None")
+            except Exception as gcs_error:
+                print(f"Error al subir a GCS, usando almacenamiento local: {gcs_error}")
+                # Fallback a local si GCS falla
+                file.file.seek(0)  # Reset file pointer
+                file_path = UPLOAD_DIR / filename
+                with open(file_path, "wb") as buffer:
+                    shutil.copyfileobj(file.file, buffer)
+                file_uri = str(file_path)
         else:
-            # Fallback local (o si no se configura GCS)
+            # Almacenamiento local si GCS no está configurado
             file_path = UPLOAD_DIR / filename
             with open(file_path, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
@@ -464,14 +476,27 @@ def upload_document_to_workspace(
     finally:
         file.file.close()
 
-    # 5. Enviar tarea a Celery con la URI (path local o gs://)
+    # Verificar que file_uri no esté vacío
+    if not file_uri:
+        db.delete(db_document)
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error: No se pudo determinar la ubicación del archivo guardado",
+        )
+
     # 5. Enviar tarea de procesamiento
-    if settings.CLOUD_TASKS_QUEUE and settings.CLOUD_TASKS_LOCATION and settings.GOOGLE_CLOUD_PROJECT:
+    # Check if Cloud Tasks configuration exists
+    cloud_tasks_queue = getattr(settings, 'CLOUD_TASKS_QUEUE', None)
+    cloud_tasks_location = getattr(settings, 'CLOUD_TASKS_LOCATION', None)
+    google_cloud_project = getattr(settings, 'GOOGLE_CLOUD_PROJECT', None)
+    
+    if cloud_tasks_queue and cloud_tasks_location and google_cloud_project:
         # Usar Cloud Tasks
         queue_path = gcp_services.tasks_client.queue_path(
-            settings.GOOGLE_CLOUD_PROJECT,
-            settings.CLOUD_TASKS_LOCATION,
-            settings.CLOUD_TASKS_QUEUE
+            google_cloud_project,
+            cloud_tasks_location,
+            cloud_tasks_queue
         )
         
         # URL de mi propio servicio (debe ser la URL publica de Cloud Run + endpoint)
@@ -910,10 +935,24 @@ def upload_document_to_conversation(
         extension = os.path.splitext(file.filename)[1]
         filename = f"{db_document.id}{extension}"
         
+        # Intentar subir a GCS si está configurado
         if settings.GCS_BUCKET_NAME:
-            file_uri = upload_to_gcs(file.file, filename)
-            print(f"Archivo conversación subido a GCS: {file_uri}")
+            try:
+                file_uri = upload_to_gcs(file.file, filename)
+                if file_uri:
+                    print(f"Archivo conversación subido a GCS: {file_uri}")
+                else:
+                    raise Exception("GCS upload returned None")
+            except Exception as gcs_error:
+                print(f"Error al subir a GCS, usando almacenamiento local: {gcs_error}")
+                # Fallback a local si GCS falla
+                file.file.seek(0)  # Reset file pointer
+                file_path = UPLOAD_DIR / filename
+                with open(file_path, "wb") as buffer:
+                    shutil.copyfileobj(file.file, buffer)
+                file_uri = str(file_path)
         else:
+            # Almacenamiento local si GCS no está configurado
             file_path = UPLOAD_DIR / filename
             with open(file_path, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
@@ -928,6 +967,15 @@ def upload_document_to_conversation(
         )
     finally:
         file.file.close()
+    
+    # Validar que file_uri no esté vacío
+    if not file_uri:
+        db.delete(db_document)
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error: No se pudo determinar la ubicación del archivo guardado",
+        )
 
     # 6. Enviar tarea a Celery con la URI
     celery_app.send_task(

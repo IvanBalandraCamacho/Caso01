@@ -1,0 +1,3 @@
+Este es un documento EXCLUSIVO del Chat 2.
+Solo debe ser visible en este chat.
+No debe verse en otros chats.

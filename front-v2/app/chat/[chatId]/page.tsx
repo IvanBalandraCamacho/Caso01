@@ -809,11 +809,13 @@ export default function GeneralChatPage({
             flexShrink: 0,
           }}
         >
-          <img 
-            src="/logo.svg" 
-            alt="Logo" 
-            style={{ height: "40px" }} 
-          />
+          <div style={{ cursor: "pointer" }} onClick={() => router.push('/')}>
+            <img 
+              src="/logo.svg" 
+              alt="Logo" 
+              style={{ height: "40px" }} 
+            />
+          </div>
 
           {/* Chat Name - center */}
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>

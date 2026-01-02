@@ -135,12 +135,18 @@ def _generate_docx(proposal_data: Dict[str, Any]) -> bytes:
 
     # ============ SECCIÓN: OBJETIVO ============
     doc.add_paragraph("2. Objetivo del Proyecto", style="CorporateHeader")
-    doc.add_paragraph(
-        proposal_data.get(
-            "objetivo_proyecto",
-            "Presentar una solución técnica integral que responda a las necesidades identificadas."
-        )
-    )
+    
+    # Manejar objetivo_general (puede ser lista) u objetivo_proyecto (string)
+    objetivo = proposal_data.get("objetivo_general") or proposal_data.get("objetivo_proyecto")
+    
+    if objetivo:
+        if isinstance(objetivo, list):
+            for obj in objetivo:
+                doc.add_paragraph(f"• {obj}", style="List Bullet")
+        else:
+            doc.add_paragraph(str(objetivo))
+    else:
+        doc.add_paragraph("Presentar una solución técnica integral que responda a las necesidades identificadas.")
 
     # ============ SECCIÓN: INFORMACIÓN GENERAL ============
     doc.add_paragraph("3. Información General del Proyecto", style="CorporateHeader")
@@ -275,7 +281,12 @@ def _generate_pdf(proposal_data: Dict[str, Any]) -> bytes:
     
     #Objetivo General
     story.append(Paragraph("Objetivo General", heading_style))
-    story.append(Paragraph(proposal_data.get("objetivo_general", "N/A"), styles['Normal']))
+    objetivo_general = proposal_data.get("objetivo_general", [])
+    if isinstance(objetivo_general, list):
+        for objetivo in objetivo_general:
+            story.append(Paragraph(f"• {objetivo}", styles['Normal']))
+    else:
+        story.append(Paragraph(str(objetivo_general) if objetivo_general else "N/A", styles['Normal']))
     story.append(Spacer(1, 0.15*inch))
     
     # Preguntas Sugeridas

@@ -209,10 +209,15 @@ class UserLogin(BaseModel):
 class UserPublic(UserBase):
     id: str
     is_active: bool
+    profile_picture: str | None = None
     created_at: datetime
     
     class Config:
         from_attributes = True
+
+class UserUpdate(BaseModel):
+    full_name: str | None = None
+    email: str | None = None
 
 class Token(BaseModel):
     access_token: str

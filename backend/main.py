@@ -2,8 +2,9 @@ import os
 import time
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 # from starlette.middleware.gzip import GZIPMiddleware
-from api.routes import health, workspaces, conversations, document_generation, auth, intention_task, tivit, notifications_ws, rag_proxy, general_chat, metrics
+from api.routes import health, workspaces, conversations, document_generation, auth, intention_task, tivit, notifications_ws, rag_proxy, general_chat, metrics, dashboard, workspace_analytics, templates
 # from api.routes import users  # Comentado: módulo no existe aún
 from exceptions import ServiceException
 from core.config import settings
@@ -94,8 +95,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,  # Solo orígenes específicos
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],  # Solo métodos necesarios
-    allow_headers=["Content-Type", "Authorization"],  # Solo headers necesarios
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Agregar OPTIONS para preflight
+    allow_headers=["*"],  # Permitir todos los headers para desarrollo
 )
 
 # Configurar GZIP para compresión de respuestas (60-70% reducción de tamaño)
@@ -104,6 +105,9 @@ app.add_middleware(
 # --- Registrar Routers ---
 app.include_router(health.router, prefix="/api/v1", tags=["Health Check"])
 app.include_router(auth.router, prefix="/api/v1", tags=["Authentication"])
+app.include_router(dashboard.router, prefix="/api/v1", tags=["Dashboard"])
+app.include_router(workspace_analytics.router, prefix="/api/v1", tags=["Workspace Analytics"])
+app.include_router(templates.router, prefix="/api/v1", tags=["Templates"])
 app.include_router(workspaces.router, prefix="/api/v1", tags=["Workspaces"])
 app.include_router(conversations.router, prefix="/api/v1", tags=["Conversations"])
 app.include_router(document_generation.router, prefix="/api/v1", tags=["Document Generation"])
@@ -116,6 +120,12 @@ app.include_router(general_chat.router, prefix="/api/v1", tags=["General Chat"])
 # Tasks Router (sin prefijo v1 estricto, o interno)
 from api.routes import tasks
 app.include_router(tasks.router, prefix="/api/tasks", tags=["Cloud Tasks Handlers"])
+
+# Montar directorio de archivos estáticos para fotos de perfil
+from pathlib import Path
+profile_pictures_dir = Path("uploaded_files/profile_pictures")
+profile_pictures_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/uploaded_files", StaticFiles(directory="uploaded_files"), name="uploaded_files")
 
 @app.get("/")
 @limiter.limit("30/minute")  # Rate limit en root endpoint

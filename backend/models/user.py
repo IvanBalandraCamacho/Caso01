@@ -39,6 +39,7 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(255), nullable=True)
+    profile_picture = Column(String(500), nullable=True)  # URL o path de la foto de perfil
     
     # Flags de estado
     is_active = Column(Boolean, default=True, nullable=False)

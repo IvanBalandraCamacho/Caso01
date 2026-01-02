@@ -5,7 +5,7 @@ import type React from "react"
 import { PlusOutlined, RocketOutlined, DownOutlined, SendOutlined, InfoCircleOutlined, UploadOutlined, DownloadOutlined, FilePdfOutlined, FileWordOutlined, LoadingOutlined } from "@ant-design/icons"
 import { Button, Select, Typography, Input, Upload, App, Modal, Spin, Descriptions, Tag, Divider } from "antd"
 import type { UploadProps, UploadFile } from "antd"
-import { useState, useCallback, memo } from "react"
+import { useState, useCallback, memo, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { v4 as uuidv4 } from "uuid"
 import { UserMenu } from "./UserMenu"
@@ -13,7 +13,17 @@ import { useUser } from "@/hooks/useUser"
 import { useWorkspaceContext } from "@/context/WorkspaceContext"
 import { GlassCard } from "@/components/ui/GlassCard"
 import { PrimaryButton } from "@/components/ui/PrimaryButton"
+import { FloatingParticles } from "@/components/ui/FloatingParticles"
+import { ModernButton } from "@/components/ui/ModernButton"
+import { FeatureCard } from "@/components/ui/FeatureCard"
+import { ValuePropositionModal } from "@/components/ui/ValuePropositionModal"
+import { OnboardingModal } from "@/components/ui/OnboardingModal"
+import { InfoTooltip } from "@/components/ui/ContextualTooltip"
+import { DashboardStats, TodoList, UpcomingDeadlines } from "@/components/ui/DashboardWidgets"
+import { SmartAssistant } from "@/components/ui/SmartAssistant"
+import { AnalysisTemplates } from "@/components/ui/AnalysisTemplates"
 import { dt } from "@/lib/design-tokens"
+import { Sparkles, Zap, Shield, Globe, FileText, Target, Folder } from "lucide-react"
 
 const { Text, Title } = Typography
 const { TextArea } = Input
@@ -33,6 +43,20 @@ export default function ChatArea() {
   const [analysisResult, setAnalysisResult] = useState<any>(null)
   const [isResultModalOpen, setIsResultModalOpen] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
+
+  const [showTemplates, setShowTemplates] = useState(false)
+  // Nuevos estados para UX mejorada
+  const [showValueProposition, setShowValueProposition] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
+
+  // Mostrar onboarding en primera visita
+  useEffect(() => {
+    const hasSeenOnboarding = localStorage.getItem('hasSeenOnboarding')
+    if (!hasSeenOnboarding && user) {
+      setShowOnboarding(true)
+      localStorage.setItem('hasSeenOnboarding', 'true')
+    }
+  }, [user])
 
   const handleMessageChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessage(e.target.value)
@@ -148,8 +172,43 @@ export default function ChatArea() {
         display: "flex",
         flexDirection: "column",
         minHeight: "100vh",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
+      {/* Floating Particles Background */}
+      <FloatingParticles count={40} />
+
+      {/* Decorative gradient orbs */}
+      <div
+        style={{
+          position: "absolute",
+          top: "10%",
+          right: "10%",
+          width: "500px",
+          height: "500px",
+          background: "radial-gradient(circle, rgba(227, 24, 55, 0.15) 0%, transparent 70%)",
+          borderRadius: "50%",
+          filter: "blur(80px)",
+          pointerEvents: "none",
+          animation: "float 20s ease-in-out infinite",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          bottom: "20%",
+          left: "5%",
+          width: "400px",
+          height: "400px",
+          background: "radial-gradient(circle, rgba(255, 107, 0, 0.1) 0%, transparent 70%)",
+          borderRadius: "50%",
+          filter: "blur(80px)",
+          pointerEvents: "none",
+          animation: "float 25s ease-in-out infinite reverse",
+        }}
+      />
+
       {/* Header */}
       <header
         style={{
@@ -157,14 +216,24 @@ export default function ChatArea() {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          position: "relative",
+          zIndex: 10,
+          backdropFilter: "blur(10px)",
+          background: "rgba(10, 10, 11, 0.3)",
+          borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
         }}
       >
-        {/* Logo */}
-        <img
-          src="/logo.svg"
-          alt="Logo"
-          style={{ height: "40px" }}
-        />
+        {/* Logo with glow */}
+        <div className="hover-lift">
+          <img
+            src="/logo.svg"
+            alt="Logo"
+            style={{ 
+              height: "40px",
+              filter: "drop-shadow(0 0 10px rgba(227, 24, 55, 0.3))",
+            }}
+          />
+        </div>
 
         {/* User Menu */}
         <UserMenu user={user} />
@@ -180,89 +249,253 @@ export default function ChatArea() {
           justifyContent: "center",
           padding: "24px",
           paddingBottom: "120px",
+          position: "relative",
+          zIndex: 1,
         }}
       >
-        {/* Greeting */}
+        {/* Greeting with enhanced design */}
         <div
+          className="animate-fade-in-up"
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "16px",
-            marginBottom: "48px",
+            gap: "20px",
+            marginBottom: "24px",
           }}
         >
           <div
+            className="hover-lift"
             style={{
-              width: "56px",
-              height: "56px",
-              background: "#E31837",
-              borderRadius: "12px",
+              width: "72px",
+              height: "72px",
+              background: "linear-gradient(135deg, #E31837 0%, #FF6B00 100%)",
+              borderRadius: "20px",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               flexShrink: 0,
+              boxShadow: "0 8px 32px rgba(227, 24, 55, 0.4)",
+              position: "relative",
             }}
           >
-            <svg width="28" height="28" viewBox="0 0 28 28">
-              <text x="6" y="22" fontSize="22" fontWeight="bold" fill="#FFFFFF" fontFamily="Arial, sans-serif">
+            <svg width="36" height="36" viewBox="0 0 36 36">
+              <text x="8" y="28" fontSize="28" fontWeight="bold" fill="#FFFFFF" fontFamily="Arial, sans-serif">
                 T
               </text>
             </svg>
+            <Sparkles 
+              size={16} 
+              style={{
+                position: "absolute",
+                top: "-4px",
+                right: "-4px",
+                color: "#FF6B00",
+                filter: "drop-shadow(0 0 4px rgba(255, 107, 0, 0.8))",
+              }}
+            />
           </div>
-          <Title
-            level={1}
-            className="text-fluid-xl animate-fade-in-up"
-            style={{
-              color: dt.colors.dark.text,
-              fontWeight: dt.typography.fontWeight.normal,
-              margin: 0,
-              whiteSpace: "nowrap",
-            }}
+          <div>
+            <Title
+              level={1}
+              className="text-fluid-xl"
+              style={{
+                color: "#FFFFFF",
+                fontWeight: 700,
+                margin: 0,
+                background: "linear-gradient(135deg, #FFFFFF 0%, #CCCCCC 100%)",
+                backgroundClip: "text",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                letterSpacing: "-0.02em",
+              }}
+            >
+              Hola, {user?.full_name || user?.email?.split('@')[0] || 'Usuario'}
+            </Title>
+            <p style={{ 
+              color: "#999999", 
+              fontSize: "16px", 
+              margin: "4px 0 0 0",
+              fontWeight: 500,
+            }}>
+              ¿En qué puedo ayudarte hoy?
+            </p>
+          </div>
+        </div>
+
+        {/* Dashboard Stats - Muestra métricas empresariales */}
+        <div style={{ maxWidth: "1200px", width: "100%", marginBottom: "32px" }} className="animate-fade-in-up">
+          <DashboardStats 
+            token={typeof window !== 'undefined' ? localStorage.getItem('access_token') || undefined : undefined}
+            autoFetch={true}
+          />
+        </div>
+
+        {/* Smart Assistant - Sugerencias proactivas */}
+        <div style={{ 
+          maxWidth: "1200px", 
+          width: "100%",
+          display: "grid",
+          gridTemplateColumns: "2fr 1fr",
+          gap: "20px",
+          marginBottom: "32px",
+        }} className="animate-fade-in-up">
+          <SmartAssistant 
+            workspaceName={activeWorkspace?.name || 'tus workspaces'}
+            token={typeof window !== 'undefined' ? localStorage.getItem('access_token') || undefined : undefined}
+            workspaceId={activeWorkspace?.id}
+            autoFetch={true}
+          />
+          <div>
+            <TodoList />
+            <UpcomingDeadlines />
+          </div>
+        </div>
+
+        {/* Quick Actions Section */}
+        <div style={{ 
+          maxWidth: "1200px", 
+          width: "100%",
+          marginBottom: "32px",
+        }} className="animate-fade-in-up">
+          <h3 style={{
+            fontSize: "18px",
+            fontWeight: 600,
+            color: "#FFFFFF",
+            marginBottom: "16px",
+            textAlign: "center",
+          }}>
+            ⚡ Acciones Rápidas Empresariales
+          </h3>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+            gap: "20px",
+          }}>
+            <div onClick={() => setIsRfpModalOpen(true)} style={{ cursor: 'pointer' }}>
+              <FeatureCard
+                icon={<Zap />}
+                title="Análisis Rápido RFP"
+                description="Analiza documentos RFP en 30 segundos con IA"
+                gradient="linear-gradient(135deg, #E31837 0%, #C41530 100%)"
+              />
+            </div>
+            <div onClick={() => router.push('/workspace')} style={{ cursor: 'pointer' }}>
+              <FeatureCard
+                icon={<Folder />}
+                title="Mis Workspaces"
+                description="Organiza proyectos por cliente o tipo"
+                gradient="linear-gradient(135deg, #3B82F6 0%, #1E40AF 100%)"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Diferenciador clave */}
+        <div 
+          style={{ 
+            maxWidth: "800px",
+            width: "100%",
+            marginBottom: "32px",
+            textAlign: "center",
+          }}
+        >
+          <p style={{ 
+            fontSize: "14px", 
+            color: "#666666",
+            marginBottom: "12px",
+          }}>
+            No es solo un chat.
+          </p>
+          <h3 style={{
+            fontSize: "20px",
+            fontWeight: 600,
+            color: "#FFFFFF",
+            marginBottom: "16px",
+            background: "linear-gradient(135deg, #E31837 0%, #FF6B00 100%)",
+            backgroundClip: "text",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+          }}>
+            Es tu asistente empresarial especializado en análisis de propuestas
+          </h3>
+          <ModernButton
+            variant="ghost"
+            size="small"
+            onClick={() => setShowValueProposition(true)}
+            icon={<InfoCircleOutlined />}
           >
-            Hola, {user?.full_name || user?.email?.split('@')[0] || 'Usuario'}
-          </Title>
+            Ver diferencias con ChatGPT
+          </ModernButton>
         </div>
 
         {/* Input Area */}
-        <div style={{ width: "100%", maxWidth: "760px" }} className="animate-fade-in-up">
+        <div style={{ width: "100%", maxWidth: "800px" }} className="animate-fade-in-up">
           <GlassCard
             hover
             style={{
-              padding: dt.spacing.lg,
-              marginBottom: dt.spacing.lg,
+              padding: "24px",
+              marginBottom: "20px",
+              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
             }}
           >
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'flex-start', 
+              gap: '8px',
+              marginBottom: '12px',
+            }}>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: '13px', color: '#999999', fontWeight: 500 }}>
+                  Pregunta algo específico
+                  <InfoTooltip
+                    title="Ejemplos de preguntas"
+                    content={
+                      <ul style={{ margin: 0, paddingLeft: '18px' }}>
+                        <li>"¿Cuáles son los requisitos obligatorios?"</li>
+                        <li>"Genera matriz de requisitos funcionales"</li>
+                        <li>"Crea checklist de cumplimiento"</li>
+                        <li>"¿Qué documentos faltan para la propuesta?"</li>
+                      </ul>
+                    }
+                  />
+                </span>
+              </div>
+            </div>
             <TextArea
-              placeholder="Preguntale a ChatGPT o Velvet..."
+              placeholder="Ej: '¿Cuáles son los requisitos funcionales del RFP?' o 'Genera matriz de requisitos técnicos'"
               value={message}
               onChange={handleMessageChange}
               onKeyDown={handleKeyPress}
-              autoSize={{ minRows: 1, maxRows: 4 }}
+              autoSize={{ minRows: 2, maxRows: 6 }}
               style={{
                 background: "transparent",
                 border: "none",
                 boxShadow: "none",
                 outline: "none",
-                color: dt.colors.dark.textMuted,
-                fontSize: dt.typography.fontSize.base,
+                color: "#FFFFFF",
+                fontSize: "16px",
                 padding: 0,
                 resize: "none",
-                marginBottom: dt.spacing.md,
+                marginBottom: "20px",
               }}
               styles={{
                 textarea: {
                   background: "transparent",
-                  color: dt.colors.dark.textMuted,
+                  color: "#FFFFFF",
+                  fontWeight: 400,
                 }
               }}
             />
 
-            {/* Bottom row */}
+            {/* Bottom row with enhanced design */}
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "12px",
+                gap: "16px",
+                paddingTop: "16px",
+                borderTop: "1px solid rgba(255, 255, 255, 0.05)",
               }}
             >
               {/* Plus button - File Upload */}
@@ -273,28 +506,36 @@ export default function ChatArea() {
               >
                 <Button
                   type="text"
-                  icon={<PlusOutlined style={{ fontSize: "18px" }} />}
+                  icon={<PlusOutlined style={{ fontSize: "20px" }} />}
+                  className="hover-lift"
                   style={{
-                    color: "#888888",
-                    background: "transparent",
-                    border: "none",
-                    padding: 0,
-                    width: "auto",
-                    height: "auto",
-                    flexShrink: 0,
+                    color: "#999999",
+                    background: "rgba(255, 255, 255, 0.05)",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    borderRadius: "10px",
+                    padding: "8px 12px",
+                    height: "40px",
+                    transition: "all 0.3s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(227, 24, 55, 0.1)"
+                    e.currentTarget.style.borderColor = "rgba(227, 24, 55, 0.3)"
+                    e.currentTarget.style.color = "#E31837"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)"
+                    e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.1)"
+                    e.currentTarget.style.color = "#999999"
                   }}
                 />
               </Upload>
 
-              {/* Spacer */}
-              <div style={{ flex: 1 }} />
-
-              {/* Model selector */}
+              {/* Model selector with modern design */}
               <Select
                 value={model}
                 onChange={setModel}
-                suffixIcon={<DownOutlined style={{ color: "#888888", fontSize: "10px" }} />}
-                style={{ width: "150px" }}
+                suffixIcon={<DownOutlined style={{ color: "#888888", fontSize: "12px" }} />}
+                style={{ width: "180px" }}
                 variant="borderless"
                 styles={{
                   popup: { root: { background: "#1A1A1C" } },
@@ -330,42 +571,27 @@ export default function ChatArea() {
             style={{
               display: "flex",
               justifyContent: "center",
-              gap: "12px",
+              gap: "16px",
               flexWrap: "wrap",
             }}
           >
-            <Button
+            <ModernButton
               onClick={() => setIsRfpModalOpen(true)}
               aria-label="Analizar documento RFP rápidamente"
-              className="glass-card hover-lift"
-              style={{
-                color: dt.colors.dark.textMuted,
-                display: "flex",
-                alignItems: "center",
-                gap: dt.spacing.sm,
-                padding: `${dt.spacing.sm} ${dt.spacing.lg}`,
-                height: "auto",
-                borderRadius: dt.radius.xl,
-                fontSize: dt.typography.fontSize.sm,
-                border: `1px solid ${dt.colors.dark.border}`,
-              }}
-              icon={<RocketOutlined style={{ color: dt.colors.accent.orange }} />}
+              variant="gradient"
+              glow
+              icon={<RocketOutlined />}
             >
-              Analisis rapido RPF
-            </Button>
-            <Button
-              style={{
-                background: "#1A1A1C",
-                border: "1px solid #333333",
-                color: "#CCCCCC",
-                padding: "8px 20px",
-                height: "auto",
-                borderRadius: "20px",
-                fontSize: "14px",
-              }}
+              Análisis Rápido RFP
+            </ModernButton>
+            
+            <ModernButton
+              onClick={() => router.push("/workspace")}
+              variant="ghost"
+              icon={<InfoCircleOutlined />}
             >
-              Resumen rapido
-            </Button>
+              Explorar Funciones
+            </ModernButton>
           </div>
         </div>
       </main>
@@ -718,6 +944,10 @@ export default function ChatArea() {
                           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-lg text-xs font-medium">
                             <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                               <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" />
+      <AnalysisTemplates
+        open={showTemplates}
+        onClose={() => setShowTemplates(false)}
+      />
                             </svg>
                             {miembro.experiencia}
                           </span>
@@ -745,6 +975,16 @@ export default function ChatArea() {
           </div>
         )}
       </Modal>
+      
+      {/* Modales de UX mejorada */}
+      <ValuePropositionModal 
+        open={showValueProposition} 
+        onClose={() => setShowValueProposition(false)} 
+      />
+      <OnboardingModal 
+        open={showOnboarding} 
+        onClose={() => setShowOnboarding(false)} 
+      />
     </div>
   )
 }
