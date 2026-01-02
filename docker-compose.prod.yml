@@ -3,20 +3,20 @@ version: '3.8'
 services:
   # --- Reverse Proxy (Entry Point) ---
   nginx:
-    image: us-central1-docker.pkg.dev/tivit-caso01/ia-platform/nginx:latest
+    build:
+      context: ./nginx
     ports:
       - "80:80"
       - "443:443"
-    links:
-      - frontend
-      - backend
     depends_on:
       - frontend
       - backend
 
   # --- Application Services ---
   backend:
-    image: us-central1-docker.pkg.dev/tivit-caso01/ia-platform/backend:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
     container_name: ia_backend
     env_file: .env
     environment:
@@ -35,14 +35,21 @@ services:
     command: uvicorn main:app --host 0.0.0.0 --port 8000
 
   frontend:
-    image: us-central1-docker.pkg.dev/tivit-caso01/ia-platform/frontend:latest
+    build:
+      context: ./front-v2
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
+        - NEXT_PUBLIC_RAG_SERVICE_URL=${NEXT_PUBLIC_RAG_SERVICE_URL}
     container_name: ia_frontend
     env_file: .env
     depends_on:
       - backend
 
   rag-service:
-    image: us-central1-docker.pkg.dev/tivit-caso01/ia-platform/rag-service:latest
+    build:
+      context: ./rag-service
+      dockerfile: Dockerfile.dev
     container_name: ia_rag_service
     env_file: .env
     environment:
@@ -53,7 +60,9 @@ services:
       - qdrant
 
   celery_worker:
-    image: us-central1-docker.pkg.dev/tivit-caso01/ia-platform/backend:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
     container_name: ia_celery_worker
     env_file: .env
     environment:
@@ -67,7 +76,7 @@ services:
       - backend
       - redis
 
-  # --- Data Services ---
+  # --- Data Services (Standard Images) ---
   mysql:
     image: mysql:8.0
     container_name: ia_mysql

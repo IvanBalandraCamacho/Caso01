@@ -1,119 +1,54 @@
-name: Deploy to Compute Engine
+name: Deploy to Compute Engine (CI/CD)
 
 on:
-    push:
-        branches:
-            - main
-        paths-ignore:
-            - "README.md"
-            - "docs/**"
-
-env:
-    PROJECT_ID: tivit-caso01
-    REGION: us-central1
-    GAR_REPO: ia-platform
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "README.md"
+      - "docs/**"
 
 jobs:
-    build-and-push:
-        name: Build & Push Images
-        runs-on: ubuntu-latest
-        permissions:
-            contents: "read"
-            id-token: "write"
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
 
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.GCE_INSTANCE_IP }}
+          username: ${{ secrets.GCE_SSH_USER }}
+          key: ${{ secrets.GCE_SSH_KEY }}
+          script: |
+            # 1. Configuración Inicial (Solo la primera vez o si cambia)
+            # Instalar Docker si no existe
+            if ! command -v docker &> /dev/null; then
+                curl -fsSL https://get.docker.com -o get-docker.sh
+                sudo sh get-docker.sh
+                sudo usermod -aG docker $USER
+            fi
 
-            - name: Google Auth
-              uses: "google-github-actions/auth@v2"
-              with:
-                  credentials_json: "${{ secrets.GCP_SA_KEY }}"
+            # Crear directorio de la app
+            mkdir -p ~/app
+            cd ~/app
 
-            - name: Docker Auth
-              run: |
-                  gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+            # 2. Obtener últimas cambios del Repositorio (CI/CD)
+            # Si el directorio .git no existe, clonamos. Si existe, hacemos pull.
+            if [ ! -d ".git" ]; then
+                git clone https://github.com/${{ github.repository }} .
+            else
+                git fetch origin
+                git reset --hard origin/main
+            fi
 
-            # 1. Build Nginx
-            - name: Build Nginx
-              run: |
-                  docker build -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.GAR_REPO }}/nginx:latest ./nginx
-                  docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.GAR_REPO }}/nginx:latest
+            # 3. Inyectar Variables de Entorno (Secrets)
+            echo "${{ secrets.ENV_FILE_PRODUCTION }}" > .env
 
-            # 2. Build Backend
-            - name: Build Backend
-              run: |
-                  docker build -f backend/Dockerfile.dev -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.GAR_REPO }}/backend:latest ./backend
-                  docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.GAR_REPO }}/backend:latest
+            # 4. Desplegar con Docker Compose
+            # --build asegura que se reconstruyan las imágenes con el nuevo código
+            docker compose -f docker-compose.prod.yml down --remove-orphans
+            docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
 
-            # 3. Build Frontend
-            # Note: We pass the proxy path as API URL because Nginx handles the routing on the same domain
-            - name: Build Frontend
-              run: |
-                  docker build \
-                    --build-arg NEXT_PUBLIC_API_BASE_URL=/api/v1 \
-                    -f front-v2/Dockerfile.dev \
-                    -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.GAR_REPO }}/frontend:latest ./front-v2
-                  docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.GAR_REPO }}/frontend:latest
-
-            # 4. Build RAG Service
-            - name: Build RAG Service
-              run: |
-                  docker build -f rag-service/Dockerfile.dev -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.GAR_REPO }}/rag-service:latest ./rag-service
-                  docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.GAR_REPO }}/rag-service:latest
-
-    deploy:
-        name: Deploy to VM
-        needs: build-and-push
-        runs-on: ubuntu-latest
-
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
-
-            # Prepare files to copy
-            - name: Create .env file from secrets
-              run: |
-                  echo "${{ secrets.ENV_FILE_PRODUCTION }}" > .env
-
-            - name: Setup SSH
-              uses: appleboy/ssh-action@master
-              with:
-                  host: ${{ secrets.GCE_INSTANCE_IP }}
-                  username: ${{ secrets.GCE_SSH_USER }}
-                  key: ${{ secrets.GCE_SSH_KEY }}
-                  script: |
-                      # 1. Create app directory if not exists
-                      mkdir -p ~/app
-                      cd ~/app
-
-                      # 2. Login to Google Artifact Registry on VM (if not using public images)
-                      # Make sure the VM service account has 'Artifact Registry Reader' permission
-                      # gcloud auth configure-docker us-central1-docker.pkg.dev
-
-                      # 3. Stop current containers (optional, strictly speaking up -d handles recreation)
-                      # docker compose -f docker-compose.prod.yml down --remove-orphans
-
-            - name: Copy files to VM
-              uses: appleboy/scp-action@master
-              with:
-                  host: ${{ secrets.GCE_INSTANCE_IP }}
-                  username: ${{ secrets.GCE_SSH_USER }}
-                  key: ${{ secrets.GCE_SSH_KEY }}
-                  source: "docker-compose.prod.yml,.env"
-                  target: "~/app"
-
-            - name: Start Services
-              uses: appleboy/ssh-action@master
-              with:
-                  host: ${{ secrets.GCE_INSTANCE_IP }}
-                  username: ${{ secrets.GCE_SSH_USER }}
-                  key: ${{ secrets.GCE_SSH_KEY }}
-                  script: |
-                      cd ~/app
-                      # Pull latest images
-                      docker compose -f docker-compose.prod.yml pull
-                      # Start services
-                      docker compose -f docker-compose.prod.yml up -d --remove-orphans
-                      # Prune old images to save space
-                      docker system prune -f
+            # 5. Limpieza de imágenes antiguas para no llenar disco
+            docker system prune -f
