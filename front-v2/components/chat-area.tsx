@@ -2,8 +2,8 @@
 
 import type React from "react"
 
-import { PlusOutlined, RocketOutlined, DownOutlined, SendOutlined, InfoCircleOutlined, UploadOutlined, DownloadOutlined, FilePdfOutlined, FileWordOutlined, LoadingOutlined } from "@ant-design/icons"
-import { Button, Select, Typography, Input, Upload, App, Modal, Spin, Descriptions, Tag, Divider } from "antd"
+import { PlusOutlined, RocketOutlined, DownOutlined, SendOutlined, InfoCircleOutlined, UploadOutlined, DownloadOutlined, FilePdfOutlined, FileWordOutlined, LoadingOutlined, CloseOutlined, BarChartOutlined } from "@ant-design/icons"
+import { Button, Select, Typography, Input, Upload, App, Modal, Spin, Descriptions, Tag, Divider, Drawer, Card, Table } from "antd"
 import type { UploadProps, UploadFile } from "antd"
 import { useState, useCallback, memo, useEffect } from "react"
 import { useRouter } from "next/navigation"
@@ -25,6 +25,12 @@ import { AnalysisTemplates } from "@/components/ui/AnalysisTemplates"
 import { dt } from "@/lib/design-tokens"
 import { Sparkles, Zap, Shield, Globe, FileText, Target, Folder } from "lucide-react"
 
+// CopilotKit Imports
+import { CopilotPopup } from "@copilotkit/react-ui"
+import { useCopilotChatActions } from "@/hooks/useCopilotChat"
+import { DataVisualization } from "@/components/chat/DataVisualization"
+import "@copilotkit/react-ui/styles.css"
+
 const { Text, Title } = Typography
 const { TextArea } = Input
 
@@ -35,6 +41,21 @@ export function ChatArea() {
   const router = useRouter()
   const { activeWorkspace, setSelectedModel } = useWorkspaceContext()
   const { modal, message: antMessage } = App.useApp()
+
+  // CopilotKit Integration
+  const [dataDrawerOpen, setDataDrawerOpen] = useState(false);
+  const { generatedData, isGenerating, clearGeneratedData } = useCopilotChatActions({
+    workspaceId: activeWorkspace?.id || "general",
+    documentContext: analysisResult ? JSON.stringify(analysisResult) : undefined,
+    onDataGenerated: (data, type) => {
+      setDataDrawerOpen(true);
+      antMessage.success(`Datos generados: ${type}`);
+    },
+    onProposalGenerated: (proposal) => {
+      console.log('Proposal generated:', proposal);
+      antMessage.success("Propuesta generada correctamente");
+    },
+  });
 
   // Estados para el análisis RFP
   const [isRfpModalOpen, setIsRfpModalOpen] = useState(false)
@@ -984,6 +1005,96 @@ export function ChatArea() {
       <OnboardingModal 
         open={showOnboarding} 
         onClose={() => setShowOnboarding(false)} 
+      />
+
+      {/* Floating Action Button for Generated Data */}
+      {generatedData.length > 0 && (
+        <div style={{ position: 'fixed', bottom: '100px', right: '32px', zIndex: 50 }}>
+          <Button
+            type="primary"
+            shape="round"
+            icon={<BarChartOutlined />}
+            onClick={() => setDataDrawerOpen(true)}
+            size="large"
+            className="animate-bounce"
+            style={{ 
+              background: '#E31837', 
+              borderColor: '#E31837',
+              boxShadow: '0 4px 12px rgba(227, 24, 55, 0.4)' 
+            }}
+          >
+            {generatedData.length} Datos Generados
+          </Button>
+        </div>
+      )}
+
+      {/* Data Drawer */}
+      <Drawer
+        title="Datos Generados por IA"
+        placement="right"
+        width={600}
+        open={dataDrawerOpen}
+        onClose={() => setDataDrawerOpen(false)}
+        extra={
+          <Button 
+            type="text" 
+            icon={<CloseOutlined />}
+            onClick={() => {
+              clearGeneratedData();
+              setDataDrawerOpen(false);
+            }}
+          >
+            Limpiar
+          </Button>
+        }
+        styles={{
+          body: { background: '#131314', padding: '24px' },
+          header: { background: '#1E1F20', borderBottom: '1px solid #333', color: 'white' },
+          content: { background: '#131314' }
+        }}
+      >
+        <div className="space-y-6">
+          {generatedData.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              No hay datos generados aún. Usa el chat para solicitar tablas, matrices o análisis.
+            </div>
+          ) : (
+            generatedData.map((data, i) => (
+              <div key={i} className="mb-6">
+                <DataVisualization
+                  title={data.title}
+                  data={data.data}
+                  columns={data.columns || []}
+                  type={data.type as any}
+                />
+              </div>
+            ))
+          )}
+        </div>
+      </Drawer>
+
+      {/* CopilotKit Popup */}
+      <CopilotPopup
+        labels={{
+          title: "Asistente de Propuestas",
+          initial: "Puedo ayudarte a:\n\n• Generar propuestas comerciales\n• Extraer datos en tablas\n• Calcular cotizaciones\n• Analizar riesgos\n\n¿Qué necesitas?",
+          placeholder: "Ej: Genera una propuesta en Word...",
+        }}
+        instructions={`
+          Eres un experto asistente de TIVIT para generación de propuestas comerciales.
+          
+          Workspace ID: ${activeWorkspace?.id || "general"}
+          
+          Puedes:
+          1. Generar propuestas comerciales completas
+          2. Crear secciones específicas (metodología, cronograma, inversión)
+          3. Extraer datos en formato tabla
+          4. Calcular cotizaciones preliminares
+          5. Analizar riesgos legales
+          
+          Usa las acciones disponibles cuando sea apropiado.
+        `}
+        shortcut="mod+shift+p"
       />
     </div>
   )

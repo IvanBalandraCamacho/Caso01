@@ -1,0 +1,51 @@
+/* Estilos para tablas en modo oscuro */
+.dark-table .ant-table {
+  background: transparent;
+}
+
+.dark-table .ant-table-thead > tr > th {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: #a1a1aa !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+.dark-table .ant-table-tbody > tr > td {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  color: #e4e4e7 !important;
+}
+
+.dark-table .ant-table-tbody > tr:hover > td {
+  background: rgba(255, 255, 255, 0.03) !important;
+}
+
+.dark-table .ant-table-tbody > tr.ant-table-row-selected > td {
+  background: rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Tabs en modo oscuro */
+.dark-tabs .ant-tabs-tab {
+  color: #71717a;
+}
+
+.dark-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: #ffffff !important;
+}
+
+.dark-tabs .ant-tabs-ink-bar {
+  background: #E31837 !important;
+}
+
+/* Cards en modo oscuro */
+.dark-card {
+  background: rgba(30, 31, 32, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.dark-card:hover {
+  border-color: rgba(227, 24, 55, 0.3);
+}

@@ -8,6 +8,7 @@ import QueryProvider from "@/providers/QueryProvider"
 import { WorkspaceProvider } from "@/context/WorkspaceContext"
 import { AuthGuard } from "@/components/AuthGuard"
 import { ErrorBoundary } from "@/components/ErrorBoundary"
+import { CopilotProvider } from "@/providers/CopilotProvider"
 import "./globals.css"
 
 const _geist = Geist({ subsets: ["latin"] })
@@ -45,15 +46,17 @@ export default function RootLayout({
       <body className={`font-sans antialiased`} suppressHydrationWarning>
         <AntdStyleRegistry>
           <ClientProviders>
-            <QueryProvider>
-              <WorkspaceProvider>
-                <ErrorBoundary>
-                  <AuthGuard>
-                    {children}
-                  </AuthGuard>
-                </ErrorBoundary>
-              </WorkspaceProvider>
-            </QueryProvider>
+            <CopilotProvider>
+              <QueryProvider>
+                <WorkspaceProvider>
+                  <ErrorBoundary>
+                    <AuthGuard>
+                      {children}
+                    </AuthGuard>
+                  </ErrorBoundary>
+                </WorkspaceProvider>
+              </QueryProvider>
+            </CopilotProvider>
           </ClientProviders>
         </AntdStyleRegistry>
         <Analytics />

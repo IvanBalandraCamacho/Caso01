@@ -30,6 +30,9 @@ import { useWorkspaceContext } from "@/context/WorkspaceContext"
 import { fetchWorkspaceDocuments, deleteDocumentApi, uploadDocumentApi, createConversationApi, uploadDocumentToConversation } from "@/lib/api"
 import type { DocumentPublic } from "@/types/api"
 import { ArrowDown, ArrowRight, ChevronDown, ChevronRight, Rocket, FileText } from "lucide-react"
+import { InteractiveAnalysisResults } from "@/components/rfp/InteractiveAnalysisResults"
+import { useCopilotAnalysisActions } from "@/hooks/useCopilotAnalysisActions"
+import { AnalysisCopilotPanel } from "@/components/rfp/AnalysisCopilotPanel"
 
 const { Sider } = Layout
 const { Text } = Typography
@@ -330,6 +333,13 @@ export default function Sidebar() {
     deleteWorkspace: deleteWorkspaceApi,
     deleteConversation: deleteConversationApi,
   } = useWorkspaceContext()
+
+  // Hook de CopilotKit para acciones de análisis (debe estar después de useWorkspaceContext)
+  useCopilotAnalysisActions({
+    analysisResult,
+    onResultUpdate: setAnalysisResult,
+    workspaceId: activeWorkspace?.id,
+  });
 
   // Cargar workspaces al montar el componente - solo una vez
   useEffect(() => {
@@ -2155,7 +2165,7 @@ export default function Sidebar() {
         }
         open={isResultModalOpen}
         onCancel={() => setIsResultModalOpen(false)}
-        width={1000}
+        width={1200}
         style={{
           top: 20,
           paddingBottom: 0
@@ -2163,7 +2173,7 @@ export default function Sidebar() {
         styles={{
           body: {
             background: '#1A1A1A',
-            padding: '32px',
+            padding: '24px',
             maxHeight: '80vh',
             overflow: 'hidden'
           },
@@ -2177,285 +2187,20 @@ export default function Sidebar() {
             padding: 0
           }
         } as any}
-        footer={[
-          <div key="actions" style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            background: '#18181b',
-            padding: '20px 32px',
-            borderTop: '1px solid #27272a'
-          }}>
-            <div style={{ color: '#888', fontSize: '13px' }}>
-              {analysisResult?.cliente && `Cliente: ${analysisResult.cliente}`}
-            </div>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <Button
-                key="docx"
-                icon={<FileWordOutlined />}
-                loading={isDownloading}
-                onClick={() => handleDownloadDocument('docx')}
-                className="h-10 px-6 rounded-lg font-medium"
-                style={{
-                  background: '#1E3A8A',
-                  borderColor: '#1E3A8A',
-                  color: '#FFFFFF'
-                }}
-              >
-                Word
-              </Button>
-              <Button
-                key="pdf"
-                icon={<FilePdfOutlined />}
-                loading={isDownloading}
-                onClick={() => handleDownloadDocument('pdf')}
-                className="h-10 px-6 rounded-lg font-medium"
-                style={{
-                  background: '#7F1D1D',
-                  borderColor: '#7F1D1D',
-                  color: '#FFFFFF'
-                }}
-              >
-                PDF
-              </Button>
-            </div>
-          </div>
-        ]}
+        footer={null}
       >
         {analysisResult && (
-          <div className="max-h-[70vh] overflow-y-auto overflow-x-hidden space-y-6 pr-2">
-            {/* Hero Section - Cliente y Presupuesto */}
-            <div className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-8 shadow-2xl">
-              <div className="grid md:grid-cols-2 gap-8">
-                {/* Cliente */}
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/>
-                      </svg>
-                    </div>
-                    <span className="text-zinc-300 text-sm font-semibold uppercase tracking-wider">
-                      Cliente
-                    </span>
-                  </div>
-                  <h2 className="text-white text-3xl font-bold bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
-                    {analysisResult.cliente || 'No especificado'}
-                  </h2>
-                </div>
-
-                {/* Presupuesto */}
-                <div className="md:text-right">
-                  <div className="flex items-center gap-2 mb-3 md:justify-end">
-                    <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center">
-                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd"/>
-                      </svg>
-                    </div>
-                    <span className="text-zinc-300 text-sm font-semibold uppercase tracking-wider">
-                      Presupuesto Total
-                    </span>
-                  </div>
-                  {analysisResult.alcance_economico?.presupuesto && 
-                   !analysisResult.alcance_economico.presupuesto.toLowerCase().includes('no especific') ? (
-                    <>
-                      <div className="text-emerald-400 text-4xl font-bold font-mono">
-                        {analysisResult.alcance_economico.moneda?.split('(')[0].trim() || ''} {analysisResult.alcance_economico.presupuesto}
-                      </div>
-                      {analysisResult.alcance_economico.moneda?.match(/\((.*?)\)/)?.[1] && (
-                        <p className="text-zinc-400 text-sm mt-2 font-medium">
-                          {analysisResult.alcance_economico.moneda.match(/\((.*?)\)/)?.[1]}
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    <div className="text-zinc-500 text-lg font-medium">
-                      No especificado
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Objetivo Principal */}
-            {analysisResult.objetivo_general?.length > 0 && (
-              <div className="bg-gradient-to-br from-red-900/10 to-orange-900/10 border border-red-500/30 rounded-xl p-6 hover:border-red-500/50 transition-all">
-                <div className="flex items-center gap-3 mb-5">
-                  <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-orange-500 rounded-xl flex items-center justify-center shadow-lg">
-                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v3.57A22.952 22.952 0 0110 13a22.95 22.95 0 01-8-1.43V8a2 2 0 012-2h2zm2-1a1 1 0 011-1h2a1 1 0 011 1v1H8V5zm1 5a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd"/>
-                      <path d="M2 13.692V16a2 2 0 002 2h12a2 2 0 002-2v-2.308A24.974 24.974 0 0110 15c-2.796 0-5.487-.46-8-1.308z"/>
-                    </svg>
-                  </div>
-                  <h3 className="text-white text-lg font-bold">Objetivo del Proyecto</h3>
-                </div>
-                <div className="space-y-4">
-                  {analysisResult.objetivo_general.map((obj: string, index: number) => (
-                    <div key={index} className="flex items-start gap-3">
-                      <div className="w-6 h-6 bg-red-500/20 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                      </div>
-                      <p className="text-zinc-200 text-base leading-relaxed flex-1">
-                        {obj}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Timeline de Plazos */}
-            {analysisResult.fechas_y_plazos?.length > 0 && (
-              <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-8 h-8 bg-blue-500/10 rounded-lg flex items-center justify-center">
-                    <div className="w-3 h-3 bg-blue-500 rounded"></div>
-                  </div>
-                  <h3 className="text-white text-base font-semibold">Plazos del Proyecto</h3>
-                </div>
-                <div className="grid md:grid-cols-2 gap-4">
-                  {analysisResult.fechas_y_plazos.map((plazo: any, index: number) => (
-                    <div key={index} className="bg-zinc-800/30 border border-zinc-700/50 rounded-lg p-4">
-                      <div className="text-zinc-400 text-xs font-medium mb-2">
-                        {plazo.tipo}
-                      </div>
-                      <div className="text-white text-lg font-semibold">
-                        {plazo.valor}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Tecnologías */}
-            {analysisResult.tecnologias_requeridas?.length > 0 && (
-              <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-8 h-8 bg-emerald-500/10 rounded-lg flex items-center justify-center">
-                    <div className="w-3 h-3 bg-emerald-500 rounded"></div>
-                  </div>
-                  <h3 className="text-white text-base font-semibold">Stack Tecnológico</h3>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {analysisResult.tecnologias_requeridas.map((tech: string, index: number) => (
-                    <span key={index} className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-lg text-sm font-medium">
-                      {tech}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Preguntas Clave */}
-            {analysisResult.preguntas_sugeridas?.length > 0 && (
-              <div className="bg-gradient-to-br from-amber-900/10 to-yellow-900/10 border border-amber-500/30 rounded-xl p-6 hover:border-amber-500/50 transition-all">
-                <div className="flex items-center gap-3 mb-5">
-                  <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-yellow-500 rounded-xl flex items-center justify-center shadow-lg">
-                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"/>
-                    </svg>
-                  </div>
-                  <h3 className="text-white text-lg font-bold">Preguntas Clave para el Cliente</h3>
-                </div>
-                <div className="space-y-3">
-                  {analysisResult.preguntas_sugeridas.map((pregunta: string, index: number) => (
-                    <div key={index} className="flex items-start gap-3 p-4 bg-amber-500/5 border border-amber-500/20 rounded-lg hover:border-amber-500/40 hover:bg-amber-500/10 transition-all group">
-                      <div className="flex-shrink-0 w-7 h-7 bg-gradient-to-br from-amber-500 to-yellow-500 rounded-lg flex items-center justify-center text-white text-sm font-bold shadow-md group-hover:scale-110 transition-transform">
-                        {index + 1}
-                      </div>
-                      <p className="text-zinc-200 text-sm leading-relaxed flex-1">
-                        {pregunta}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Equipo Propuesto */}
-            {analysisResult.equipo_sugerido?.length > 0 && (
-              <div className="bg-gradient-to-br from-purple-900/10 to-pink-900/10 border border-purple-500/30 rounded-xl p-6 hover:border-purple-500/50 transition-all">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg">
-                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-white text-lg font-bold">Equipo Recomendado</h3>
-                    <p className="text-zinc-400 text-sm">Roles profesionales sugeridos para el proyecto</p>
-                  </div>
-                </div>
-                <div className="grid md:grid-cols-2 gap-4">
-                  {analysisResult.equipo_sugerido.map((miembro: any, index: number) => {
-                    const avatarColors = [
-                      'bg-gradient-to-br from-blue-500 to-blue-600',
-                      'bg-gradient-to-br from-purple-500 to-purple-600',
-                      'bg-gradient-to-br from-pink-500 to-pink-600',
-                      'bg-gradient-to-br from-orange-500 to-orange-600',
-                      'bg-gradient-to-br from-teal-500 to-teal-600',
-                      'bg-gradient-to-br from-indigo-500 to-indigo-600',
-                    ];
-
-                    return (
-                      <div key={index} className="bg-zinc-800/30 border border-purple-500/20 rounded-xl p-5 hover:border-purple-500/40 hover:bg-zinc-800/50 transition-all group">
-                        {/* Header */}
-                        <div className="flex items-start gap-4 mb-4">
-                          <div className={`w-14 h-14 ${avatarColors[index % avatarColors.length]} rounded-xl flex items-center justify-center text-white font-bold text-xl flex-shrink-0 shadow-lg group-hover:scale-105 transition-transform`}>
-                            {miembro.nombre?.split(' ').map((n: string) => n[0]).join('').substring(0, 2) || '?'}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="text-white font-bold text-base mb-1.5">
-                              {miembro.nombre}
-                            </h4>
-                            <p className="text-zinc-300 text-sm leading-snug font-medium">
-                              {miembro.rol}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Experiencia */}
-                        {miembro.experiencia && (
-                          <div className="mb-4">
-                            <div className="inline-flex items-center gap-2 px-3.5 py-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 rounded-lg shadow-sm">
-                              <svg className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v3.57A22.952 22.952 0 0110 13a22.95 22.95 0 01-8-1.43V8a2 2 0 012-2h2zm2-1a1 1 0 011-1h2a1 1 0 011 1v1H8V5zm1 5a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd"/>
-                                <path d="M2 13.692V16a2 2 0 002 2h12a2 2 0 002-2v-2.308A24.974 24.974 0 0110 15c-2.796 0-5.487-.46-8-1.308z"/>
-                              </svg>
-                              <div className="flex items-baseline gap-1">
-                                <span className="text-amber-300 font-bold text-base">
-                                  {miembro.experiencia}
-                                </span>
-                                <span className="text-amber-400/80 text-xs font-medium">
-                                  años de experiencia
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Skills */}
-                        {miembro.skills?.length > 0 && (
-                          <div>
-                            <p className="text-purple-300 text-xs font-semibold mb-2.5 uppercase tracking-wider">Habilidades Clave</p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {miembro.skills.map((skill: string, idx: number) => (
-                                <span key={idx} className="px-2.5 py-1.5 bg-purple-500/10 border border-purple-500/30 text-purple-200 rounded-md text-xs font-medium">
-                                  {skill}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
+          <>
+            <InteractiveAnalysisResults
+              result={analysisResult}
+              onRefresh={() => handleRfpAnalysis()}
+              onExport={(format) => handleDownloadDocument(format as 'docx' | 'pdf')}
+            />
+            {/* Panel flotante de CopilotKit para el contexto del análisis */}
+            <AnalysisCopilotPanel 
+              analysisContext={JSON.stringify(analysisResult, null, 2)} 
+            />
+          </>
         )}
       </Modal>
 

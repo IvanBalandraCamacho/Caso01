@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 # from starlette.middleware.gzip import GZIPMiddleware
-from api.routes import health, workspaces, conversations, document_generation, auth, intention_task, tivit, notifications_ws, rag_proxy, general_chat, metrics, dashboard, workspace_analytics, templates
+from api.routes import health, workspaces, conversations, document_generation, auth, intention_task, tivit, notifications_ws, rag_proxy, general_chat, metrics, dashboard, workspace_analytics, templates, data_extraction
 # from api.routes import users  # Comentado: módulo no existe aún
 from exceptions import ServiceException
 from core.config import settings
@@ -122,6 +122,7 @@ app.include_router(workspace_analytics.router, prefix="/api/v1", tags=["Workspac
 app.include_router(templates.router, prefix="/api/v1", tags=["Templates"])
 app.include_router(workspaces.router, prefix="/api/v1", tags=["Workspaces"])
 app.include_router(conversations.router, prefix="/api/v1", tags=["Conversations"])
+app.include_router(data_extraction.router, prefix="/api/v1", tags=["Data Extraction"])
 app.include_router(
     document_generation.router, prefix="/api/v1", tags=["Document Generation"]
 )

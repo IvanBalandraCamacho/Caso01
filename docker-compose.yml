@@ -54,6 +54,8 @@ services:
     environment:
       - NODE_ENV=development
       - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
+      - NEXT_PUBLIC_COPILOT_ENABLED=true
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     volumes:
       - ./front-v2:/app           
       - /app/node_modules         
