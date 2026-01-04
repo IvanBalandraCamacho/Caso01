@@ -28,6 +28,7 @@ nest_asyncio
 # --- IA y LLM ---
 openai>=1.54.0  # Cliente requerido para OpenAI
 tenacity>=8.0.0  # Para retry logic en llamadas a LLM
+copilotkit  # SDK oficial para integración con CopilotKit
 
 # --- GCP Services ---
 google-cloud-secret-manager

@@ -16,11 +16,16 @@ export function CopilotProvider({ children }: CopilotProviderProps) {
     return <>{children}</>;
   }
 
-  // Usar el endpoint de API Route de Next.js que maneja OpenAI
+  // Usar el endpoint directo del Backend (Python/FastAPI)
+  const runtimeUrl = process.env.NEXT_PUBLIC_API_BASE_URL 
+    ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/copilot`
+    : "http://localhost:8000/api/v1/copilot";
+
   return (
     <CopilotKit 
-      runtimeUrl="/api/copilotkit"
+      runtimeUrl={runtimeUrl}
       showDevConsole={process.env.NODE_ENV === "development"}
+      agent="default"
     >
       {children}
     </CopilotKit>

@@ -1,195 +1,132 @@
-from fastapi import APIRouter, Request, Depends, Header
+from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
-from sqlalchemy.orm import Session
 from core.llm_service import get_provider
 from core.rag_client import rag_client
 from models.schemas import DocumentChunk
-from models.database import get_db
 import logging
 import json
-from typing import Optional
+import asyncio
 
 router = APIRouter(prefix="/copilot", tags=["CopilotKit"])
 logger = logging.getLogger(__name__)
 
-# System prompt para el copiloto de análisis RFP
+# System prompt para el copiloto
 COPILOT_SYSTEM_PROMPT = """
 Eres un experto asistente de análisis de RFPs (Request for Proposals) de TIVIT.
-
-Tu rol es ayudar a los usuarios a:
-1. Analizar documentos RFP de manera estructurada
-2. Identificar requisitos técnicos y funcionales
-3. Detectar fechas límite y plazos importantes
-4. Estimar presupuestos y alcances económicos
-5. Sugerir equipos técnicos adecuados
-6. Identificar riesgos y vacíos de información
-7. Generar preguntas de aclaración para el cliente
-
-Siempre basa tus respuestas en el contexto del documento proporcionado.
-Sé preciso, profesional y estructurado en tus respuestas.
+Tu objetivo es ayudar a analizar documentos, extraer datos y generar propuestas.
+Usa el contexto proporcionado para responder con precisión.
 """
+
+@router.post("")
+@router.post("/")
+async def copilot_chat(request: Request):
+    """
+    Endpoint principal para CopilotKit.
+    Maneja el protocolo de chat y streaming.
+    """
+    try:
+        body = await request.json()
+        messages = body.get("messages", [])
+        
+        # Extraer propiedades adicionales (contexto del frontend)
+        properties = body.get("properties", {})
+        workspace_id = properties.get("workspace_id")
+        
+        if not messages:
+            raise HTTPException(status_code=400, detail="No messages provided")
+
+        # Último mensaje del usuario
+        last_message = messages[-1].get("content", "")
+        
+        # Historial de chat (excluyendo el último)
+        chat_history = messages[:-1]
+
+        # 1. Recuperar Contexto RAG (si hay workspace)
+        rag_chunks = []
+        if workspace_id and workspace_id != "general":
+            try:
+                rag_results = await rag_client.search(
+                    query=last_message,
+                    workspace_id=workspace_id,
+                    limit=5
+                )
+                rag_chunks = [
+                    DocumentChunk(
+                        document_id=r.document_id,
+                        chunk_text=r.content,
+                        chunk_index=r.metadata.get("chunk_index", 0) if r.metadata else 0,
+                        score=r.score
+                    ) for r in rag_results
+                ]
+                logger.info(f"Retrieved {len(rag_chunks)} RAG chunks for workspace {workspace_id}")
+            except Exception as e:
+                logger.error(f"Error retrieving RAG context: {e}")
+
+        # 2. Generar respuesta (Streaming)
+        async def generate_stream():
+            try:
+                provider = get_provider()
+                
+                # Construir historial con system prompt
+                formatted_history = [
+                    {"role": "system", "content": COPILOT_SYSTEM_PROMPT}
+                ]
+                
+                # Adaptar mensajes al formato del provider
+                for m in chat_history:
+                    role = m.get("role", "user")
+                    if role not in ["user", "assistant", "system"]:
+                        role = "user"
+                    formatted_history.append({
+                        "role": role,
+                        "content": m.get("content", "")
+                    })
+
+                # Generar respuesta
+                # Nota: generate_response_stream es síncrono en la implementación actual de llm_service
+                # pero lo envolvemos para streaming asíncrono HTTP
+                iterator = provider.generate_response_stream(
+                    query=last_message,
+                    context_chunks=rag_chunks,
+                    chat_history=formatted_history
+                )
+
+                for chunk in iterator:
+                    # Formato SSE estándar
+                    yield f"data: {chunk}\n\n"
+                    # Pequeña pausa para no saturar el event loop si fuera muy rápido
+                    await asyncio.sleep(0.01)
+                
+                # Señal de terminación (opcional en algunos clientes, buena práctica)
+                yield "data: [DONE]\n\n"
+
+            except Exception as e:
+                logger.error(f"Streaming error: {e}")
+                # Enviar error como texto en el stream para que el usuario lo vea
+                yield f"data: Error generating response: {str(e)}\n\n"
+
+        return StreamingResponse(
+            generate_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "Access-Control-Allow-Origin": "*",
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error in copilot_chat: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)}
+        )
 
 @router.get("/info")
 async def copilot_info():
-    """
-    Endpoint de descubrimiento para CopilotKit.
-    Retorna la información del runtime según la especificación de CopilotKit.
-    """
+    """Endpoint de información (Health check para CopilotKit)"""
     return {
-        "runtime": "fastapi-copilotkit",
-        "version": "1.0.0",
-        "agents": [
-            {
-                "name": "default",
-                "description": "Asistente de Análisis RFP (TIVIT)",
-                "model": "gemini-2.0-flash-exp"
-            }
-        ],
-        "actions": []
+        "status": "active",
+        "provider": "python-fastapi",
+        "capabilities": ["chat", "rag", "actions"]
     }
-
-@router.post("/")
-async def copilot_runtime(
-    request: Request,
-    content_type: Optional[str] = Header(None)
-):
-    """
-    Endpoint runtime principal para CopilotKit.
-    Maneja tanto solicitudes de chat como de acciones.
-    """
-    try:
-        body = await request.json()
-        logger.info(f"Copilot request received: {json.dumps(body, indent=2)}")
-        
-        # Manejar diferentes tipos de solicitudes de CopilotKit
-        request_type = body.get("type", "chat")
-        
-        if request_type == "chat" or "messages" in body:
-            return await handle_chat_request(body)
-        elif request_type == "action":
-            return await handle_action_request(body)
-        else:
-            return JSONResponse(
-                content={"error": "Unknown request type"},
-                status_code=400
-            )
-        
-    except Exception as e:
-        logger.error(f"Error in copilot_runtime: {e}", exc_info=True)
-        return JSONResponse(
-            content={"error": str(e)},
-            status_code=500
-        )
-
-
-async def handle_chat_request(body: dict):
-    """
-    Maneja las solicitudes de chat del copiloto.
-    """
-    messages = body.get("messages", [])
-    properties = body.get("properties", {})
-    workspace_id = properties.get("workspace_id")
-    
-    if not messages:
-        return JSONResponse(
-            content={"error": "No messages provided"},
-            status_code=400
-        )
-
-    last_message = messages[-1].get("content", "")
-    chat_history = [m for m in messages[:-1] if m.get("role") != "system"]
-
-    # Obtener contexto RAG si hay workspace
-    rag_chunks = []
-    if workspace_id:
-        try:
-            rag_results = await rag_client.search(
-                query=last_message,
-                workspace_id=workspace_id,
-                limit=5
-            )
-            rag_chunks = [
-                DocumentChunk(
-                    document_id=r.document_id,
-                    chunk_text=r.content,
-                    chunk_index=r.metadata.get("chunk_index", 0) if r.metadata else 0,
-                    score=r.score
-                ) for r in rag_results
-            ]
-        except Exception as e:
-            logger.error(f"Error searching documents: {e}")
-    
-    # Generar respuesta con streaming
-    def generate():
-        try:
-            provider = get_provider()
-            enhanced_history = [{"role": "system", "content": COPILOT_SYSTEM_PROMPT}] + chat_history
-            
-            for chunk in provider.generate_response_stream(
-                query=last_message,
-                context_chunks=rag_chunks,
-                chat_history=enhanced_history
-            ):
-                yield f"data: {chunk}\n\n"
-            
-            yield "data: [DONE]\n\n"
-        except Exception as e:
-            logger.error(f"Error in streaming: {e}", exc_info=True)
-            error_msg = json.dumps({"error": str(e)})
-            yield f"data: {error_msg}\n\n"
-    
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
-        }
-    )
-
-
-async def handle_action_request(body: dict):
-    """
-    Maneja las solicitudes de acciones del copiloto.
-    """
-    action_name = body.get("action")
-    parameters = body.get("parameters", {})
-    
-    logger.info(f"Action request: {action_name} with params: {parameters}")
-    
-    # Implementar acciones específicas aquí
-    return JSONResponse(
-        content={
-            "success": True,
-            "message": f"Action {action_name} processed"
-        }
-    )
-
-@router.post("/action/{action_name}")
-async def execute_action(
-    action_name: str, 
-    request: Request,
-    db: Session = Depends(get_db)
-):
-    """
-    Ejecuta una acción del copiloto (Server-side actions).
-    """
-    try:
-        body = await request.json()
-        params = body.get("parameters", {})
-        
-        # Aquí se pueden implementar acciones específicas del backend
-        # Por ahora, retornamos éxito ya que la mayoría de acciones las maneja el frontend
-        
-        logger.info(f"Copilot Action received: {action_name} with params: {params}")
-        
-        if action_name == "extractDates":
-             # Ejemplo de implementación futura
-             return {"success": True, "dates": []}
-             
-        return {"success": True, "message": f"Action {action_name} processed"}
-        
-    except Exception as e:
-        logger.error(f"Error executing action {action_name}: {e}")
-        return {"error": str(e)}
