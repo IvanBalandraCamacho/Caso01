@@ -588,7 +588,7 @@ export default function ProfilePage() {
         onCancel={() => setShowPasswordModal(false)}
         footer={null}
         styles={{
-          content: {
+          body: {
             background: 'rgba(26, 26, 28, 0.95)',
             backdropFilter: 'blur(20px)',
             border: '1px solid rgba(255, 255, 255, 0.1)',

@@ -954,7 +954,7 @@ export default function ChatPage({
         centered
         width={400}
         closeIcon={<X className="text-zinc-500" />}
-        styles={{ content: { background: '#1E1F20', padding: 32 } }}
+        styles={{ body: { background: '#1E1F20', padding: 32 } }}
       >
         <div className="text-center">
           <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">🚧</div>

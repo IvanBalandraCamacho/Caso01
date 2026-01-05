@@ -33,12 +33,10 @@ logger = logging.getLogger(__name__)
 limiter = Limiter(key_func=get_remote_address)
 
 # --- Definir orígenes permitidos (CORS) ---
-# raw_origins = os.getenv(
-#     "CORS_ALLOWED_ORIGINS",
-#     "http://localhost:3000,http://127.0.0.1:3000,http://0.0.0.0:3000,http://localhost:3000/*",
-# )
-# origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
-origins = ["*"]  # DEBUG: Allow all origins
+raw_origins = os.getenv("CORS_ALLOWED_ORIGINS", "")
+origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+if not origins:
+    origins = ["*"] # Fallback controlado, idealmente vacío en prod
 
 # NOTA: create_tables_with_retry() comentado porque usamos Alembic para migraciones
 # Si no usas Alembic, descomenta esta función para crear tablas automáticamente
@@ -70,7 +68,7 @@ def create_tables_with_retry(max_retries=5, delay=3):
                 raise
 
 
-create_tables_with_retry()
+# create_tables_with_retry()  # Comentado para producción, usar Alembic
 
 # Inicializar GCP services
 logger.info("📊 Inicializando GCP services...")

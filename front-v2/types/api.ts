@@ -43,6 +43,7 @@ export interface UserPublic {
   full_name?: string | null;
   id: string;
   is_active: boolean;
+  profile_picture?: string | null;
   created_at: string; // ISO 8601 date-time
 }
 
