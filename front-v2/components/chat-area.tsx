@@ -392,7 +392,7 @@ export function ChatArea() {
             gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
             gap: "20px",
           }}>
-            <div onClick={() => setIsRfpModalOpen(true)} style={{ cursor: 'pointer' }}>
+            <div onClick={() => router.push('/quick-analysis')} style={{ cursor: 'pointer' }}>
               <FeatureCard
                 icon={<Zap />}
                 title="Análisis Rápido RFP"
@@ -597,7 +597,7 @@ export function ChatArea() {
             }}
           >
             <ModernButton
-              onClick={() => setIsRfpModalOpen(true)}
+              onClick={() => router.push('/quick-analysis')}
               aria-label="Analizar documento RFP rápidamente"
               variant="gradient"
               glow
@@ -616,74 +616,6 @@ export function ChatArea() {
           </div>
         </div>
       </main>
-
-      {/* Modal para subir archivo RFP */}
-      <Modal
-        title="Análisis Rápido RFP"
-        open={isRfpModalOpen}
-        onCancel={() => {
-          setIsRfpModalOpen(false)
-          setRfpFile(null)
-        }}
-        footer={[
-          <Button key="cancel" onClick={() => {
-            setIsRfpModalOpen(false)
-            setRfpFile(null)
-          }}>
-            Cancelar
-          </Button>,
-          <Button
-            key="analyze"
-            type="primary"
-            loading={isAnalyzing}
-            disabled={!rfpFile}
-            onClick={handleRfpAnalysis}
-            style={{
-              background: "#E31837",
-              borderColor: "#E31837",
-            }}
-          >
-            Analizar
-          </Button>,
-        ]}
-      >
-        <div style={{ padding: "20px 0" }}>
-          <Upload
-            beforeUpload={(file) => {
-              const isValidType = [
-                'application/pdf',
-                'application/msword',
-                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-              ].includes(file.type)
-
-              if (!isValidType) {
-                antMessage.error('Solo se permiten archivos PDF y Word')
-                return Upload.LIST_IGNORE
-              }
-
-              const uploadFile: UploadFile = {
-                uid: file.uid || '-1',
-                name: file.name,
-                status: 'done',
-                originFileObj: file as any,
-              }
-              setRfpFile(uploadFile)
-              return false
-            }}
-            onRemove={() => setRfpFile(null)}
-            fileList={rfpFile ? [rfpFile] : []}
-            maxCount={1}
-            accept=".pdf,.doc,.docx"
-          >
-            <Button icon={<UploadOutlined />} style={{ width: "100%" }}>
-              Seleccionar archivo RFP
-            </Button>
-          </Upload>
-          <Text style={{ display: "block", marginTop: "12px", color: "#888", fontSize: "13px" }}>
-            Formatos permitidos: PDF, Word (.doc, .docx)
-          </Text>
-        </div>
-      </Modal>
 
       {/* Modal para mostrar resultados del análisis */}
       <Modal
