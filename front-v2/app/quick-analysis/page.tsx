@@ -64,21 +64,21 @@ export default function QuickAnalysisPage() {
       title: 'Análisis Rápido',
       description: 'Ver el resumen ejecutivo y puntos clave en el Dashboard.',
       icon: <RocketOutlined className="text-4xl text-[#E31837]" />,
-      action: () => router.push(`/workspace/${workspaceId}`)
+      action: () => router.push(`/workspace/${workspaceId}/quick-analysis`)
     },
     {
       id: 'B',
       title: 'Generación Completa',
       description: 'Ir al chat para generar una propuesta detallada.',
       icon: <FileTextOutlined className="text-4xl text-[#FF6B00]" />,
-      action: () => router.push(`/workspace/${workspaceId}`)
+      action: () => router.push(`/workspace/${workspaceId}/quick-analysis`)
     },
     {
       id: 'C',
       title: 'Extracción de Requisitos',
       description: 'Ver la matriz de cumplimiento extraída.',
       icon: <DatabaseOutlined className="text-4xl text-[#52c41a]" />,
-      action: () => router.push(`/workspace/${workspaceId}`)
+      action: () => router.push(`/workspace/${workspaceId}/quick-analysis`)
     }
   ]
 

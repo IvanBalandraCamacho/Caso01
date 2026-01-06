@@ -47,11 +47,11 @@ async def analyze(self, file: UploadFile, db: Session, user: User) -> Dict[str, 
     return {
         "analysis": analysis_result,
         "workspace_id": str(new_workspace.id)
-    }
+    }´´´
 1.2 Actualizar Controlador backend/api/routes/intention_task.py
 Inyectar la dependencia de base de datos y usuario actual en el endpoint.
 
-Python
+´´´Python
 
 @router.post("/task/analyze")
 async def analyze_document(
@@ -62,6 +62,7 @@ async def analyze_document(
     # Pasar db y user al servicio
     result = await service.analyze(file=file, db=db, user=current_user)
     return result
+    ´´´
 🖥 Tarea 2: Frontend - Conexión Real
 2.1 Reemplazar Mock en front-v2/app/quick-analysis/page.tsx
 Eliminar la función customRequest simulada (setTimeout) y usar una llamada real a la API.
