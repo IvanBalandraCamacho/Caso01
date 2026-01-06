@@ -46,14 +46,18 @@ service = ProposalsServiceImpl()
     description="Analiza un documento RFP y extrae información relevante usando IA"
 )
 async def analyze_document(
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    db: Session = Depends(database.get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
-    analysis = await get_analyze(file=file)
+    analysis = await get_analyze(file=file, db=db, user=current_user)
     return analysis
 
 
 async def get_analyze(
-    file: UploadFile = File(...)
+    file: UploadFile,
+    db: Session,
+    user: User
 ):
     """Delega toda la lógica de validación, extracción y análisis al servicio."""
     if file:
@@ -63,6 +67,8 @@ async def get_analyze(
         try:
             analysis = await service.analyze(
                 file=file,
+                db=db,
+                user=user
             )
             logger.info(f"ANALYSIS OK: {analysis}")
             return analysis

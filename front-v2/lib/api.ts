@@ -966,6 +966,11 @@ export const downloadDocumentDirect = async (
 // PROPOSAL/TASK ANALYSIS API FUNCTIONS
 // ============================================
 
+export interface AnalysisResponse {
+  analysis: ProposalAnalysis;
+  workspace_id: string;
+}
+
 /**
  * Analyze a document/RFP using AI
  * POST /api/v1/task/analyze
@@ -974,11 +979,11 @@ export const downloadDocumentDirect = async (
 export const analyzeDocumentApi = async (
   file: File,
   onProgress?: (progress: number) => void,
-): Promise<ProposalAnalysis> => {
+): Promise<AnalysisResponse> => {
   const formData = new FormData();
   formData.append("file", file);
 
-  const { data } = await api.post<ProposalAnalysis>("/task/analyze", formData, {
+  const { data } = await api.post<AnalysisResponse>("/task/analyze", formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },

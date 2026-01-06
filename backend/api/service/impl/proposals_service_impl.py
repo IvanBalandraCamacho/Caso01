@@ -1,10 +1,13 @@
 import json
 from typing import Dict, Any, Optional
 from fastapi import UploadFile, HTTPException, requests, status, File
+from sqlalchemy.orm import Session
 from api.service.proposals_service import ProposalsService
 from prompts.proposals.analyze_prompts import AnalyzePrompts
 from utils.file_util import FileUtil
 from core import llm_service
+from models.user import User
+from models.workspace import Workspace
 import logging
 
 logger = logging.getLogger(__name__)
@@ -12,8 +15,10 @@ class ProposalsServiceImpl(ProposalsService):
 
     async def analyze(  
         self,  
-        file: UploadFile = File(...)
-    ):
+        file: UploadFile,
+        db: Session,
+        user: User
+    ) -> Dict[str, Any]:
         if file:
             logger.info(file)
             FileUtil.validate_supported_file(file)
@@ -21,7 +26,63 @@ class ProposalsServiceImpl(ProposalsService):
                 # Validar y extraer texto soportando PDF o DOCX
                 document_text = await FileUtil.extract_text(file)
                 prompt = AnalyzePrompts.create_analysis_JSON_prompt(document_text = document_text, max_length=8000)
-                return self._analyze_with_ia(prompt)
+                
+                # 1. Ejecutar análisis IA
+                analysis_result = self._analyze_with_ia(prompt)
+                
+                # 2. Persistir como Workspace
+                try:
+                    # Limpieza básica de datos antes de guardar
+                    tvt_val = analysis_result.get("tvt")
+                    if isinstance(tvt_val, str):
+                        # Intentar limpiar símbolos de moneda si vienen
+                        tvt_val = float(tvt_val.replace('$', '').replace(',', '').strip()) if tvt_val else 0.0
+                    
+                    tech_stack_val = analysis_result.get("stack_tecnologico")
+                    # tech_stack en DB es JSON, SQLAlchemy maneja listas/dicts automáticamente si el dialecto lo soporta o si es JSON type
+                    
+                    new_workspace = Workspace(
+                        name=f"Análisis RFP: {file.filename}",
+                        description=f"Auto-generado del archivo {file.filename}. Cliente: {analysis_result.get('cliente', 'Desconocido')}",
+                        owner_id=user.id,
+                        is_active=True,
+                        
+                        # Campos estratégicos mapeados
+                        client_company=analysis_result.get("cliente"),
+                        country=analysis_result.get("pais"),
+                        tvt=float(tvt_val) if tvt_val else None,
+                        operation_name=analysis_result.get("nombre_operacion"),
+                        tech_stack=tech_stack_val if isinstance(tech_stack_val, list) else [str(tech_stack_val)] if tech_stack_val else [],
+                        opportunity_type="RFP",
+                        category=analysis_result.get("categoria"),
+                        
+                        # Guardar resultado completo en instructions para contexto
+                        instructions=json.dumps(analysis_result, ensure_ascii=False)
+                    )
+                    
+                    db.add(new_workspace)
+                    db.commit()
+                    db.refresh(new_workspace)
+                    
+                    logger.info(f"Workspace creado automáticamente: {new_workspace.id}")
+                    
+                    # 3. Retornar ID junto con análisis
+                    return {
+                        "analysis": analysis_result,
+                        "workspace_id": str(new_workspace.id)
+                    }
+                    
+                except Exception as db_error:
+                    logger.error(f"Error persistiendo workspace: {db_error}")
+                    # No fallar todo el proceso si solo falla el guardado, pero idealmente sí
+                    # Para este fix, retornamos el análisis aun si falla la BD? 
+                    # El requerimiento es "Persistencia Automática", así que si falla, debería ser error.
+                    db.rollback()
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+                        detail=f"Error guardando el análisis en base de datos: {str(db_error)}"
+                    )
+
             except HTTPException:
                 raise
             except Exception as e:
