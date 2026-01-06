@@ -5,9 +5,10 @@ import { FileText, CheckCircle2 } from "lucide-react";
 interface Props {
   showProposal: boolean;
   isLoading: boolean;
+  fileUrl?: string | null;
 }
 
-export default function DocumentPreviewPanel({ showProposal, isLoading }: Props) {
+export default function DocumentPreviewPanel({ showProposal, isLoading, fileUrl }: Props) {
   
   if (isLoading) {
     return (
@@ -41,18 +42,29 @@ export default function DocumentPreviewPanel({ showProposal, isLoading }: Props)
     );
   }
 
+  if (fileUrl) {
+      return (
+        <div className="w-full h-full bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+           <div className="bg-slate-50 p-3 border-b border-slate-200 flex justify-between items-center">
+              <span className="text-sm font-medium text-slate-600">Documento Original</span>
+              <span className="text-xs bg-slate-200 text-slate-600 px-2 py-1 rounded">Vista Previa</span>
+           </div>
+           <iframe src={fileUrl} className="w-full h-full border-none" title="Documento Original" />
+        </div>
+      );
+  }
+
   // Estado inicial: Muestra el documento subido (Placeholder)
   return (
     <div className="w-full h-full bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
        <div className="bg-slate-50 p-3 border-b border-slate-200 flex justify-between items-center">
-          <span className="text-sm font-medium text-slate-600">RFP_Cliente_2024.pdf</span>
-          <span className="text-xs bg-slate-200 text-slate-600 px-2 py-1 rounded">Solo Lectura</span>
+          <span className="text-sm font-medium text-slate-600">Documento no disponible</span>
+          <span className="text-xs bg-slate-200 text-slate-600 px-2 py-1 rounded">Offline</span>
        </div>
        <div className="flex-1 bg-slate-50/50 flex items-center justify-center text-slate-300">
-          {/* Aquí iría el <iframe /> o visor de PDF */}
           <div className="text-center">
              <FileText className="w-16 h-16 mx-auto mb-2 opacity-20" />
-             <p className="m-0">Previsualización del Documento</p>
+             <p className="m-0">No se pudo cargar la vista previa</p>
           </div>
        </div>
     </div>
