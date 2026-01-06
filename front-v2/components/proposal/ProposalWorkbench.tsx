@@ -3,8 +3,14 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { CopilotChat } from "@copilotkit/react-ui";
-import { message, Spin, Button } from "antd";
-import { LoadingOutlined, ArrowLeftOutlined, DownloadOutlined } from "@ant-design/icons";
+import { message, Spin, Button, Tooltip } from "antd";
+import { 
+  LoadingOutlined, 
+  ArrowLeftOutlined, 
+  DownloadOutlined, 
+  MessageOutlined,
+  FileTextOutlined
+} from "@ant-design/icons";
 import "@copilotkit/react-ui/styles.css";
 
 // API
@@ -36,12 +42,10 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
   const [proposalReady, setProposalReady] = useState(false);
   const [lastBlob, setLastBlob] = useState<Blob | null>(null);
   const [documentUrl, setDocumentUrl] = useState<string | null>(null);
+  const [generatedDocUrl, setGeneratedDocUrl] = useState<string | null>(null);
 
   // 1. Cargar Datos y Documento
   useEffect(() => {
-    // Definir la función de carga fuera del condicional para poder llamarla aunque haya initialData
-    // (necesitamos el documento de todas formas)
-    
     const loadAll = async () => {
       try {
         if (!initialData) setLoadingData(true);
@@ -67,9 +71,7 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
         // Cargar documento original para previsualización
         const docs = await fetchWorkspaceDocuments(workspaceId);
         if (docs && docs.length > 0) {
-            // Tomamos el primero (o el más reciente)
             const mainDoc = docs[0]; 
-            // Obtenemos el contenido como Blob
             const blob = await fetchDocumentContent(workspaceId, mainDoc.id);
             const url = window.URL.createObjectURL(blob);
             setDocumentUrl(url);
@@ -85,9 +87,9 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
 
     loadAll();
     
-    // Cleanup de la URL del documento al desmontar
     return () => {
         if (documentUrl) window.URL.revokeObjectURL(documentUrl);
+        if (generatedDocUrl) window.URL.revokeObjectURL(generatedDocUrl);
     };
   }, [workspaceId, initialData]);
 
@@ -103,10 +105,11 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
       const blob = await generateProposalDocumentApi(proposalData);
       setLastBlob(blob);
       
-      // Descarga directa
-      downloadBlob(blob, `Propuesta_${extractedData.client_company || 'TIVIT'}.docx`);
+      // Crear URL para visualización inmediata en el panel central
+      const url = window.URL.createObjectURL(blob);
+      setGeneratedDocUrl(url);
 
-      message.success("Propuesta generada exitosamente.");
+      message.success("Propuesta actualizada con los nuevos datos.");
       setProposalReady(true);
     } catch (error) {
       console.error(error);
@@ -116,28 +119,33 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
     }
   };
 
-  const downloadBlob = (blob: Blob, filename: string) => {
-      const url = window.URL.createObjectURL(blob);
+  const handleDownload = () => {
+      if (!lastBlob) return;
+      const url = window.URL.createObjectURL(lastBlob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = filename;
+      link.download = `Propuesta_${extractedData.client_company || 'TIVIT'}.docx`;
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
   };
 
+  const goToChat = () => {
+      router.push(`/workspace/${workspaceId}`);
+  };
+
   if (loadingData) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-[#131314] text-white min-h-[400px]">
+      <div className="flex h-screen w-full items-center justify-center bg-[#131314] text-white">
         <Spin indicator={<LoadingOutlined style={{ fontSize: 32, color: '#E31837' }} spin />} />
-        <span className="ml-4">Cargando Workbench...</span>
+        <span className="ml-4">Cargando Mesa de Trabajo...</span>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-12 h-full bg-[#F5F5F5] overflow-hidden font-sans relative">
+    <div className="flex h-screen w-full bg-[#F5F5F5] overflow-hidden font-sans relative">
       
       {onClose && (
         <button 
@@ -148,78 +156,132 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
         </button>
       )}
 
-      {/* --- COLUMNA IZQUIERDA (3 Cols - Acciones y Chat) --- */}
-      <div className="col-span-3 border-r border-zinc-200 bg-white flex flex-col h-full shadow-sm z-10">
+      {/* --- COLUMNA IZQUIERDA (Acciones y Chat) - Ancho Fijo --- */}
+      <div className="w-[320px] flex-shrink-0 border-r border-zinc-200 bg-white flex flex-col h-full shadow-sm z-20">
         
-        {/* Cabecera con Volver */}
-        <div className="p-4 border-b border-zinc-100 flex items-center gap-2">
+        {/* Cabecera / Navegación */}
+        <div className="p-4 border-b border-zinc-100 flex items-center justify-between bg-white">
             <Button 
                 type="text" 
                 icon={<ArrowLeftOutlined />} 
-                onClick={() => router.back()}
-                className="text-slate-500 hover:text-slate-800"
+                onClick={() => router.push('/quick-analysis')}
+                className="text-slate-500 hover:text-slate-800 p-0 flex items-center"
             >
-                Volver
+                Atrás
             </Button>
-            <span className="font-semibold text-slate-700">Mesa de Trabajo</span>
+            
+            <Tooltip title="Ir al chat completo del proyecto">
+                <Button 
+                    type="default"
+                    size="small"
+                    icon={<MessageOutlined />}
+                    onClick={goToChat}
+                    className="text-blue-600 border-blue-200 hover:border-blue-400 bg-blue-50"
+                >
+                    Ir al Chat
+                </Button>
+            </Tooltip>
         </div>
 
         {/* Panel de Acciones Principal */}
-        <div className="p-4 border-b border-zinc-200 bg-slate-50/50">
+        <div className="p-5 border-b border-zinc-200 bg-slate-50/80">
            <AnalysisActionsPanel 
              onGenerate={handleGenerate}
              isGenerating={isGenerating}
            />
            
-           {/* Botón de descarga extra si ya se generó */}
-           {proposalReady && lastBlob && (
-               <Button 
-                 block 
-                 icon={<DownloadOutlined />} 
-                 onClick={() => downloadBlob(lastBlob, `Propuesta_${extractedData.client_company || 'TIVIT'}.docx`)}
-                 className="mt-3 text-slate-600 border-slate-300 hover:border-blue-500 hover:text-blue-600"
-               >
-                 Descargar Nuevamente
-               </Button>
+           {/* Botón de descarga condicional */}
+           {proposalReady && (
+               <div className="mt-3 pt-3 border-t border-slate-200 animate-fade-in-up">
+                   <Button 
+                     block 
+                     type="dashed"
+                     icon={<DownloadOutlined />} 
+                     onClick={handleDownload}
+                     className="text-slate-600 border-slate-300 hover:text-blue-600 hover:border-blue-400"
+                   >
+                     Descargar .DOCX
+                   </Button>
+                   <p className="text-[10px] text-center text-slate-400 mt-2">
+                       Generado: {new Date().toLocaleTimeString()}
+                   </p>
+               </div>
            )}
         </div>
         
         {/* Chat Copilot */}
-        <div className="flex-1 flex flex-col bg-white overflow-hidden border-t border-zinc-100">
-           <div className="text-[10px] uppercase font-bold text-gray-400 p-2 text-center tracking-wider bg-slate-50 border-b border-zinc-100">
-             Asistente de Propuestas
+        <div className="flex-1 flex flex-col bg-white overflow-hidden relative">
+           <div className="text-[10px] uppercase font-bold text-gray-400 p-2 text-center tracking-wider bg-white border-b border-zinc-100 flex items-center justify-center gap-2">
+             <MessageOutlined /> Asistente de Análisis
            </div>
            <div className="flex-1 relative custom-copilot-wrapper">
              <CopilotChat 
                 className="h-full w-full border-none shadow-none"
                 instructions={`
-                    Contexto: Generando propuesta para ${extractedData.client_company}.
+                    Estás en la Mesa de Trabajo de Propuestas.
+                    Contexto: Propuesta para ${extractedData.client_company}.
                     Datos actuales: ${JSON.stringify(extractedData)}.
                     
-                    IMPORTANTE: 
-                    Si el usuario pide cambiar un dato (ej: "cambia el TVT"), usa la herramienta updateExtractedData.
-                    AVISA SIEMPRE al usuario que debe pulsar "Generar Propuesta" nuevamente para ver los cambios reflejados en el documento final.
+                    TU OBJETIVO: Ayudar al usuario a completar o corregir los datos de la columna derecha.
+                    
+                    SI EL USUARIO PIDE UN CAMBIO (ej: "El TVT es 1M"):
+                    1. Usa la herramienta "updateExtractedData" para cambiarlo visualmente.
+                    2. Dile al usuario: "He actualizado el dato. Dale a 'Generar Propuesta' para ver el cambio en el documento."
                 `}
                 labels={{
                   title: "Asistente",
-                  initial: "¿Necesitas ajustar algún dato antes de generar la propuesta?",
+                  initial: "Revisa los datos a la derecha. ¿Necesitas corregir algo antes de generar?",
                 }}
              />
            </div>
         </div>
       </div>
 
-      {/* --- COLUMNA CENTRAL (5 Cols - Previsualización) --- */}
-      <div className="col-span-5 bg-gray-100 p-6 overflow-hidden flex flex-col relative border-r border-zinc-200">
-         <DocumentPreviewPanel 
-           showProposal={proposalReady} 
-           isLoading={isGenerating}
-           fileUrl={documentUrl}
-         />
+      {/* --- COLUMNA CENTRAL (Previsualización) - Flexible --- */}
+      <div className="flex-1 bg-gray-100 p-6 overflow-hidden flex flex-col relative">
+         <div className="h-full bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+             {/* Cabecera del visor */}
+             <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center flex-shrink-0">
+                <div className="flex items-center gap-2">
+                    {proposalReady ? (
+                        <>
+                            <FileTextOutlined className="text-green-500" />
+                            <span className="font-semibold text-slate-700 text-sm">Propuesta Generada (Preview)</span>
+                            <span className="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded-full font-medium">NUEVO</span>
+                        </>
+                    ) : (
+                        <>
+                            <FileTextOutlined className="text-slate-500" />
+                            <span className="font-semibold text-slate-700 text-sm">Documento Original (RFP)</span>
+                            <span className="bg-slate-200 text-slate-600 text-[10px] px-2 py-0.5 rounded-full font-medium">SOLO LECTURA</span>
+                        </>
+                    )}
+                </div>
+                {proposalReady && (
+                    <Button 
+                        size="small" 
+                        type="text" 
+                        className="text-slate-500 hover:text-slate-800 text-xs"
+                        onClick={() => setProposalReady(false)}
+                    >
+                        Ver original
+                    </Button>
+                )}
+             </div>
+
+             {/* Contenido del visor */}
+             <div className="flex-1 relative bg-slate-100/50">
+                 <DocumentPreviewPanel 
+                   showProposal={proposalReady} 
+                   isLoading={isGenerating}
+                   fileUrl={proposalReady ? generatedDocUrl : documentUrl}
+                 />
+             </div>
+         </div>
       </div>
 
-      {/* --- COLUMNA DERECHA (4 Cols - Datos) --- */}
-      <div className="col-span-4 bg-white h-full overflow-y-auto p-6 shadow-xl z-10 scrollbar-hide border-l border-zinc-200">
+      {/* --- COLUMNA DERECHA (Datos) - Ancho Fijo --- */}
+      <div className="w-[400px] flex-shrink-0 bg-white h-full overflow-y-auto p-6 shadow-xl z-20 border-l border-zinc-200">
          <ExtractedDataPanel 
             data={extractedData} 
             setData={setExtractedData} 
