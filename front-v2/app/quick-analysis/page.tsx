@@ -47,8 +47,11 @@ export default function QuickAnalysisPage() {
       
       onProgress({ percent: 100 })
       onSuccess("ok")
-      message.success("Análisis completado exitosamente")
-      setCurrentStep(1) // Avanzar al paso de selección
+      message.success("Análisis completado exitosamente. Redirigiendo al entorno de trabajo...")
+      
+      // Redirigir inmediatamente al Proposal Workbench
+      router.push(`/workspace/${response.workspace_id}/proposal`)
+      
     } catch (error) {
       console.error(error)
       onError(error)

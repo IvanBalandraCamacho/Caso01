@@ -486,14 +486,17 @@ export default function ChatPage({
           onComplete: (conversationId: string) => {
             setIsStreaming(false)
             if (detectedIntentRef.current === "GENERATE_PROPOSAL") {
-              setMessages((prev) => {
+              // Redirigir al Proposal Workbench para la experiencia unificada
+              router.push(`/workspace/${id}/proposal`);
+            } else {
+               // Lógica original para otros intents si es necesaria
+               setMessages((prev) => {
                 const lastMessage = prev[prev.length - 1]
                 if (lastMessage && lastMessage.role === "assistant") {
-                  setProposalMarkdown(lastMessage.content)
+                  // Actualizar estado local si es necesario, aunque al redirigir ya no importa tanto
                 }
                 return prev
               })
-              setProposalGenerated(true)
             }
             if (!firstChunkReceived) setIsLoading(false)
           },
