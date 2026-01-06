@@ -1,3 +1,8 @@
+Paso 1: Convertir ProposalWorkbench en el componente maestro
+Este componente encapsulará toda la lógica de la "Mesa de Trabajo" (Workbench). Copia esto en front-v2/components/proposal/ProposalWorkbench.tsx:
+
+TypeScript
+
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -50,7 +55,7 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
           estimated_price: workspace.estimated_price || "",
           estimated_time: workspace.estimated_time || "",
           resource_count: workspace.resource_count || "",
-          objetivo: workspace.objective || ""
+          objective: workspace.objective || ""
         });
       } catch (error) {
         console.error("Error cargando workspace:", error);
@@ -159,3 +164,28 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
     </div>
   );
 }
+Paso 2: Limpiar la Página (app/workspace/[id]/quick-analysis/page.tsx)
+Ahora la página queda limpísima, solo invoca al componente.
+
+TypeScript
+
+"use client";
+
+import React, { use } from "react";
+import ProposalWorkbench from "@/components/proposal/ProposalWorkbench";
+
+export default function AnalysisPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+
+  return (
+    <div className="h-screen w-screen">
+      <ProposalWorkbench workspaceId={id} />
+    </div>
+  );
+}
+Resultado Final
+Reutilización: Ahora puedes importar <ProposalWorkbench workspaceId={id} /> dentro de cualquier modal o drawer en tu página de chat (app/workspace/[id]/chat/[chatId]/page.tsx) cuando detectes la intención.
+
+Consistencia: El código de generación y carga de datos está centralizado.
+
+Flujo "Quick Analysis": Sigue funcionando perfecto porque redirige a esta página que ahora usa el componente maestro.

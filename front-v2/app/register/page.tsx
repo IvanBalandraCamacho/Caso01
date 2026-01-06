@@ -54,23 +54,14 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1';
-      const response = await fetch(`${apiUrl}/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-          full_name: formData.full_name,
-        }),
+      // Usar la función de la API que maneja correctamente los errores
+      const { registerUser } = await import('@/lib/api');
+      
+      await registerUser({
+        email: formData.email,
+        password: formData.password,
+        full_name: formData.full_name,
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Error al registrarse');
-      }
 
       showToast("¡Cuenta creada exitosamente! Redirigiendo al login...", "success");
       
@@ -79,9 +70,19 @@ export default function RegisterPage() {
         router.push('/login');
       }, 1500);
 
-    } catch (error: unknown) {
-      console.error('Error en registro:', error as Error);
-      showToast((error as Error).message || "Error al crear la cuenta", "error");
+    } catch (error: any) {
+      console.error('Error en registro:', error);
+      
+      // Extraer mensaje de error más específico
+      let errorMessage = "Error al crear la cuenta";
+      
+      if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      showToast(errorMessage, "error");
     } finally {
       setIsLoading(false);
     }
