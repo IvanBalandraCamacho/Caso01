@@ -308,6 +308,15 @@ export const deleteWorkspaceApi = async (workspaceId: string): Promise<void> => 
 };
 
 /**
+ * Get workspace health (completion percentage and missing sections)
+ * GET /api/v1/workspaces/{workspace_id}/health
+ */
+export const fetchWorkspaceHealth = async (workspaceId: string): Promise<WorkspaceHealth> => {
+  const { data } = await api.get<WorkspaceHealth>(`/workspaces/${workspaceId}/health`);
+  return data;
+};
+
+/**
  * Get all documents in a workspace
  * GET /api/v1/workspaces/{workspace_id}/documents
  */

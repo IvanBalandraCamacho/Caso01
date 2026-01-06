@@ -55,6 +55,19 @@ export interface WorkspaceBase {
   name: string;
   description?: string | null;
   instructions?: string | null;
+  
+  // --- Strategic Fields (Fase 1) ---
+  country?: string | null;
+  client_company?: string | null;
+  operation_name?: string | null;
+  tvt?: number | null;
+  tech_stack?: string[] | null;
+  opportunity_type?: string | null;
+  estimated_price?: number | null;
+  estimated_time?: string | null;
+  resource_count?: number | null;
+  category?: string | null;
+  objective?: string | null;
 }
 
 export interface WorkspaceCreate extends WorkspaceBase { }
@@ -63,6 +76,19 @@ export interface WorkspaceUpdate {
   name?: string | null;
   description?: string | null;
   instructions?: string | null;
+  
+  // --- Strategic Fields (Fase 1) ---
+  country?: string | null;
+  client_company?: string | null;
+  operation_name?: string | null;
+  tvt?: number | null;
+  tech_stack?: string[] | null;
+  opportunity_type?: string | null;
+  estimated_price?: number | null;
+  estimated_time?: string | null;
+  resource_count?: number | null;
+  category?: string | null;
+  objective?: string | null;
 }
 
 export interface WorkspacePublic extends WorkspaceBase {
@@ -458,6 +484,17 @@ export interface QueryAnalysis {
   complexity: string;
   estimated_tokens: number;
   optimal_parameters: Record<string, unknown>;
+}
+
+// ==============================================
+// HEALTH & COMPLETION TYPES
+// ==============================================
+
+export interface WorkspaceHealth {
+  workspace_id: string;
+  percentage: number;
+  missing_sections: string[];
+  is_complete: boolean;
 }
 
 // ==============================================

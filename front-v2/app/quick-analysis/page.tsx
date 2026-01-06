@@ -1,0 +1,193 @@
+"use client"
+
+import React, { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Upload, Card, Typography, Row, Col, Button, message, Steps } from 'antd'
+import { 
+  InboxOutlined, 
+  RocketOutlined, 
+  FileTextOutlined, 
+  DatabaseOutlined,
+  ArrowRightOutlined
+} from '@ant-design/icons'
+import Sidebar from '@/components/sidebar'
+import { UserMenu } from '@/components/UserMenu'
+import { useUser } from '@/hooks/useUser'
+
+const { Dragger } = Upload
+const { Title, Text } = Typography
+
+export default function QuickAnalysisPage() {
+  const { user } = useUser()
+  const router = useRouter()
+  const [currentStep, setCurrentStep] = useState(0)
+  const [file, setFile] = useState<any>(null)
+
+  const handleUpload = (info: any) => {
+    const { status } = info.file
+    if (status !== 'uploading') {
+      console.log(info.file, info.fileList)
+    }
+    if (status === 'done') {
+      message.success(`${info.file.name} subido correctamente.`)
+      setFile(info.file)
+      setCurrentStep(1)
+    } else if (status === 'error') {
+      message.error(`${info.file.name} falló al subir.`)
+    }
+  }
+
+  // Simulación de carga para el prototipo
+  const customRequest = ({ file, onSuccess }: any) => {
+    setTimeout(() => {
+      onSuccess("ok")
+    }, 1500)
+  }
+
+  const analysisOptions = [
+    {
+      id: 'A',
+      title: 'Análisis Rápido',
+      description: 'Resumen ejecutivo y puntos clave en segundos.',
+      icon: <RocketOutlined className="text-4xl text-[#E31837]" />,
+      action: () => router.push('/quick-analysis/results?type=fast')
+    },
+    {
+      id: 'B',
+      title: 'Generación Completa',
+      description: 'Propuesta técnica detallada basada en el RFP.',
+      icon: <FileTextOutlined className="text-4xl text-[#FF6B00]" />,
+      action: () => router.push('/quick-analysis/results?type=full')
+    },
+    {
+      id: 'C',
+      title: 'Extracción de Requisitos',
+      description: 'Matriz de cumplimiento y requisitos técnicos.',
+      icon: <DatabaseOutlined className="text-4xl text-[#52c41a]" />,
+      action: () => router.push('/quick-analysis/results?type=requirements')
+    }
+  ]
+
+  return (
+    <div className="flex h-screen bg-[#131314] text-white overflow-hidden font-sans">
+      <Sidebar />
+
+      <main className="flex-1 flex flex-col h-full relative overflow-hidden">
+        <header className="px-6 py-6 z-20 flex justify-between items-center bg-[#131314]/80 backdrop-blur-md border-b border-white/5">
+          <div className="cursor-pointer" onClick={() => router.push('/')}>
+            <img src="/logo.svg" alt="Logo" className="h-8" />
+          </div>
+          <UserMenu user={user} />
+        </header>
+
+        <div className="flex-1 overflow-y-auto p-8 sm:p-12">
+          <div className="max-w-5xl mx-auto">
+            <div className="mb-12">
+              <Title level={2} className="text-white !mb-2">Nuevo Análisis RFP</Title>
+              <Text className="text-zinc-400">Sigue los pasos para analizar tu documento de licitación de forma inteligente.</Text>
+            </div>
+
+            <Steps
+              current={currentStep}
+              className="custom-steps mb-16"
+              items={[
+                { title: 'Carga de Archivo' },
+                { title: 'Selección de Análisis' },
+                { title: 'Resultados' }
+              ]}
+            />
+
+            {currentStep === 0 && (
+              <div className="animate-fade-in-up">
+                <Dragger
+                  name="file"
+                  multiple={false}
+                  customRequest={customRequest}
+                  onChange={handleUpload}
+                  className="bg-[#1E1F20] border-2 border-dashed border-zinc-800 hover:border-[#E31837] rounded-3xl p-12 transition-all"
+                >
+                  <p className="ant-upload-drag-icon">
+                    <InboxOutlined className="text-zinc-500" />
+                  </p>
+                  <p className="text-xl font-semibold text-white mt-4">Arrastra tu RFP aquí o haz clic para subir</p>
+                  <p className="text-zinc-500 mt-2">Soportamos PDF, Word y archivos de texto hasta 50MB.</p>
+                </Dragger>
+              </div>
+            )}
+
+            {currentStep === 1 && (
+              <div className="animate-fade-in-up">
+                <Title level={3} className="text-white text-center mb-10">¿Qué tipo de análisis prefieres?</Title>
+                <Row gutter={[24, 24]}>
+                  {analysisOptions.map((opt) => (
+                    <Col xs={24} md={8} key={opt.id}>
+                      <Card
+                        hoverable
+                        className="h-full bg-[#1E1F20] border-white/5 hover:border-[#E31837]/50 rounded-3xl transition-all group overflow-hidden"
+                        onClick={opt.action}
+                      >
+                        <div className="flex flex-col items-center text-center p-4">
+                          <div className="mb-6 p-6 bg-[#131314] rounded-2xl group-hover:scale-110 transition-transform">
+                            {opt.icon}
+                          </div>
+                          <Title level={4} className="text-white !mb-3">{opt.title}</Title>
+                          <Text className="text-zinc-400 mb-6">{opt.description}</Text>
+                          <Button 
+                            type="text" 
+                            icon={<ArrowRightOutlined />} 
+                            className="text-[#E31837] group-hover:translate-x-2 transition-transform"
+                          >
+                            Seleccionar
+                          </Button>
+                        </div>
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
+                <div className="mt-12 text-center">
+                  <Button type="link" onClick={() => setCurrentStep(0)} className="text-zinc-500">
+                    Volver a subir archivo
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+
+      <style jsx global>{`
+        .custom-steps .ant-steps-item-title {
+          color: #a1a1aa !important;
+        }
+        .custom-steps .ant-steps-item-active .ant-steps-item-title {
+          color: white !important;
+          font-weight: 600 !important;
+        }
+        .custom-steps .ant-steps-item-finish .ant-steps-item-title {
+          color: #52c41a !important;
+        }
+        .custom-steps .ant-steps-item-icon {
+          background: #1E1F20 !important;
+          border-color: #27272a !important;
+        }
+        .custom-steps .ant-steps-item-active .ant-steps-item-icon {
+          background: #E31837 !important;
+          border-color: #E31837 !important;
+        }
+        .custom-steps .ant-steps-item-active .ant-steps-item-icon .ant-steps-icon {
+          color: white !important;
+        }
+        .custom-steps .ant-steps-item-finish .ant-steps-item-icon {
+          background: transparent !important;
+          border-color: #52c41a !important;
+        }
+        .custom-steps .ant-steps-item-finish .ant-steps-item-icon .ant-steps-icon {
+          color: #52c41a !important;
+        }
+        .ant-card {
+          background: #1E1F20 !important;
+        }
+      `}</style>
+    </div>
+  )
+}

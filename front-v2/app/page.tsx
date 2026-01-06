@@ -13,6 +13,7 @@ import {
 import { DashboardStats, TodoList, UpcomingDeadlines, ComplianceScore } from "@/components/ui/DashboardWidgets"
 import { AnalysisTemplates } from "@/components/ui/AnalysisTemplates"
 import { LayoutGrid } from "lucide-react"
+import { WorkspacesTable } from "@/components/WorkspacesTable"
 
 export default function Home() {
   const { user } = useUser()
@@ -91,6 +92,7 @@ export default function Home() {
                   {/* Action Buttons inside Input */}
                   <div className="absolute bottom-3 right-3 flex items-center gap-2">
                     <button 
+                      onClick={() => router.push('/quick-analysis')}
                       className="p-2 text-zinc-400 hover:text-[#E31837] hover:bg-white/5 rounded-full transition-colors"
                       aria-label="Adjuntar archivo"
                     >
@@ -146,6 +148,11 @@ export default function Home() {
                 <div className="lg:col-span-1 flex flex-col gap-6">
                   <ComplianceScore score={75} />
                 </div>
+              </div>
+
+              {/* 3. STRATEGIC DATA TABLE (Fase 1) */}
+              <div className="mt-12 animate-fade-in-up delay-200">
+                <WorkspacesTable />
               </div>
 
             </div>

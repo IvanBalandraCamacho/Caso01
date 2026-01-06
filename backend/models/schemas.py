@@ -12,6 +12,19 @@ class WorkspaceBase(BaseModel):
     name: str
     description: str | None = None
     instructions: str | None = None
+    
+    # --- Strategic Fields (Fase 1) ---
+    country: str | None = None
+    client_company: str | None = None
+    operation_name: str | None = None
+    tvt: float | None = None
+    tech_stack: list[str] | None = None
+    opportunity_type: str | None = None
+    estimated_price: float | None = None
+    estimated_time: str | None = None
+    resource_count: int | None = None
+    category: str | None = None
+    objective: str | None = None
 
 class WorkspaceCreate(WorkspaceBase):
     """Schema para crear un Workspace (solo entrada)."""
@@ -121,6 +134,19 @@ class WorkspaceUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
     instructions: str | None = None
+    
+    # --- Strategic Fields (Fase 1) ---
+    country: str | None = None
+    client_company: str | None = None
+    operation_name: str | None = None
+    tvt: float | None = None
+    tech_stack: list[str] | None = None
+    opportunity_type: str | None = None
+    estimated_price: float | None = None
+    estimated_time: str | None = None
+    resource_count: int | None = None
+    category: str | None = None
+    objective: str | None = None
 
 # --- Conversation Schemas ---
 

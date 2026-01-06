@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, DateTime, Boolean, func, Text, ForeignKey
+from sqlalchemy import Column, String, DateTime, Boolean, func, Text, ForeignKey, Float, Integer, JSON
 from sqlalchemy.dialects.mysql import CHAR
 from sqlalchemy.orm import relationship
 from .database import Base
@@ -12,6 +12,19 @@ class Workspace(Base):
     
     name = Column(String(100), nullable=False, index=True)
     description = Column(String(500), nullable=True)
+    
+    # --- Strategic Fields (Fase 1) ---
+    country = Column(String(100), nullable=True)
+    client_company = Column(String(200), nullable=True)
+    operation_name = Column(String(200), nullable=True)
+    tvt = Column(Float, nullable=True)  # Total Contract Value
+    tech_stack = Column(JSON, nullable=True)  # List of technologies
+    opportunity_type = Column(String(50), nullable=True)  # RFP, RFI, etc.
+    estimated_price = Column(Float, nullable=True)
+    estimated_time = Column(String(100), nullable=True)
+    resource_count = Column(Integer, nullable=True)
+    category = Column(String(100), nullable=True)
+    objective = Column(Text, nullable=True)
     
     # System Prompt
     instructions = Column(Text, nullable=True)
@@ -31,6 +44,12 @@ class Workspace(Base):
     
     conversations = relationship(
         "Conversation",
+        back_populates="workspace",
+        cascade="all, delete-orphan",
+    )
+    
+    proposals = relationship(
+        "Proposal",
         back_populates="workspace",
         cascade="all, delete-orphan",
     )
