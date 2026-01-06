@@ -1,3 +1,19 @@
+# IMPLEMENT_WORKBENCH_LOGIC.md
+
+## 🎯 Objetivo
+Conectar la "Mesa de Trabajo" (Workbench) con la API real (`lib/api.ts`) para que cargue los datos del Workspace y genere la propuesta descargable.
+
+---
+
+## 🛠 Tarea 1: Actualizar la Página de Análisis (`workspace/[id]/quick-analysis/page.tsx`)
+
+Reemplaza todo el contenido de `front-v2/app/workspace/[id]/quick-analysis/page.tsx` con el siguiente código.
+**Mejoras clave:**
+- Usa `fetchWorkspaceDetails` para traer los datos reales de la BD.
+- Usa `generateProposalDocumentApi` para generar y descargar el Word.
+- Maneja la descarga del BLOB correctamente.
+
+```tsx
 "use client";
 
 import React, { useState, useEffect, use } from "react";
@@ -40,16 +56,12 @@ export default function AnalysisPage({ params }: { params: Promise<{ id: string 
         // Mapear datos del workspace al panel derecho
         setExtractedData({
           client_company: workspace.client_company || "",
-          nombre_operacion: workspace.operation_name || "",
+          operation_name: workspace.operation_name || "",
           tvt: workspace.tvt || 0,
           country: workspace.country || "",
-          stack_tecnologico: Array.isArray(workspace.tech_stack) ? workspace.tech_stack.join(", ") : workspace.tech_stack || "",
-          categoria: workspace.category || "",
-          oportunidad: workspace.opportunity_type || "RFP",
-          precio: workspace.estimated_price || "",
-          tiempo_aproximado: workspace.estimated_time || "",
-          nro_recursos: workspace.resource_count || "",
-          objetivo: workspace.objective || ""
+          tech_stack: workspace.tech_stack || [],
+          category: workspace.category || "",
+          opportunity_type: workspace.opportunity_type || "RFP"
         });
 
         // Intentar cargar el archivo original para preview (si existe)
@@ -129,7 +141,7 @@ export default function AnalysisPage({ params }: { params: Promise<{ id: string 
            </div>
            <div className="flex-1 relative custom-copilot-wrapper bg-white">
              <CopilotChat 
-                className="h-full w-full border-none shadow-none"
+                className="h-full w-full"
                 instructions={`Estás ayudando a analizar la RFP de ${extractedData.client_company}. Datos actuales: ${JSON.stringify(extractedData)}. Si el usuario pide cambios, sugiérele editar el panel derecho.`}
                 labels={{
                   title: "Asistente TIVIT",
@@ -145,7 +157,7 @@ export default function AnalysisPage({ params }: { params: Promise<{ id: string 
          <DocumentPreviewPanel 
            showProposal={proposalReady} 
            isLoading={isGenerating}
-           // fileUrl={previewUrl} // Prop no soportada todavía en DocumentPreviewPanel
+           fileUrl={previewUrl} // Pasar URL si se implementa la carga de preview
          />
       </div>
 
@@ -160,3 +172,46 @@ export default function AnalysisPage({ params }: { params: Promise<{ id: string 
     </div>
   );
 }
+🔄 Tarea 2: Redirección Directa en "Análisis Rápido" (quick-analysis/page.tsx)
+Modifica la función customRequest en front-v2/app/quick-analysis/page.tsx para que no se quede esperando selección, sino que vaya directo al Workbench.
+
+Código a modificar:
+
+TypeScript
+
+  const customRequest = async ({ file, onSuccess, onError, onProgress }: any) => {
+    setIsAnalyzing(true)
+    try {
+      onProgress({ percent: 10 })
+      
+      // Llamada real a la API
+      const response = await analyzeDocumentApi(file, (percent) => {
+         onProgress({ percent: Math.min(percent, 90) })
+      });
+      
+      onProgress({ percent: 100 })
+      onSuccess("ok")
+      message.success("Análisis completado. Redirigiendo...")
+      
+      // REDIRECCIÓN INMEDIATA AL WORKBENCH
+      if (response.workspace_id) {
+         router.push(`/workspace/${response.workspace_id}/quick-analysis`);
+      } else {
+         throw new Error("No se recibió ID del workspace");
+      }
+
+    } catch (error) {
+      console.error(error)
+      onError(error)
+      message.error("Error al analizar el documento.")
+      setIsAnalyzing(false) // Solo desactivar loading si falla
+    }
+  }
+(Nota: Puedes eliminar el paso 2 y 3 del Steps component en este archivo, ya que ahora el flujo es directo).
+
+✅ Lista de Verificación Final
+El usuario sube archivo -> Spinner -> Redirección automática.
+
+En la nueva pantalla, ve los datos (TVT, Cliente) cargados desde la BD.
+
+Al hacer clic en "Generar Propuesta", el botón muestra loading y finalmente descarga un .docx.

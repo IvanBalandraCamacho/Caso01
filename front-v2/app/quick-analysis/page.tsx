@@ -50,7 +50,7 @@ export default function QuickAnalysisPage() {
       message.success("Análisis completado exitosamente. Redirigiendo al entorno de trabajo...")
       
       // Redirigir inmediatamente al Proposal Workbench
-      router.push(`/workspace/${response.workspace_id}/proposal`)
+      router.push(`/workspace/${response.workspace_id}/quick-analysis`)
       
     } catch (error) {
       console.error(error)
