@@ -25,7 +25,7 @@ export function CopilotProvider({ children }: CopilotProviderProps) {
   return (
     <CopilotKit 
       runtimeUrl={runtimeUrl}
-      showDevConsole={process.env.NODE_ENV === "development"}
+      showDevConsole={false}
     >
       {children}
     </CopilotKit>

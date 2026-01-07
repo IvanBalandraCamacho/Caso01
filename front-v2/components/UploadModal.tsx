@@ -7,7 +7,7 @@ import {
   Typography,
   List,
   Space,
-  message,
+  App,
   Tag,
 } from "antd";
 import {
@@ -50,6 +50,7 @@ export function UploadModal({
   conversationId,
   onUploadComplete,
 }: UploadModalProps) {
+  const { message } = App.useApp();
   const [fileList, setFileList] = useState<FileWithStatus[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [wsConnection, setWsConnection] = useState<WebSocket | null>(null);

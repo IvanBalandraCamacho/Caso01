@@ -1,7 +1,7 @@
 "use client";
 
 import { useCopilotAction, useCopilotReadable } from "@copilotkit/react-core";
-import { message } from "antd";
+import { Toast } from "@/components/Toast";
 
 interface UseAnalysisActionsProps {
   analysisResult: any;
@@ -174,13 +174,13 @@ ${analysisResult.equipo_sugerido?.map((m: any) => `- ${m.nombre} (${m.experienci
       switch (format) {
         case 'json':
           navigator.clipboard.writeText(JSON.stringify(analysisResult, null, 2));
-          message.success("JSON copiado al portapapeles");
+          Toast.success("JSON copiado al portapapeles");
           return "Análisis exportado como JSON y copiado al portapapeles";
         
         case 'markdown':
           const md = `# Análisis RFP - ${analysisResult.cliente}\n\n...`;
           navigator.clipboard.writeText(md);
-          message.success("Markdown copiado al portapapeles");
+          Toast.success("Markdown copiado al portapapeles");
           return "Análisis exportado como Markdown";
         
         case 'csv':
@@ -189,7 +189,7 @@ ${analysisResult.equipo_sugerido?.map((m: any) => `- ${m.nombre} (${m.experienci
             ?.map((m: any) => `${m.nombre},${m.rol},${m.experiencia}`)
             .join('\n');
           navigator.clipboard.writeText(`Nombre,Rol,Experiencia\n${csv}`);
-          message.success("CSV copiado al portapapeles");
+          Toast.success("CSV copiado al portapapeles");
           return "Equipo exportado como CSV";
         
         default:

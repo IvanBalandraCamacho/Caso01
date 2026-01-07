@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Upload, Card, Typography, Row, Col, Button, message, Steps, Spin } from 'antd'
+import { Upload, Card, Typography, Row, Col, Button, App, Steps, Spin } from 'antd'
 import { 
   InboxOutlined, 
   RocketOutlined, 
@@ -14,14 +14,18 @@ import {
 import Sidebar from '@/components/sidebar'
 import { UserMenu } from '@/components/UserMenu'
 import { useUser } from '@/hooks/useUser'
-import { analyzeDocumentApi } from '@/lib/api'
+import { analyzeDocumentApi, uploadDocumentApi } from '@/lib/api'
 
 const { Dragger } = Upload
 const { Title, Text } = Typography
 
+// Tipos de archivo permitidos
+const ACCEPTED_FILE_TYPES = ".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
 export default function QuickAnalysisPage() {
   const { user } = useUser()
   const router = useRouter()
+  const { message } = App.useApp()
   const [currentStep, setCurrentStep] = useState(0)
   const [file, setFile] = useState<any>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -30,6 +34,24 @@ export default function QuickAnalysisPage() {
 
   // Custom request para realizar la llamada real a la API
   const customRequest = async ({ file, onSuccess, onError, onProgress }: any) => {
+    // Validar tipo de archivo
+    const validTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ];
+    const fileName = file.name.toLowerCase();
+    const isValidType = validTypes.includes(file.type) || 
+                        fileName.endsWith('.pdf') || 
+                        fileName.endsWith('.doc') || 
+                        fileName.endsWith('.docx');
+    
+    if (!isValidType) {
+      message.error("Solo se permiten archivos PDF o Word (.pdf, .doc, .docx)");
+      onError(new Error("Tipo de archivo no permitido"));
+      return;
+    }
+
     setIsAnalyzing(true)
     try {
       // Simular progreso inicial
@@ -37,7 +59,7 @@ export default function QuickAnalysisPage() {
       
       const response = await analyzeDocumentApi(file, (percent) => {
          // Ajustar porcentaje para que no llegue a 100 antes de tiempo
-         onProgress({ percent: Math.min(percent, 90) })
+         onProgress({ percent: Math.min(percent * 0.7, 70) }) // Análisis = 70%
       }) as any // Casting porque la firma original solo retorna ProposalAnalysis
       
       // Guardar resultado y ID
@@ -45,9 +67,23 @@ export default function QuickAnalysisPage() {
       setWorkspaceId(response.workspace_id)
       setFile(file)
       
+      onProgress({ percent: 75 })
+      
+      // Subir el documento al workspace creado
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        await uploadDocumentApi(response.workspace_id, formData);
+        onProgress({ percent: 95 })
+        message.success("Documento analizado y guardado en el workspace.");
+      } catch (uploadError) {
+        console.warn("Error subiendo documento al workspace:", uploadError);
+        // No fallar todo el proceso si solo falla el upload
+        message.warning("Análisis completado. El documento se procesará en segundo plano.");
+      }
+      
       onProgress({ percent: 100 })
       onSuccess("ok")
-      message.success("Análisis completado exitosamente. Redirigiendo al entorno de trabajo...")
       
       // Redirigir inmediatamente al Proposal Workbench
       router.push(`/workspace/${response.workspace_id}/quick-analysis`)
@@ -119,23 +155,24 @@ export default function QuickAnalysisPage() {
                 <Dragger
                   name="file"
                   multiple={false}
+                  accept={ACCEPTED_FILE_TYPES}
                   customRequest={customRequest}
-                  showUploadList={false} // Ocultar lista por defecto para manejar estado custom si se quiere
+                  showUploadList={false}
                   disabled={isAnalyzing}
                   className={`bg-[#1E1F20] border-2 border-dashed border-zinc-800 hover:border-[#E31837] rounded-3xl p-12 transition-all ${isAnalyzing ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
-                  <p className="ant-upload-drag-icon">
+                  <div className="ant-upload-drag-icon">
                     {isAnalyzing ? (
                       <Spin indicator={<LoadingOutlined style={{ fontSize: 48, color: '#E31837' }} spin />} />
                     ) : (
                       <InboxOutlined className="text-zinc-500" />
                     )}
-                  </p>
+                  </div>
                   <p className="text-xl font-semibold text-white mt-4">
                     {isAnalyzing ? "Analizando documento con IA..." : "Arrastra tu RFP aquí o haz clic para subir"}
                   </p>
                   <p className="text-zinc-500 mt-2">
-                    {isAnalyzing ? "Esto puede tardar unos segundos." : "Soportamos PDF, Word y archivos de texto hasta 50MB."}
+                    {isAnalyzing ? "Esto puede tardar unos segundos." : "Solo PDF y Word (.pdf, .doc, .docx) hasta 50MB."}
                   </p>
                 </Dragger>
               </div>

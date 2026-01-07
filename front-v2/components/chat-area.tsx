@@ -42,6 +42,18 @@ export function ChatArea() {
   const { activeWorkspace, setSelectedModel } = useWorkspaceContext()
   const { modal, message: antMessage } = App.useApp()
 
+  // Estados para el análisis RFP
+  const [isRfpModalOpen, setIsRfpModalOpen] = useState(false)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [rfpFile, setRfpFile] = useState<UploadFile | null>(null)
+  const [analysisResult, setAnalysisResult] = useState<any>(null)
+  const [isResultModalOpen, setIsResultModalOpen] = useState(false)
+  const [isDownloading, setIsDownloading] = useState(false)
+
+  const [showTemplates, setShowTemplates] = useState(false)
+  // Nuevos estados para UX mejorada
+  const [showValueProposition, setShowValueProposition] = useState(false)
+
   // CopilotKit Integration
   const [dataDrawerOpen, setDataDrawerOpen] = useState(false);
   const { generatedData, isGenerating, clearGeneratedData } = useCopilotChatActions({
@@ -56,18 +68,6 @@ export function ChatArea() {
       antMessage.success("Propuesta generada correctamente");
     },
   });
-
-  // Estados para el análisis RFP
-  const [isRfpModalOpen, setIsRfpModalOpen] = useState(false)
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [rfpFile, setRfpFile] = useState<UploadFile | null>(null)
-  const [analysisResult, setAnalysisResult] = useState<any>(null)
-  const [isResultModalOpen, setIsResultModalOpen] = useState(false)
-  const [isDownloading, setIsDownloading] = useState(false)
-
-  const [showTemplates, setShowTemplates] = useState(false)
-  // Nuevos estados para UX mejorada
-  const [showValueProposition, setShowValueProposition] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
 
   // Mostrar onboarding en primera visita
@@ -982,7 +982,7 @@ export function ChatArea() {
         styles={{
           body: { background: '#131314', padding: '24px' },
           header: { background: '#1E1F20', borderBottom: '1px solid #333', color: 'white' },
-          content: { background: '#131314' }
+          wrapper: { background: '#131314' }
         }}
       >
         <div className="space-y-6">

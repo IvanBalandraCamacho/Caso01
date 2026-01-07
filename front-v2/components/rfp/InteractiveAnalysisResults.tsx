@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Table, Card, Tabs, Tag, Button, Space, Tooltip, message, Modal } from "antd";
+import { Table, Card, Tabs, Tag, Button, Space, Tooltip, App, Modal } from "antd";
 import { 
   CopyOutlined, 
   EditOutlined, 
@@ -48,6 +48,7 @@ export function InteractiveAnalysisResults({
   onRefresh,
   onExport 
 }: InteractiveAnalysisResultsProps) {
+  const { message } = App.useApp();
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [localResult, setLocalResult] = useState(result);

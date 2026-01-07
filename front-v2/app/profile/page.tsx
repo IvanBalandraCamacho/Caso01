@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Input, Typography, Avatar, Spin, Modal, Upload, message as antMessage } from "antd";
+import { Button, Input, Typography, Avatar, Spin, Modal, Upload } from "antd";
 import { 
   UserOutlined, 
   MailOutlined, 

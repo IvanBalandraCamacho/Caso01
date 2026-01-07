@@ -212,121 +212,62 @@ Respuesta: SPECIFIC_QUERY
 
 # RFP Analysis JSON Prompt
 RFP_ANALYSIS_JSON_PROMPT_TEMPLATE = """
-Analiza el siguiente documento RFP y extrae la siguiente información en formato JSON estricto:
+Analiza el siguiente documento RFP (Request For Proposal) o documento técnico y extrae la información clave en formato JSON estricto.
 
-DOCUMENTO RFP:
+DOCUMENTO:
 {document_text}
 
-Debes retornar un JSON con esta estructura EXACTA (sin markdown, sin explicaciones adicionales):
+=== INSTRUCCIONES DE EXTRACCIÓN ===
+1. **Cliente**: Busca el nombre de la empresa solicitante en encabezados, pie de página o introducción. Si no es explícito, infiérelo del contexto.
+2. **Fechas**: Identifica fechas límite de entrega, reuniones de homologación o inicio de proyecto.
+3. **Presupuesto**: Busca cifras monetarias explícitas asociadas a "presupuesto base", "monto referencial" o "valor estimado".
+4. **Tecnologías**: Lista lenguajes, frameworks, nubes (AWS/Azure/GCP), bases de datos o herramientas mencionadas.
+5. **Objetivo**: Resume el propósito del proyecto en 1 parrafo conciso.
+6. **Equipo**: Infiere los roles necesarios (ej: si piden Java, sugiere Desarrollador Backend Java).
+7. **Tipo de Oportunidad**: Determina si es RFP, RFI o Intención de Compra basándote en el título y contenido del documento.
+8. **Tiempo Aproximado**: Extrae la duración total estimada del proyecto en meses o semanas.
+9. **Número de Recursos**: Suma la cantidad total de recursos/perfiles solicitados o inferidos.
+
+=== FORMATO DE SALIDA (JSON ÚNICAMENTE) ===
+Debes responder con un ÚNICO bloque JSON válido, sin bloques de código markdown (```json), sin introducciones y sin comentarios.
+
 {{
-"cliente": "nombre de la empresa cliente",
-"fechas_y_plazos": [
-    {{
-        "tipo": "Entrega de Propuesta (Oferta)", 
-        "valor": "YYYY-MM-DD o Hito relativo",
-        "unidad": "FECHA_ABSOLUTA / HITO_RELATIVO / PLAZO_RELATIVO / NO_ESPECIFICADA"
-    }},
-    {{
-        "tipo": "Plazo de Ejecución del Proyecto", 
-        "valor": "X semanas / X meses / X días o 'No especificado'",
-        "unidad": "SEMANAS / MESES / DIAS / NO_ESPECIFICADA"
-    }}
-],
-"alcance_economico": {{
-    "presupuesto": "monto numérico o 'No especificado'",
-    "moneda": "USD/EUR/MXN/etc o 'No especificada'"
-}},
-"tecnologias_requeridas": ["tecnología1", "tecnología2", ...],
-"objetivo_general": ["texto del objetivo general"],
-"preguntas_sugeridas": ["pregunta1", "pregunta2", ...],
-"equipo_sugerido": [
-    {{
-    "nombre": "Rol del profesional",
-    "rol": "Descripción del rol",
-    "skills": ["skill1", "skill2"],
-    "experiencia": "X+ años"
-    }}
-]
+  "cliente": "Nombre de la empresa cliente o 'No identificado'",
+  "nombre_operacion": "Nombre corto del proyecto o 'Proyecto TIVIT'",
+  "pais": "País del cliente o 'No identificado'",
+  "categoria": "Desarrollo / Ciberseguridad / Cloud / Data / Soporte",
+  "tipo_oportunidad": "RFP / RFI / Intención de Compra",
+  "fechas_y_plazos": [
+      {{
+          "tipo": "Entrega de Propuesta", 
+          "valor": "YYYY-MM-DD o 'No especificado'"
+      }},
+      {{
+          "tipo": "Duración del Proyecto", 
+          "valor": "X meses/semanas o 'No especificado'"
+      }}
+  ],
+  "tiempo_aproximado": "X meses o 'No especificado'",
+  "alcance_economico": {{
+      "presupuesto": "Monto numérico o 'No especificado'",
+      "moneda": "USD/CLP/PEN/BRL/EUR"
+  }},
+  "stack_tecnologico": ["Java", "Python", "React", "AWS", "etc... (lista de strings)"],
+  "objetivo_general": "Resumen ejecutivo del objetivo del proyecto (máx 300 caracteres).",
+  "equipo_sugerido": [
+      {{
+        "rol": "Nombre del rol (ej: Arquitecto Cloud)",
+        "seniority": "Senior/Semi-senior/Junior",
+        "cantidad": 1,
+        "skills": ["skill1", "skill2"]
+      }}
+  ],
+  "nro_recursos": 0,
+  "preguntas_sugeridas": [
+      "Pregunta aclaratoria 1 sobre el alcance...",
+      "Pregunta 2 sobre requisitos técnicos..."
+  ]
 }}
-
-INSTRUCCIONES:
-1. Extrae ÚNICAMENTE la información presente en el documento
-2. Si algo no está especificado, usa "No especificado" o arrays vacíos
-3. Para el campo "objetivo_general", genera un único elemento en el array. Este texto debe ser un **Resumen Ejecutivo Conciso que combine el Propósito Institucional del proyecto, su Alcance funcional más importante y la Limitación o Restricción contractual más relevante. Este resumen debe tener una longitud máxima de 4 oraciones (aproximadamente 300 caracteres) para ser legible en una interfaz de usuario rápida.
-4. Para el equipo, sugiere perfiles basados en las tecnologías y alcance
-5. Retorna SOLO el JSON, sin texto adicional
-Prohibido generar preguntas subjetivas, abiertas, opinables o que dependan de expectativas, satisfacción, evaluaciones o juicios del cliente. 
-Cada pregunta debe tener una única respuesta correcta basada en un hecho verificable, parámetro concreto o dato exacto. 
-Prohibido preguntar por:
-- expectativas
-- percepciones
-- niveles de satisfacción
-- métricas de éxito
-- criterios de evaluación
-- opiniones
-- procesos “esperados” sin base explícita
-- preferencias personales del cliente
-Si una pregunta no puede formularse de manera 100% objetiva y verificable, NO debe incluirse.
-6. Analiza TODO el documento RFP/RFI y genera solo preguntas objetivas, técnicas y obligatorias para evitar ambigüedad contractual, enfocándote en información faltante, ambigua o inconclusa en: alcance funcional, arquitectura, integraciones, normativas aplicables, datos sensibles, seguridad, SLAs/penalidades, volúmenes transaccionales, licenciamiento, ambientes, soporte, propiedad intelectual y restricciones operativas. Cada pregunta debe ser específica, verificable y no genérica, similar al estilo de la referencia dada. Prohibido hacer preguntas vagas. Si una duda impacta costo, plazo, responsabilidad o cumplimiento legal, destácala explícitamente con: “(impacto en costo/plazo/legalidad)”.
-    Toma de referencia:
-    ¿Cuál es el promedio mensual histórico de incidencias registradas por el sistema y por servicio o plataforma?
-    ¿Qué proporción corresponde a incidencias críticas, altas y medias?
-    ¿La Superintendencia cuenta con herramienta propia de Service Desk o debe proveerla el oferente?
-    ¿Existe actualmente una base de conocimiento para soporte nivel 1 y 1.5?
-    ¿Cuál es la expectativa de tiempo de resolución para aplicaciones nivel 1.5?
-    ¿Cómo se deben reportar los errores detectados (correo, sistema de tickets, logs centralizados)?
-    ¿Se desea una mesa de ayuda telefónica, soporte remoto o ambas para el primer nivel de soporte?
-    ¿Cómo se maneja el proceso de escalamiento en caso de incidentes en los ambientes de desarrollo y producción?
-    ¿Se puede recibir un inventario actualizado de equipos por sede, tipo y estado?
-    ¿Se cuenta con etiquetado estandarizado por activo (código, serie, ubicación)?
-    ¿Por política del cliente, el proveedor puede aprovisionar laptops y licencias o serán provistas por el cliente?
-    ¿Qué aplicaciones tienen integraciones con terceros, APIs o servicios externos?
-    ¿Se menciona la creación de conjuntos de APIs dentro del alcance?
-    ¿Se requiere una plataforma de gestión de APIs?
-    ¿Se tiene una estimación del número de consultas o transacciones concurrentes esperadas en hora pico?
-    ¿Todos los ambientes (DEV, QA, Preproducción, Producción) serán provistos por la Superintendencia?
-    ¿Es correcto interpretar que el cliente proveerá los ambientes de desarrollo y QA para el trabajo de las células?
-    ¿El oferente tendrá responsabilidades sobre actualizaciones de sistema operativo, librerías y dependencias?
-    ¿Es necesario que la solución sea On-Premise o en la nube? En caso de nube, especificar el partner (Azure, AWS, GCP).
-    ¿El cliente ya cuenta con licencias para plataformas asociadas a dashboards, monitoreo, gestión o integración, o se deben incluir?
-    ¿Cuántos datasets activos existen en el Data Lake?
-    ¿Cuál es la complejidad estimada del modelo de datos PostgreSQL (tablas, vistas, procedimientos, triggers, particiones)?
-    ¿Cuáles son las fuentes de datos principales que recibirá el sistema a desarrollar?
-    ¿Los datos procesados contienen información sensible o confidencial (financiera, personal, etc.)?
-    ¿Hay requerimientos de seguridad, privacidad o normativos que debamos considerar?
-    ¿Se necesita trazabilidad completa de cada acción que ejecute el sistema?
-    ¿Qué controles de acceso deben considerarse (usuarios, contraseñas, roles)?
-    ¿Quién sería el responsable de ejecutar el Ethical Hacking de los desarrollos entregados?
-    ¿Es válido proponer profesionales ubicados en oficinas del oferente en el extranjero si cumplen con el perfil requerido?
-    ¿Para efectos de calificación, es válido presentar experiencias de oficinas extranjeras?
-    ¿Se espera o requiere alguna certificación específica para los perfiles de la célula?
-    ¿Cuál es el plazo esperado de aprovisionamiento ante rotación o nueva solicitud de perfiles?
-    ¿Cuál es el máximo de días para el Onboarding o transición de perfiles?
-    En caso de ausencias temporales (vacaciones, licencias, descanso médico), ¿cuál es el tratamiento esperado?
-    ¿El cliente proporcionará una herramienta para gestión y seguimiento de proyectos (hitos, avances, registro)? Si requiere licencias (p. ej. Jira), ¿quién las costea?
-    ¿Las reuniones de seguimiento serán orquestadas por el cliente o por el oferente? ¿Cuál sería la frecuencia y si se requiere presencialidad?
-    ¿Existe un rol o comité del cliente con potestad de toma de decisiones y aprobación?
-    ¿Se tiene un estimado de participantes para las transferencias de conocimiento?
-    ¿Se debe proponer tarifa fuera de horario hábil por atención de incidentes?
-    ¿El diseño UX/UI será generado por el oferente o el cliente lo proporcionará?
-    En caso de migración, ¿qué metodología se espera? ¿Cuántos organismos serían incluidos y en qué formato?
-    ¿Se necesita un dashboard o portal para monitorar la ejecución de robots o automatizaciones?
-    ¿Quién será responsable de administrar los robots (TI, negocio o proveedor)?
-    ¿De dónde provienen los datos de entrada (formularios web, correos, Excel, BD, APIs, aplicaciones)?
-    ¿Cuál es el período de garantía exigido post pase a producción de un aplicativo?
-    
-INSTRUCCIONES ADICIONALES PARA FECHAS Y PLAZOS:
-
-1. Cada objeto en este array debe especificar claramente el "tipo" de fecha:
-    - Usa **"Entrega de Propuesta (Oferta)"** para la fecha límite de presentación de la oferta.
-    - Usa **"Plazo de Ejecución del Proyecto"** para la duración total del servicio/proyecto.
-    - Usa **"Fecha de Publicación/Resolución"** para la fecha del documento legal que inicia la licitación.
-2.  El campo "valor" debe contener la fecha o el plazo exacto del documento.
-3.  El campo "unidad" debe categorizar el formato encontrado:
-    - **FECHA_ABSOLUTA:** para fechas en formato YYYY-MM-DD (ej: 2025-10-24).
-    - **HITO_RELATIVO:** para hitos que usan días hábiles (ej: Día 10 hábil).
-    - **SEMANAS / MESES / DIAS:** para la duración del proyecto (ej: 26 semanas).
-4.  Si un tipo de fecha no se encuentra (ej: no hay Plazo de Ejecución), NO incluyas ese objeto en el array. Si no se encuentra *ninguna* fecha, el array debe ser `[]`.
 """
 
 # Proposal Generation Markdown Prompt

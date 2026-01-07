@@ -693,6 +693,7 @@ def get_workspace_documents(
     documents = (
         db.query(document_model.Document)
         .filter(document_model.Document.workspace_id == workspace_id)
+        .order_by(document_model.Document.created_at.desc())
         .all()
     )
 

@@ -7,7 +7,7 @@ import {
   ExpandOutlined,
   TableOutlined,
 } from "@ant-design/icons";
-import { message } from "antd";
+import { Toast } from "@/components/Toast";
 
 interface DataVisualizationProps {
   title: string;
@@ -34,7 +34,7 @@ export function DataVisualization({
 
   const handleCopyToClipboard = () => {
     navigator.clipboard.writeText(JSON.stringify(data, null, 2));
-    message.success("Datos copiados al portapapeles");
+    Toast.success("Datos copiados al portapapeles");
   };
 
   const handleExportCSV = () => {
@@ -50,7 +50,7 @@ export function DataVisualization({
     a.href = url;
     a.download = `${title.replace(/\s+/g, '_')}.csv`;
     a.click();
-    message.success("CSV descargado");
+    Toast.success("CSV descargado");
   };
 
   const tableColumns = columns.map(col => ({

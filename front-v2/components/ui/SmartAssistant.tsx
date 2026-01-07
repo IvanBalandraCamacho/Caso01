@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useState } from 'react'
-import { Modal, Tag, Progress, Spin, message, Tooltip } from 'antd'
+import { Modal, Tag, Progress, Spin, App, Tooltip } from 'antd'
 import { ModernButton } from './ModernButton'
 import { 
   CheckCircleOutlined, 
@@ -27,6 +27,7 @@ export function SmartAssistant({
   workspaceId,
   autoFetch = false,
 }: SmartAssistantProps) {
+  const { message } = App.useApp()
   const [loading, setLoading] = useState(false)
   const [realSuggestions, setRealSuggestions] = useState<Suggestion[]>([])
 
@@ -61,6 +62,8 @@ export function SmartAssistant({
       description: 'El RFP menciona "Plan de Calidad" pero no lo has subido aún',
       action: 'Subir documento',
       priority: 'high',
+      workspace_id: '',
+      workspace_name: '',
     },
     {
       type: 'deadline',
@@ -68,6 +71,8 @@ export function SmartAssistant({
       description: 'Presentación técnica debe entregarse en 14 días (15 Ene)',
       action: 'Ver calendario',
       priority: 'high',
+      workspace_id: '',
+      workspace_name: '',
     },
     {
       type: 'requirement',
@@ -75,6 +80,8 @@ export function SmartAssistant({
       description: 'Requisito #12: "Certificación ISO 27001" necesita evidencia',
       action: 'Agregar evidencia',
       priority: 'medium',
+      workspace_id: '',
+      workspace_name: '',
     },
     {
       type: 'team',
@@ -82,6 +89,8 @@ export function SmartAssistant({
       description: 'Se detectó necesidad de Arquitecto Cloud Senior (5+ años)',
       action: 'Ver equipo',
       priority: 'medium',
+      workspace_id: '',
+      workspace_name: '',
     },
     {
       type: 'improvement',
@@ -89,6 +98,8 @@ export function SmartAssistant({
       description: 'Agrega casos de éxito similares para aumentar score',
       action: 'Ver sugerencias',
       priority: 'low',
+      workspace_id: '',
+      workspace_name: '',
     },
   ]
 

@@ -1314,7 +1314,13 @@ export default function Sidebar() {
               <Button
                 type="text"
                 icon={<Rocket size={16} />}
-                onClick={() => router.push('/quick-analysis')}
+                onClick={() => {
+                  if (activeWorkspace?.id) {
+                    router.push(`/workspace/${activeWorkspace.id}/quick-analysis`);
+                  } else {
+                    router.push('/quick-analysis');
+                  }
+                }}
                 className="transition-smooth hover-lift"
                 style={{
                   width: "100%",

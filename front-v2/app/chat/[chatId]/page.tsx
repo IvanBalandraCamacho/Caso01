@@ -22,7 +22,7 @@ import {
   LoadingOutlined,
   DownOutlined,
 } from "@ant-design/icons"
-import { Button, Input, Typography, Drawer, message, Upload, Popover, Select } from "antd"
+import { Button, Input, Typography, Drawer, App, Upload, Popover, Select } from "antd"
 import type { UploadFile } from "antd"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -177,6 +177,7 @@ export default function GeneralChatPage({
   const { chatId } = use(params)
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { message } = App.useApp()
   const initialMessage = searchParams.get("message") || ""
   const chatTitle = searchParams.get("title") || "Nuevo Chat"
 

@@ -20,17 +20,21 @@ export const WorkspacesTable: React.FC = () => {
       key: 'operation_name',
       render: (text, record) => text || record.name,
       sorter: (a, b) => (a.operation_name || a.name).localeCompare(b.operation_name || b.name),
+      fixed: 'left',
+      width: 180,
     },
     {
       title: 'Cliente',
       dataIndex: 'client_company',
       key: 'client_company',
       sorter: (a, b) => (a.client_company || '').localeCompare(b.client_company || ''),
+      width: 150,
     },
     {
       title: 'País',
       dataIndex: 'country',
       key: 'country',
+      width: 100,
       filters: [
         { text: 'Brasil', value: 'Brasil' },
         { text: 'Chile', value: 'Chile' },
@@ -45,13 +49,34 @@ export const WorkspacesTable: React.FC = () => {
       title: 'TVT (USD)',
       dataIndex: 'tvt',
       key: 'tvt',
+      width: 120,
       render: (value) => value ? `$${value.toLocaleString()}` : '-',
       sorter: (a, b) => (a.tvt || 0) - (b.tvt || 0),
+    },
+    {
+      title: 'Stack',
+      dataIndex: 'tech_stack',
+      key: 'tech_stack',
+      width: 180,
+      render: (stack: string[] | null) => {
+        if (!stack || stack.length === 0) return '-';
+        const displayStack = stack.slice(0, 3);
+        const remaining = stack.length - 3;
+        return (
+          <Space size={[0, 4]} wrap>
+            {displayStack.map((tech, i) => (
+              <Tag key={i} color="blue" className="text-xs">{tech}</Tag>
+            ))}
+            {remaining > 0 && <Tag color="default">+{remaining}</Tag>}
+          </Space>
+        );
+      },
     },
     {
       title: 'Tipo',
       dataIndex: 'opportunity_type',
       key: 'opportunity_type',
+      width: 100,
       render: (type) => {
         let color = 'default'
         if (type === 'RFP') color = 'volcano'
@@ -67,14 +92,31 @@ export const WorkspacesTable: React.FC = () => {
       onFilter: (value, record) => record.opportunity_type === value,
     },
     {
+      title: 'Tiempo',
+      dataIndex: 'estimated_time',
+      key: 'estimated_time',
+      width: 100,
+      render: (time) => time || '-',
+    },
+    {
+      title: 'Recursos',
+      dataIndex: 'resource_count',
+      key: 'resource_count',
+      width: 90,
+      render: (count) => count ? count : '-',
+      sorter: (a, b) => (a.resource_count || 0) - (b.resource_count || 0),
+    },
+    {
       title: 'Categoría',
       dataIndex: 'category',
       key: 'category',
+      width: 120,
     },
     {
       title: 'Fecha',
       dataIndex: 'created_at',
       key: 'created_at',
+      width: 110,
       render: (date) => format(new Date(date), 'dd MMM yyyy', { locale: es }),
       sorter: (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
     },
@@ -105,6 +147,7 @@ export const WorkspacesTable: React.FC = () => {
         dataSource={filteredData}
         loading={isLoading}
         rowKey="id"
+        scroll={{ x: 1400 }}
         pagination={{
           pageSize: 5,
           className: "ant-table-pagination-custom",

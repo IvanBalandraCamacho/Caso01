@@ -4,7 +4,8 @@ import React from 'react'
 import { Button } from 'antd'
 import type { ButtonProps } from 'antd'
 
-interface ModernButtonProps extends ButtonProps {
+// Omit the 'variant' property from ButtonProps to avoid conflict with Ant Design 5.x
+interface ModernButtonProps extends Omit<ButtonProps, 'variant'> {
   variant?: 'primary' | 'secondary' | 'ghost' | 'gradient' | 'outline'
   glow?: boolean
 }

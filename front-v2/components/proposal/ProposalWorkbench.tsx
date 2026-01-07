@@ -1,20 +1,20 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { CopilotChat } from "@copilotkit/react-ui";
-import { message, Spin, Button, Tooltip } from "antd";
-import { 
-  LoadingOutlined, 
-  ArrowLeftOutlined, 
-  DownloadOutlined, 
+import { App, Spin, Button, Tooltip, Select } from "antd";
+import {
+  LoadingOutlined,
+  ArrowLeftOutlined,
+  DownloadOutlined,
   MessageOutlined,
   FileTextOutlined
 } from "@ant-design/icons";
+import { CopilotChat } from "@copilotkit/react-ui";
 import "@copilotkit/react-ui/styles.css";
 
 // API
-import { 
+import {
   generateProposalDocumentApi,
   fetchWorkspaceDetails,
   fetchWorkspaceDocuments,
@@ -34,6 +34,7 @@ interface ProposalWorkbenchProps {
 
 export default function ProposalWorkbench({ workspaceId, initialData, onClose }: ProposalWorkbenchProps) {
   const router = useRouter();
+  const { message } = App.useApp();
   
   // Estados
   const [extractedData, setExtractedData] = useState<any>(initialData || {});
@@ -42,6 +43,9 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
   const [proposalReady, setProposalReady] = useState(false);
   const [lastBlob, setLastBlob] = useState<Blob | null>(null);
   const [documentUrl, setDocumentUrl] = useState<string | null>(null);
+  const [documentType, setDocumentType] = useState<string | null>(null);
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [generatedDocUrl, setGeneratedDocUrl] = useState<string | null>(null);
 
   // 1. Cargar Datos y Documento
@@ -53,28 +57,62 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
         // Cargar detalles del workspace solo si no tenemos datos iniciales
         if (!initialData) {
             const workspace = await fetchWorkspaceDetails(workspaceId);
+            
+            // Intentar parsear los datos del análisis desde instructions
+            let analysisData: any = {};
+            if (workspace.instructions) {
+              try {
+                analysisData = JSON.parse(workspace.instructions);
+              } catch (e) {
+                console.warn("No se pudo parsear instructions como JSON");
+              }
+            }
+            
+            // Combinar datos del workspace con datos del análisis
             setExtractedData({
-              client_company: workspace.client_company || "",
-              operation_name: workspace.operation_name || "",
-              tvt: workspace.tvt || 0,
-              country: workspace.country || "",
-              tech_stack: Array.isArray(workspace.tech_stack) ? workspace.tech_stack.join(", ") : workspace.tech_stack || "",
-              category: workspace.category || "",
-              opportunity_type: workspace.opportunity_type || "RFP",
-              estimated_price: workspace.estimated_price || "",
-              estimated_time: workspace.estimated_time || "",
-              resource_count: workspace.resource_count || "",
-              objetivo: workspace.objective || ""
+              // Datos básicos del workspace
+              cliente: workspace.client_company || analysisData.cliente || "",
+              nombre_operacion: workspace.operation_name || analysisData.nombre_operacion || "",
+              tvt: workspace.tvt || analysisData.alcance_economico?.presupuesto || 0,
+              pais: workspace.country || analysisData.pais || "",
+              stack_tecnologico: Array.isArray(workspace.tech_stack) 
+                ? workspace.tech_stack.join(", ") 
+                : (Array.isArray(analysisData.stack_tecnologico) 
+                  ? analysisData.stack_tecnologico.join(", ") 
+                  : ""),
+              categoria: workspace.category || analysisData.categoria || "",
+              oportunidad: workspace.opportunity_type || analysisData.tipo_oportunidad || "RFP",
+              objetivo: workspace.objective || analysisData.objetivo_general || "",
+              fecha: new Date().toISOString().split('T')[0], // Fecha actual por defecto
+              // Tiempo y recursos
+              tiempo_aproximado: workspace.estimated_time || analysisData.tiempo_aproximado || "",
+              nro_recursos: workspace.resource_count || analysisData.nro_recursos || 0,
+              // Datos adicionales del análisis
+              equipo_sugerido: analysisData.equipo_sugerido || [],
+              fechas_y_plazos: analysisData.fechas_y_plazos || [],
+              preguntas_sugeridas: analysisData.preguntas_sugeridas || [],
+              moneda: analysisData.alcance_economico?.moneda || "USD"
             });
         }
 
-        // Cargar documento original para previsualización
+        // Cargar documentos del workspace
         const docs = await fetchWorkspaceDocuments(workspaceId);
+        setDocuments(docs || []);
+        
         if (docs && docs.length > 0) {
+            // Seleccionar el primero por defecto (que debería ser el más reciente por la corrección en backend)
             const mainDoc = docs[0]; 
-            const blob = await fetchDocumentContent(workspaceId, mainDoc.id);
-            const url = window.URL.createObjectURL(blob);
-            setDocumentUrl(url);
+            setSelectedDocId(mainDoc.id);
+            setDocumentType(mainDoc.file_type);
+            
+            try {
+                const blob = await fetchDocumentContent(workspaceId, mainDoc.id);
+                const url = window.URL.createObjectURL(blob);
+                setDocumentUrl(url);
+            } catch (err) {
+                console.error("Error cargando contenido del documento:", err);
+                message.warning("No se pudo cargar la vista previa del documento.");
+            }
         }
 
       } catch (error) {
@@ -93,13 +131,55 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
     };
   }, [workspaceId, initialData]);
 
+  const handleDocumentChange = async (docId: string) => {
+      setSelectedDocId(docId);
+      const selectedDoc = documents.find(d => d.id === docId);
+      if (!selectedDoc) return;
+      
+      setDocumentType(selectedDoc.file_type);
+      setProposalReady(false); // Volver a ver original si se cambia
+      
+      try {
+          // Revocar URL anterior para liberar memoria
+          if (documentUrl) window.URL.revokeObjectURL(documentUrl);
+          
+          const blob = await fetchDocumentContent(workspaceId, docId);
+          const url = window.URL.createObjectURL(blob);
+          setDocumentUrl(url);
+      } catch (err) {
+          console.error("Error cambiando documento:", err);
+          message.error("Error al cargar el documento seleccionado.");
+      }
+  };
+
   // 2. Manejar Generación
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
+      // Transformar datos del formulario al formato esperado por el backend
       const proposalData = {
         workspace_id: workspaceId,
-        ...extractedData
+        cliente: extractedData.cliente || "",
+        nombre_operacion: extractedData.nombre_operacion || "",
+        pais: extractedData.pais || "",
+        categoria: extractedData.categoria || "",
+        // Alcance económico como objeto estructurado
+        alcance_economico: {
+          presupuesto: extractedData.tvt || extractedData.precio || "",
+          moneda: extractedData.moneda || "USD"
+        },
+        // Objetivo general (el backend acepta string o lista)
+        objetivo_general: extractedData.objetivo || "",
+        objetivo_proyecto: extractedData.objetivo || "",
+        // Tecnologías como array
+        tecnologias_requeridas: typeof extractedData.stack_tecnologico === 'string'
+          ? extractedData.stack_tecnologico.split(',').map((t: string) => t.trim()).filter(Boolean)
+          : (extractedData.stack_tecnologico || []),
+        // Equipo y preguntas
+        equipo_sugerido: extractedData.equipo_sugerido || [],
+        preguntas_sugeridas: extractedData.preguntas_sugeridas || [],
+        // Fecha de entrega
+        fecha_entrega: extractedData.fecha || new Date().toISOString().split('T')[0]
       };
 
       const blob = await generateProposalDocumentApi(proposalData);
@@ -124,7 +204,7 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
       const url = window.URL.createObjectURL(lastBlob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `Propuesta_${extractedData.client_company || 'TIVIT'}.docx`;
+      link.download = `Propuesta_${extractedData.cliente || 'TIVIT'}.docx`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -145,7 +225,7 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
   }
 
   return (
-    <div className="flex h-screen w-full bg-[#F5F5F5] overflow-hidden font-sans relative">
+    <div className="flex h-screen w-full bg-[#131314] overflow-hidden font-sans relative">
       
       {onClose && (
         <button 
@@ -157,15 +237,15 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
       )}
 
       {/* --- COLUMNA IZQUIERDA (Acciones y Chat) - Ancho Fijo --- */}
-      <div className="w-[320px] flex-shrink-0 border-r border-zinc-200 bg-white flex flex-col h-full shadow-sm z-20">
+      <div className="w-[320px] flex-shrink-0 border-r border-zinc-800 bg-[#1E1F20] flex flex-col h-full shadow-sm z-20">
         
         {/* Cabecera / Navegación */}
-        <div className="p-4 border-b border-zinc-100 flex items-center justify-between bg-white">
+        <div className="p-4 border-b border-zinc-800 flex items-center justify-between bg-[#1E1F20]">
             <Button 
                 type="text" 
                 icon={<ArrowLeftOutlined />} 
                 onClick={() => router.push('/quick-analysis')}
-                className="text-slate-500 hover:text-slate-800 p-0 flex items-center"
+                className="text-zinc-400 hover:text-white p-0 flex items-center"
             >
                 Atrás
             </Button>
@@ -176,7 +256,7 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
                     size="small"
                     icon={<MessageOutlined />}
                     onClick={goToChat}
-                    className="text-blue-600 border-blue-200 hover:border-blue-400 bg-blue-50"
+                    className="text-[#E31837] border-red-900/30 hover:border-[#E31837] bg-red-950/20"
                 >
                     Ir al Chat
                 </Button>
@@ -184,7 +264,7 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
         </div>
 
         {/* Panel de Acciones Principal */}
-        <div className="p-5 border-b border-zinc-200 bg-slate-50/80">
+        <div className="p-5 border-b border-zinc-800 bg-[#131314]/80">
            <AnalysisActionsPanel 
              onGenerate={handleGenerate}
              isGenerating={isGenerating}
@@ -192,17 +272,17 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
            
            {/* Botón de descarga condicional */}
            {proposalReady && (
-               <div className="mt-3 pt-3 border-t border-slate-200 animate-fade-in-up">
+               <div className="mt-3 pt-3 border-t border-zinc-700 animate-fade-in-up">
                    <Button 
                      block 
                      type="dashed"
                      icon={<DownloadOutlined />} 
                      onClick={handleDownload}
-                     className="text-slate-600 border-slate-300 hover:text-blue-600 hover:border-blue-400"
+                     className="text-zinc-300 border-zinc-700 hover:text-[#E31837] hover:border-[#E31837]"
                    >
                      Descargar .DOCX
                    </Button>
-                   <p className="text-[10px] text-center text-slate-400 mt-2">
+                   <p className="text-[10px] text-center text-zinc-500 mt-2">
                        Generado: {new Date().toLocaleTimeString()}
                    </p>
                </div>
@@ -210,8 +290,8 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
         </div>
         
         {/* Chat Copilot */}
-        <div className="flex-1 flex flex-col bg-white overflow-hidden relative">
-           <div className="text-[10px] uppercase font-bold text-gray-400 p-2 text-center tracking-wider bg-white border-b border-zinc-100 flex items-center justify-center gap-2">
+        <div className="flex-1 flex flex-col bg-[#1E1F20] overflow-hidden relative">
+           <div className="text-[10px] uppercase font-bold text-zinc-400 p-2 text-center tracking-wider bg-[#131314] border-b border-zinc-800 flex items-center justify-center gap-2">
              <MessageOutlined /> Asistente de Análisis
            </div>
            <div className="flex-1 relative custom-copilot-wrapper">
@@ -219,7 +299,7 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
                 className="h-full w-full border-none shadow-none"
                 instructions={`
                     Estás en la Mesa de Trabajo de Propuestas.
-                    Contexto: Propuesta para ${extractedData.client_company}.
+                    Contexto: Propuesta para ${extractedData.cliente}.
                     Datos actuales: ${JSON.stringify(extractedData)}.
                     
                     TU OBJETIVO: Ayudar al usuario a completar o corregir los datos de la columna derecha.
@@ -238,22 +318,42 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
       </div>
 
       {/* --- COLUMNA CENTRAL (Previsualización) - Flexible --- */}
-      <div className="flex-1 bg-gray-100 p-6 overflow-hidden flex flex-col relative">
-         <div className="h-full bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+      <div className="flex-1 bg-[#0A0A0B] p-6 overflow-hidden flex flex-col relative">
+         <div className="h-full bg-[#1E1F20] rounded-xl shadow-sm border border-zinc-800 overflow-hidden flex flex-col">
              {/* Cabecera del visor */}
-             <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center flex-shrink-0">
-                <div className="flex items-center gap-2">
+             <div className="bg-[#131314] px-4 py-3 border-b border-zinc-800 flex justify-between items-center flex-shrink-0">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
                     {proposalReady ? (
                         <>
-                            <FileTextOutlined className="text-green-500" />
-                            <span className="font-semibold text-slate-700 text-sm">Propuesta Generada (Preview)</span>
-                            <span className="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded-full font-medium">NUEVO</span>
+                            <FileTextOutlined className="text-green-500 flex-shrink-0" />
+                            <span className="font-semibold text-white text-sm truncate">Propuesta Generada (Preview)</span>
+                            <span className="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0">NUEVO</span>
                         </>
                     ) : (
                         <>
-                            <FileTextOutlined className="text-slate-500" />
-                            <span className="font-semibold text-slate-700 text-sm">Documento Original (RFP)</span>
-                            <span className="bg-slate-200 text-slate-600 text-[10px] px-2 py-0.5 rounded-full font-medium">SOLO LECTURA</span>
+                            <FileTextOutlined className="text-zinc-400 flex-shrink-0" />
+                            <div className="flex flex-col flex-1 min-w-0 mr-4">
+                                {documents.length > 1 ? (
+                                    <Select
+                                        value={selectedDocId}
+                                        onChange={handleDocumentChange}
+                                        bordered={false}
+                                        className="text-white font-semibold min-w-[200px]"
+                                        popupMatchSelectWidth={false}
+                                        dropdownStyle={{ backgroundColor: '#1E1F20', border: '1px solid #303030' }}
+                                        suffixIcon={<span className="text-zinc-500">▼</span>}
+                                        options={documents.map(doc => ({
+                                            value: doc.id,
+                                            label: <span className="text-zinc-200">{doc.file_name}</span>
+                                        }))}
+                                    />
+                                ) : (
+                                    <span className="font-semibold text-white text-sm truncate">
+                                        {documents.length > 0 ? documents[0].file_name : "Documento Original (RFP)"}
+                                    </span>
+                                )}
+                            </div>
+                            <span className="bg-slate-200 text-slate-600 text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0">SOLO LECTURA</span>
                         </>
                     )}
                 </div>
@@ -261,7 +361,7 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
                     <Button 
                         size="small" 
                         type="text" 
-                        className="text-slate-500 hover:text-slate-800 text-xs"
+                        className="text-zinc-400 hover:text-white text-xs"
                         onClick={() => setProposalReady(false)}
                     >
                         Ver original
@@ -270,18 +370,19 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
              </div>
 
              {/* Contenido del visor */}
-             <div className="flex-1 relative bg-slate-100/50">
+             <div className="flex-1 relative bg-[#0A0A0B]/50">
                  <DocumentPreviewPanel 
                    showProposal={proposalReady} 
                    isLoading={isGenerating}
                    fileUrl={proposalReady ? generatedDocUrl : documentUrl}
+                   fileType={proposalReady ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" : (documentType || undefined)}
                  />
              </div>
          </div>
       </div>
 
       {/* --- COLUMNA DERECHA (Datos) - Ancho Fijo --- */}
-      <div className="w-[400px] flex-shrink-0 bg-white h-full overflow-y-auto p-6 shadow-xl z-20 border-l border-zinc-200">
+      <div className="w-[400px] flex-shrink-0 bg-[#1E1F20] h-full overflow-y-auto p-6 shadow-xl z-20 border-l border-zinc-800">
          <ExtractedDataPanel 
             data={extractedData} 
             setData={setExtractedData} 

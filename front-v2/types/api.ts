@@ -98,6 +98,15 @@ export interface WorkspacePublic extends WorkspaceBase {
   default_conversation_id?: string | null;
 }
 
+/**
+ * Workspace health/completion status
+ */
+export interface WorkspaceHealth {
+  completion_percentage: number;
+  missing_sections: string[];
+  status: 'healthy' | 'incomplete' | 'needs_attention';
+}
+
 // ==============================================
 // DOCUMENT TYPES
 // ==============================================

@@ -53,8 +53,11 @@ class ProposalsServiceImpl(ProposalsService):
                         tvt=float(tvt_val) if tvt_val else None,
                         operation_name=analysis_result.get("nombre_operacion"),
                         tech_stack=tech_stack_val if isinstance(tech_stack_val, list) else [str(tech_stack_val)] if tech_stack_val else [],
-                        opportunity_type="RFP",
+                        opportunity_type=analysis_result.get("tipo_oportunidad", "RFP"),
                         category=analysis_result.get("categoria"),
+                        objective=analysis_result.get("objetivo_general"),
+                        estimated_time=analysis_result.get("tiempo_aproximado"),
+                        resource_count=analysis_result.get("nro_recursos"),
                         
                         # Guardar resultado completo en instructions para contexto
                         instructions=json.dumps(analysis_result, ensure_ascii=False)

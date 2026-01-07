@@ -11,7 +11,7 @@ interface Props {
 export default function AnalysisActionsPanel({ onGenerate, isGenerating }: Props) {
   return (
     <div className="w-full flex flex-col gap-4">
-      <div className="text-sm font-medium text-slate-600">Acciones</div>
+      <div className="text-sm font-medium text-zinc-300">Acciones</div>
       
       <Button 
         onClick={onGenerate}
@@ -19,14 +19,14 @@ export default function AnalysisActionsPanel({ onGenerate, isGenerating }: Props
         type="primary"
         className={`
            w-full h-auto py-4 flex flex-col items-center justify-center gap-2 transition-all border-none
-           ${isGenerating ? "bg-slate-100 text-slate-400 border-2 border-slate-200 !shadow-none" : "bg-blue-600 hover:!bg-blue-700 text-white shadow-lg shadow-blue-200"}
+           ${isGenerating ? "bg-zinc-800 text-zinc-500 border-2 border-zinc-700 !shadow-none" : "bg-[#E31837] hover:!bg-[#C01530] text-white shadow-lg shadow-red-900/50"}
         `}
         style={{ height: 'auto', padding: '16px' }}
       >
         {isGenerating ? (
           <>
-            <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-            <span className="text-xs font-medium text-slate-400">Analizando documento...</span>
+            <Loader2 className="w-6 h-6 animate-spin text-zinc-500" />
+            <span className="text-xs font-medium text-zinc-500">Analizando documento...</span>
           </>
         ) : (
           <>
@@ -40,7 +40,7 @@ export default function AnalysisActionsPanel({ onGenerate, isGenerating }: Props
       </Button>
 
       {!isGenerating && (
-        <p className="text-xs text-slate-400 text-center px-2 m-0">
+        <p className="text-xs text-zinc-400 text-center px-2 m-0">
           La IA analizará el documento cargado y rellenará la tabla de datos automáticamente.
         </p>
       )}
