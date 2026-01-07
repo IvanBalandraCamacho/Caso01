@@ -1,0 +1,7 @@
+mcp
+pandas
+lancedb
+sentence-transformers
+tantivy
+torch
+openpyxl

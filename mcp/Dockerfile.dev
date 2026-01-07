@@ -1,0 +1,58 @@
+# Stage 1: Builder
+FROM python:3.11-slim AS builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gcc \
+    g++ \
+    gfortran \
+    libopenblas-dev \
+    liblapack-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt .
+
+# Install dependencies into user directory
+RUN pip install --user --no-cache-dir --upgrade pip
+# Install PyTorch for CPU to keep image size small
+RUN pip install --user --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --user --no-cache-dir -r requirements.txt
+
+# Stage 2: Runner
+FROM python:3.11-slim AS runner
+
+WORKDIR /app
+
+# Create a non-root user for security
+RUN useradd -m -u 1000 appuser
+
+# Install only runtime libraries needed by numpy/scipy/torch
+RUN apt-get update && apt-get install -y \
+    libopenblas0 \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy installed packages from builder
+COPY --from=builder /root/.local /home/appuser/.local
+
+# Update PATH to include user bin
+ENV PATH=/home/appuser/.local/bin:$PATH
+
+# Copy application code
+COPY . .
+
+# Create directory for LanceDB data and set permissions
+RUN mkdir -p /app/lancedb_data && chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
+
+# MCP servers typically run via stdio, but we expose a port for health checks
+EXPOSE 8083
+
+# Default command runs the MCP server
+CMD ["python", "server.py"]

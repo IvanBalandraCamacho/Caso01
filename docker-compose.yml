@@ -122,6 +122,21 @@ services:
       - rag_data:/app/data
     command: uvicorn main:app --host 0.0.0.0 --port 8080 --reload
 
+  # 7. Servidor MCP - Buscador de Talento Semántico
+  mcp-server:
+    build:
+      context: ./mcp
+      dockerfile: Dockerfile.dev
+    container_name: ia_mcp_server
+    ports:
+      - "8083:8083"
+    volumes:
+      - ./mcp:/app
+      - mcp_lancedb_data:/app/lancedb_data
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+
   celery_worker:
     build:
       context: ./backend
@@ -165,3 +180,4 @@ volumes:
   mysql_data:
   qdrant_data:
   rag_data:
+  mcp_lancedb_data:
