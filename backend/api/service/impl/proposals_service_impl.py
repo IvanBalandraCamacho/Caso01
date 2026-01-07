@@ -1,11 +1,13 @@
 import json
-from typing import Dict, Any, Optional
-from fastapi import UploadFile, HTTPException, requests, status, File
+import asyncio
+from typing import Dict, Any, Optional, List
+from fastapi import UploadFile, HTTPException, status, File
 from sqlalchemy.orm import Session
 from api.service.proposals_service import ProposalsService
 from prompts.proposals.analyze_prompts import AnalyzePrompts
 from utils.file_util import FileUtil
 from core import llm_service
+from core.mcp_client import mcp_talent_client
 from models.user import User
 from models.workspace import Workspace
 import logging
@@ -29,6 +31,12 @@ class ProposalsServiceImpl(ProposalsService):
                 
                 # 1. Ejecutar análisis IA
                 analysis_result = self._analyze_with_ia(prompt)
+                
+                # 1.5 Enriquecer equipo sugerido con candidatos reales (MCP)
+                analysis_result = await self._enrich_team_with_mcp(
+                    analysis_result, 
+                    pais=analysis_result.get("pais")
+                )
                 
                 # 2. Persistir como Workspace
                 try:
@@ -172,32 +180,53 @@ class ProposalsServiceImpl(ProposalsService):
             response_text = response_text[:-3]
         return response_text.strip()
     
-    def _consume_api(self, response: str) -> list[str]:
-        external_url = "http://localhost:8095/recomendations/recommend"
-        payload = {
-            "requirement": response,
-            "limit": 3,
-            "umbral": 2
-        }
-
+    async def _enrich_team_with_mcp(
+        self, 
+        analysis_result: Dict[str, Any],
+        pais: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Enriquece el equipo sugerido con candidatos reales del MCP.
+        
+        Args:
+            analysis_result: Resultado del analisis LLM
+            pais: Pais del proyecto para filtrar candidatos
+            
+        Returns:
+            analysis_result con equipo_sugerido enriquecido
+        """
+        equipo_sugerido = analysis_result.get("equipo_sugerido", [])
+        
+        if not equipo_sugerido:
+            logger.info("No hay equipo_sugerido para enriquecer")
+            return analysis_result
+        
         try:
-            api_result = requests.post(external_url, json=payload)
-            api_result.raise_for_status()
-
-            trabajadores = api_result.json() 
-            textos = []
-
-            for t in trabajadores:
-                if isinstance(t, dict):
-                    texto = "\n".join([
-                        f"{k}: {v}" for k, v in t.items()
-                    ])
-                    textos.append(texto)
-                else:
-                    textos.append(str(t))
-
-            return textos
-
+            logger.info(f"Enriqueciendo {len(equipo_sugerido)} roles con MCP...")
+            
+            # Llamar al MCP para enriquecer cada rol
+            enriched_team = await mcp_talent_client.enrich_team_suggestions(
+                equipo_sugerido=equipo_sugerido,
+                pais=pais
+            )
+            
+            # Actualizar el resultado
+            analysis_result["equipo_sugerido"] = enriched_team
+            
+            total_candidatos = sum(
+                len(m.get("candidatos_sugeridos", [])) 
+                for m in enriched_team
+            )
+            logger.info(f"Equipo enriquecido con {total_candidatos} candidatos sugeridos")
+            
         except Exception as e:
-            logger.error(f"Error consumiendo API externa: {str(e)}")
-            return []
+            logger.warning(f"Error enriqueciendo equipo con MCP (continuando sin enriquecer): {e}")
+            # No fallar el analisis si MCP no esta disponible
+        
+        return analysis_result
+    
+    def _consume_api(self, response: str) -> list:
+        """Legacy method - kept for backwards compatibility but deprecated."""
+        # Este metodo esta deprecado, usar MCP client en su lugar
+        logger.warning("_consume_api is deprecated, use MCP client instead")
+        return []

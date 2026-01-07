@@ -30,6 +30,9 @@ services:
       # LLM
       - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # MCP Talent Service
+      - MCP_SERVICE_URL=http://mcp-server:8083
+      - MCP_SERVICE_ENABLED=true
     depends_on:
       mysql:
         condition: service_healthy
@@ -164,6 +167,9 @@ services:
       - DOCUMENT_AI_PROCESSOR_ID=${DOCUMENT_AI_PROCESSOR_ID:-}
       - DOCUMENT_AI_LOCATION=${DOCUMENT_AI_LOCATION:-us}
       - ENABLE_NATURAL_LANGUAGE=${ENABLE_NATURAL_LANGUAGE:-true}
+      # MCP Talent Service
+      - MCP_SERVICE_URL=http://mcp-server:8083
+      - MCP_SERVICE_ENABLED=true
     depends_on:
       mysql:
         condition: service_healthy
@@ -174,6 +180,8 @@ services:
       qdrant:
         condition: service_started
       rag-service:
+        condition: service_started
+      mcp-server:
         condition: service_started
 
 volumes:

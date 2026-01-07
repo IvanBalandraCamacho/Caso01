@@ -524,3 +524,102 @@ export interface TeamSuggestionResponse {
   costo_total_proyecto: number;
   cobertura_servicios: string[];
 }
+
+// ==============================================
+// MCP TALENT SEARCH TYPES
+// ==============================================
+
+/**
+ * Candidato encontrado en la busqueda de talento MCP
+ */
+export interface TalentCandidate {
+  nombre: string;
+  cargo: string;
+  certificacion: string;
+  institucion: string;
+  pais: string;
+  fecha_emision: string;
+  score: float;
+}
+
+/**
+ * Request para busqueda de talento
+ */
+export interface TalentSearchRequest {
+  consulta: string;
+  limit?: number;
+}
+
+/**
+ * Response de busqueda de talento
+ */
+export interface TalentSearchResponse {
+  exito: boolean;
+  mensaje: string;
+  candidatos: TalentCandidate[];
+}
+
+/**
+ * Miembro del equipo para enriquecimiento
+ */
+export interface TeamMemberForEnrichment {
+  rol: string;
+  seniority?: string;
+  cantidad?: number;
+  skills?: string[];
+}
+
+/**
+ * Request para enriquecer equipo con candidatos
+ */
+export interface EnrichTeamRequest {
+  equipo_sugerido: TeamMemberForEnrichment[];
+  pais?: string;
+}
+
+/**
+ * Candidato sugerido para un rol
+ */
+export interface SuggestedCandidate {
+  nombre: string;
+  cargo_actual: string;
+  certificacion: string;
+  institucion: string;
+  pais: string;
+  match_score: number;
+}
+
+/**
+ * Miembro del equipo enriquecido con candidatos
+ */
+export interface EnrichedTeamMember {
+  rol: string;
+  seniority?: string;
+  cantidad: number;
+  skills: string[];
+  candidatos_sugeridos: SuggestedCandidate[];
+}
+
+/**
+ * Response de enriquecimiento de equipo
+ */
+export interface EnrichTeamResponse {
+  exito: boolean;
+  mensaje: string;
+  equipo_enriquecido: EnrichedTeamMember[];
+}
+
+/**
+ * Estadisticas de la base de talento
+ */
+export interface TalentStats {
+  exito: boolean;
+  estadisticas?: {
+    total_certificaciones: number;
+    total_colaboradores: number;
+    paises: Record<string, number>;
+    instituciones_top_10: Record<string, number>;
+    cargos_top_10: Record<string, number>;
+  };
+  mensaje?: string;
+}

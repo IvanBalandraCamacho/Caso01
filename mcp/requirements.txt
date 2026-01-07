@@ -5,3 +5,6 @@ sentence-transformers
 tantivy
 torch
 openpyxl
+fastapi
+uvicorn[standard]
+pydantic

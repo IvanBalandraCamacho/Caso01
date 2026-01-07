@@ -1104,6 +1104,58 @@ export const sugerirEquipo = async (
 };
 
 // ============================================
+// MCP TALENT SEARCH API FUNCTIONS
+// ============================================
+
+import type {
+  TalentSearchRequest,
+  TalentSearchResponse,
+  EnrichTeamRequest,
+  EnrichTeamResponse,
+  TalentStats,
+} from "@/types/api";
+
+/**
+ * Search for talent using semantic search
+ * POST /api/v1/talent/search
+ */
+export const searchTalent = async (
+  request: TalentSearchRequest,
+): Promise<TalentSearchResponse> => {
+  const { data } = await api.post<TalentSearchResponse>("/talent/search", request);
+  return data;
+};
+
+/**
+ * Enrich team suggestions with real candidates from MCP
+ * POST /api/v1/talent/enrich-team
+ */
+export const enrichTeamWithCandidates = async (
+  request: EnrichTeamRequest,
+): Promise<EnrichTeamResponse> => {
+  const { data } = await api.post<EnrichTeamResponse>("/talent/enrich-team", request);
+  return data;
+};
+
+/**
+ * Get talent database statistics
+ * GET /api/v1/talent/stats
+ */
+export const getTalentStats = async (): Promise<TalentStats> => {
+  const { data } = await api.get<TalentStats>("/talent/stats");
+  return data;
+};
+
+/**
+ * Health check for MCP talent service
+ * GET /api/v1/talent/health
+ */
+export const talentHealthCheck = async (): Promise<{ status: string; total_registros: number; modelo_cargado: boolean }> => {
+  const { data } = await api.get("/talent/health");
+  return data;
+};
+
+// ============================================
 // HEALTH CHECK API FUNCTIONS
 // ============================================
 

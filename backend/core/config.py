@@ -87,6 +87,13 @@ class Settings(BaseSettings):
     RAG_SERVICE_ENABLED: bool = True
     
     # ========================================================================
+    # MCP TALENT SERVICE
+    # ========================================================================
+    MCP_SERVICE_URL: str = "http://mcp-server:8083"
+    MCP_SERVICE_ENABLED: bool = True
+    MCP_SERVICE_TIMEOUT: float = 30.0
+    
+    # ========================================================================
     # FILE UPLOAD
     # ========================================================================
     MAX_FILE_SIZE: int = 52428800  # 50MB
