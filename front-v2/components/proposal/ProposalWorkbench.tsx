@@ -175,8 +175,10 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
         tecnologias_requeridas: typeof extractedData.stack_tecnologico === 'string'
           ? extractedData.stack_tecnologico.split(',').map((t: string) => t.trim()).filter(Boolean)
           : (extractedData.stack_tecnologico || []),
-        // Equipo y preguntas
-        equipo_sugerido: extractedData.equipo_sugerido || [],
+        // Equipo y preguntas - Usar equipo_seleccionado si existe, sino equipo_sugerido
+        equipo_sugerido: extractedData.equipo_seleccionado?.length > 0 
+          ? extractedData.equipo_seleccionado 
+          : (extractedData.equipo_sugerido || []),
         preguntas_sugeridas: extractedData.preguntas_sugeridas || [],
         // Fecha de entrega
         fecha_entrega: extractedData.fecha || new Date().toISOString().split('T')[0]

@@ -548,6 +548,7 @@ export interface TalentCandidate {
 export interface TalentSearchRequest {
   consulta: string;
   limit?: number;
+  pais?: string;  // Filtro opcional por pais
 }
 
 /**

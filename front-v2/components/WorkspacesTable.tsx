@@ -99,11 +99,11 @@ export const WorkspacesTable: React.FC = () => {
       render: (time) => time || '-',
     },
     {
-      title: 'Recursos',
+      title: 'Personas',
       dataIndex: 'resource_count',
       key: 'resource_count',
       width: 90,
-      render: (count) => count ? count : '-',
+      render: (count) => count ? `${count} pers.` : '-',
       sorter: (a, b) => (a.resource_count || 0) - (b.resource_count || 0),
     },
     {

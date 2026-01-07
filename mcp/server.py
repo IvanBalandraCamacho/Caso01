@@ -5,6 +5,10 @@ Permite buscar candidatos idoneos en una base de datos de certificaciones usando
 Expone:
 1. Servidor MCP via stdio para integracion con agentes IA
 2. API REST HTTP en puerto 8083 para integracion directa con backend
+
+FILTROS OBLIGATORIOS:
+- Status: Verificado
+- Expirado: Nao
 """
 
 import os
@@ -33,15 +37,6 @@ DATA_FILE = BASE_DIR / "Capital Intelectual.xlsx"
 LANCEDB_PATH = BASE_DIR / "lancedb_data"
 TABLE_NAME = "certificaciones"
 
-# Columnas del archivo (nombres exactos)
-COL_CERTIFICACION = "Certificacao"
-COL_INSTITUCION = "Instituicao"
-COL_STATUS = "Status"
-COL_NOMBRE = "[Colaborador] Nome"
-COL_CARGO = "[Colaborador] Cargo"
-COL_PAIS = "[Colaborador] Pais"
-COL_FECHA_EMISION = "Data de emissao"
-
 # Modelo multilingue para embeddings (PT/ES)
 EMBEDDING_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"
 
@@ -54,6 +49,7 @@ class TalentSearchRequest(BaseModel):
     """Request para busqueda de talento."""
     consulta: str
     limit: int = 10
+    pais: Optional[str] = None  # Filtro opcional por pais
 
 
 class Candidato(BaseModel):
@@ -74,6 +70,13 @@ class TalentSearchResponse(BaseModel):
     candidatos: List[Candidato]
 
 
+class CountriesResponse(BaseModel):
+    """Response con lista de paises disponibles."""
+    exito: bool
+    paises: List[str]
+    total: int
+
+
 class StatsResponse(BaseModel):
     """Response de estadisticas."""
     exito: bool
@@ -92,6 +95,7 @@ class HealthResponse(BaseModel):
 _model: SentenceTransformer = None
 _db: lancedb.DBConnection = None
 _table = None
+_available_countries: List[str] = []  # Cache de paises disponibles
 
 
 def get_model() -> SentenceTransformer:
@@ -104,8 +108,21 @@ def get_model() -> SentenceTransformer:
     return _model
 
 
+def find_column(df: pd.DataFrame, possible_names: list) -> Optional[str]:
+    """Encuentra una columna por nombres posibles."""
+    for name in possible_names:
+        if name in df.columns:
+            return name
+        for col in df.columns:
+            if name.lower() in col.lower():
+                return col
+    return None
+
+
 def load_and_process_data() -> pd.DataFrame:
     """Carga y procesa el archivo Excel de certificaciones."""
+    global _available_countries
+    
     try:
         logger.info(f"Cargando datos desde: {DATA_FILE}")
         
@@ -117,23 +134,43 @@ def load_and_process_data() -> pd.DataFrame:
         # Limpiar valores NaN
         df = df.fillna("")
         
-        # FILTRO CRITICO: Solo procesar certificaciones verificadas
-        # Buscar columna Status de forma flexible
-        status_col = None
-        for col in df.columns:
-            if "status" in col.lower():
-                status_col = col
-                break
-        
+        # ============================================
+        # FILTRO OBLIGATORIO 1: Status = Verificado
+        # ============================================
+        status_col = find_column(df, ["Status", "status"])
         if status_col:
+            before_count = len(df)
             df = df[df[status_col].astype(str).str.strip().str.lower() == "verificado"]
-            logger.info(f"Filas despues de filtrar por 'Verificado': {len(df)}")
+            logger.info(f"Filtro Status=Verificado: {before_count} -> {len(df)} registros")
         else:
-            logger.warning("Columna 'Status' no encontrada. Procesando todas las filas.")
+            logger.warning("Columna 'Status' no encontrada")
+        
+        # ============================================
+        # FILTRO OBLIGATORIO 2: Expirado = Nao
+        # ============================================
+        expirado_col = find_column(df, ["Expirado", "expirado", "Expired"])
+        if expirado_col:
+            before_count = len(df)
+            # Filtrar por "Nao" o "Não" (con tilde portugues)
+            df = df[df[expirado_col].astype(str).str.strip().str.lower().isin(["nao", "não", "no", "n"])]
+            logger.info(f"Filtro Expirado=Nao: {before_count} -> {len(df)} registros")
+        else:
+            logger.warning("Columna 'Expirado' no encontrada")
         
         if len(df) == 0:
-            logger.warning("No se encontraron registros con status 'Verificado'")
+            logger.warning("No se encontraron registros despues de aplicar filtros")
             return pd.DataFrame()
+        
+        # ============================================
+        # Extraer paises disponibles para filtros
+        # ============================================
+        pais_col = find_column(df, ["[Colaborador] Pais", "Pais", "Country", "pais"])
+        if pais_col:
+            _available_countries = sorted(
+                df[pais_col].astype(str).str.strip().unique().tolist()
+            )
+            _available_countries = [p for p in _available_countries if p]  # Remover vacios
+            logger.info(f"Paises disponibles: {_available_countries}")
         
         return df
         
@@ -149,20 +186,23 @@ def get_column_value(row: pd.Series, possible_names: list, default: str = "") ->
     """Obtiene valor de columna buscando varios nombres posibles."""
     for name in possible_names:
         if name in row.index:
-            return str(row[name])
-        # Buscar de forma flexible
+            val = row[name]
+            if pd.notna(val):
+                return str(val)
         for col in row.index:
             if name.lower() in col.lower():
-                return str(row[col])
+                val = row[col]
+                if pd.notna(val):
+                    return str(val)
     return default
 
 
 def create_search_context(row: pd.Series) -> str:
     """Crea el texto de contexto para vectorizar concatenando campos relevantes."""
-    cargo = get_column_value(row, ["Cargo", "[Colaborador] Cargo"])
-    cert = get_column_value(row, ["Certificacao", "Certificacao"])
-    inst = get_column_value(row, ["Instituicao", "Instituicao"])
-    pais = get_column_value(row, ["Pais", "[Colaborador] Pais"])
+    cargo = get_column_value(row, ["[Colaborador] Cargo", "Cargo"])
+    cert = get_column_value(row, ["Certificação", "Certificacao", "Certificación"])
+    inst = get_column_value(row, ["Instituição", "Instituicao", "Institución"])
+    pais = get_column_value(row, ["[Colaborador] País", "[Colaborador] Pais", "Pais", "País"])
     
     parts = [cargo, cert, inst, pais]
     return " ".join(part.strip() for part in parts if part.strip())
@@ -187,6 +227,15 @@ def initialize_vector_db(force_rebuild: bool = False):
         logger.info(f"Tabla '{TABLE_NAME}' encontrada. Reutilizando datos existentes.")
         _table = _db.open_table(TABLE_NAME)
         logger.info(f"Tabla abierta con {_table.count_rows()} registros")
+        
+        # Cargar paises disponibles desde la tabla
+        global _available_countries
+        try:
+            df = _table.to_pandas()
+            _available_countries = sorted(df["pais"].unique().tolist())
+            _available_countries = [p for p in _available_countries if p]
+        except:
+            pass
         return
     
     # Cargar y procesar datos
@@ -210,12 +259,12 @@ def initialize_vector_db(force_rebuild: bool = False):
     for idx, (_, row) in enumerate(df.iterrows()):
         records.append({
             "id": idx,
-            "nombre": get_column_value(row, ["Nome", "[Colaborador] Nome"]),
-            "cargo": get_column_value(row, ["Cargo", "[Colaborador] Cargo"]),
-            "certificacion": get_column_value(row, ["Certificacao", "Certificacao"]),
-            "institucion": get_column_value(row, ["Instituicao", "Instituicao"]),
-            "pais": get_column_value(row, ["Pais", "[Colaborador] Pais"]),
-            "fecha_emision": get_column_value(row, ["Data de emissao", "Data"]),
+            "nombre": get_column_value(row, ["[Colaborador] Nome", "Nome"]),
+            "cargo": get_column_value(row, ["[Colaborador] Cargo", "Cargo"]),
+            "certificacion": get_column_value(row, ["Certificação", "Certificacao", "Certificación"]),
+            "institucion": get_column_value(row, ["Instituição", "Instituicao", "Institución"]),
+            "pais": get_column_value(row, ["[Colaborador] País", "[Colaborador] Pais", "Pais", "País"]),
+            "fecha_emision": get_column_value(row, ["Data de emissão", "Data de emissao", "Data"]),
             "search_context": row["search_context"],
             "vector": embeddings[idx].tolist()
         })
@@ -228,7 +277,7 @@ def initialize_vector_db(force_rebuild: bool = False):
     logger.info(f"Tabla '{TABLE_NAME}' creada con {len(records)} registros")
 
 
-def search_candidates(query: str, limit: int = 10) -> list:
+def search_candidates(query: str, limit: int = 10, pais: Optional[str] = None) -> list:
     """Busca candidatos usando busqueda vectorial."""
     global _table
     
@@ -240,12 +289,26 @@ def search_candidates(query: str, limit: int = 10) -> list:
     # Convertir consulta a vector
     query_vector = model.encode([query])[0].tolist()
     
-    # Buscar vecinos mas cercanos
-    results = _table.search(query_vector).limit(limit).to_pandas()
+    # Buscar vecinos mas cercanos (buscar mas si hay filtro de pais)
+    search_limit = limit * 5 if pais else limit
+    results = _table.search(query_vector).limit(search_limit).to_pandas()
+    
+    # Aplicar filtro de pais si se especifica
+    if pais:
+        results = results[results["pais"].str.lower() == pais.lower()]
+    
+    # Limitar resultados finales
+    results = results.head(limit)
     
     # Formatear resultados
     candidates = []
     for _, row in results.iterrows():
+        # Convertir distancia a score de similitud (0-1, donde 1 = mejor match)
+        # LanceDB retorna _distance donde menor = mejor
+        # Usamos formula: similarity = 1 / (1 + distance)
+        distance = float(row.get("_distance", 0))
+        similarity_score = 1 / (1 + distance)  # Siempre entre 0 y 1
+        
         candidates.append({
             "nombre": row["nombre"],
             "cargo": row["cargo"],
@@ -253,7 +316,7 @@ def search_candidates(query: str, limit: int = 10) -> list:
             "institucion": row["institucion"],
             "pais": row["pais"],
             "fecha_emision": row["fecha_emision"],
-            "score": float(row.get("_distance", 0))
+            "score": similarity_score  # Ahora es 0-1 donde 1 = mejor
         })
     
     return candidates
@@ -283,6 +346,7 @@ def get_statistics() -> dict:
 async def lifespan(app: FastAPI):
     """Lifecycle manager para inicializar la DB al arrancar."""
     logger.info("Iniciando servidor REST API: Buscador de Talento")
+    logger.info("FILTROS ACTIVOS: Status=Verificado, Expirado=Nao")
     try:
         initialize_vector_db()
     except FileNotFoundError:
@@ -300,8 +364,8 @@ async def lifespan(app: FastAPI):
 # Crear app FastAPI
 app = FastAPI(
     title="MCP Talent Search API",
-    description="API REST para busqueda semantica de talento basada en certificaciones",
-    version="1.0.0",
+    description="API REST para busqueda semantica de talento basada en certificaciones. Filtra automaticamente por Status=Verificado y Expirado=Nao.",
+    version="1.1.0",
     lifespan=lifespan
 )
 
@@ -325,6 +389,19 @@ async def health_check():
     )
 
 
+@app.get("/countries", response_model=CountriesResponse)
+async def get_countries():
+    """
+    Obtiene la lista de paises disponibles para filtrar.
+    Solo incluye paises de personas con Status=Verificado y Expirado=Nao.
+    """
+    return CountriesResponse(
+        exito=True,
+        paises=_available_countries,
+        total=len(_available_countries)
+    )
+
+
 @app.post("/search", response_model=TalentSearchResponse)
 async def search_talent(request: TalentSearchRequest):
     """
@@ -332,6 +409,9 @@ async def search_talent(request: TalentSearchRequest):
     
     - **consulta**: Descripcion de las habilidades o perfil buscado
     - **limit**: Numero maximo de resultados (default: 10)
+    - **pais**: Filtro opcional por pais
+    
+    NOTA: Solo retorna personas con Status=Verificado y Expirado=Nao
     """
     try:
         if _table is None:
@@ -340,8 +420,8 @@ async def search_talent(request: TalentSearchRequest):
                 detail="Base de datos no inicializada. El servicio esta en modo degradado."
             )
         
-        logger.info(f"Buscando talento con consulta: {request.consulta}")
-        candidates = search_candidates(request.consulta, limit=request.limit)
+        logger.info(f"Buscando talento: '{request.consulta}' | pais={request.pais} | limit={request.limit}")
+        candidates = search_candidates(request.consulta, limit=request.limit, pais=request.pais)
         
         if not candidates:
             return TalentSearchResponse(
@@ -368,12 +448,13 @@ async def search_talent(request: TalentSearchRequest):
 @app.get("/search", response_model=TalentSearchResponse)
 async def search_talent_get(
     consulta: str = Query(..., description="Consulta en lenguaje natural"),
-    limit: int = Query(10, ge=1, le=50, description="Numero maximo de resultados")
+    limit: int = Query(10, ge=1, le=50, description="Numero maximo de resultados"),
+    pais: Optional[str] = Query(None, description="Filtrar por pais")
 ):
     """
     Busca candidatos (metodo GET para facilitar pruebas).
     """
-    return await search_talent(TalentSearchRequest(consulta=consulta, limit=limit))
+    return await search_talent(TalentSearchRequest(consulta=consulta, limit=limit, pais=pais))
 
 
 @app.get("/stats", response_model=StatsResponse)
@@ -407,7 +488,8 @@ async def reindex_database():
             count = _table.count_rows()
             return {
                 "exito": True,
-                "mensaje": f"Indice reconstruido exitosamente con {count} registros."
+                "mensaje": f"Indice reconstruido exitosamente con {count} registros.",
+                "paises_disponibles": _available_countries
             }
         else:
             return {
@@ -424,25 +506,26 @@ async def reindex_database():
 # MCP TOOLS (si MCP esta disponible)
 # ============================================
 
-# Importar MCP solo si esta disponible
 try:
     from mcp.server.fastmcp import FastMCP
     mcp = FastMCP("buscador-talento")
     MCP_AVAILABLE = True
     
     @mcp.tool()
-    def buscar_talento(consulta: str) -> str:
+    def buscar_talento(consulta: str, pais: str = None) -> str:
         """
         Busca candidatos idoneos basandose en una consulta en lenguaje natural.
+        Solo retorna personas con Status=Verificado y Expirado=Nao.
         
         Args:
             consulta: Descripcion de las habilidades o perfil buscado.
+            pais: Filtro opcional por pais.
         
         Returns:
             JSON string con lista de candidatos encontrados.
         """
         try:
-            candidates = search_candidates(consulta, limit=10)
+            candidates = search_candidates(consulta, limit=10, pais=pais)
             
             if not candidates:
                 return json.dumps({
@@ -465,6 +548,15 @@ try:
             }, ensure_ascii=False, indent=2)
 
     @mcp.tool()
+    def listar_paises() -> str:
+        """Lista los paises disponibles para filtrar la busqueda."""
+        return json.dumps({
+            "exito": True,
+            "paises": _available_countries,
+            "total": len(_available_countries)
+        }, ensure_ascii=False, indent=2)
+
+    @mcp.tool()
     def reiniciar_indice() -> str:
         """Reconstruye el indice vectorial desde el archivo Excel."""
         try:
@@ -473,7 +565,8 @@ try:
                 count = _table.count_rows()
                 return json.dumps({
                     "exito": True,
-                    "mensaje": f"Indice reconstruido con {count} registros."
+                    "mensaje": f"Indice reconstruido con {count} registros.",
+                    "paises_disponibles": _available_countries
                 }, ensure_ascii=False)
             return json.dumps({
                 "exito": False,

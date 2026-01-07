@@ -203,3 +203,23 @@ async def talent_health_check():
             "status": "error",
             "detail": str(e)
         }
+
+
+@router.get("/countries")
+async def get_countries(
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Obtiene la lista de paises disponibles para filtrar.
+    Solo incluye paises de personas con Status=Verificado y Expirado=Nao.
+    """
+    try:
+        countries = await mcp_talent_client.get_countries()
+        return countries
+        
+    except Exception as e:
+        logger.error(f"Error getting countries: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al obtener paises: {str(e)}"
+        )

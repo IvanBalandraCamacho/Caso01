@@ -1155,6 +1155,15 @@ export const talentHealthCheck = async (): Promise<{ status: string; total_regis
   return data;
 };
 
+/**
+ * Get available countries for talent filtering
+ * GET /api/v1/talent/countries
+ */
+export const getTalentCountries = async (): Promise<{ exito: boolean; paises: string[]; total: number }> => {
+  const { data } = await api.get("/talent/countries");
+  return data;
+};
+
 // ============================================
 // HEALTH CHECK API FUNCTIONS
 // ============================================

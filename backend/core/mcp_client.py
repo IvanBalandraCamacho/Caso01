@@ -118,7 +118,8 @@ class MCPTalentClient:
     async def search_talent(
         self,
         consulta: str,
-        limit: int = 10
+        limit: int = 10,
+        pais: Optional[str] = None
     ) -> TalentSearchResponse:
         """
         Busca candidatos relevantes para una consulta.
@@ -126,6 +127,7 @@ class MCPTalentClient:
         Args:
             consulta: Descripcion en lenguaje natural del perfil buscado
             limit: Numero maximo de resultados
+            pais: Filtro opcional por pais
 
         Returns:
             TalentSearchResponse con los candidatos encontrados
@@ -135,6 +137,8 @@ class MCPTalentClient:
                 "consulta": consulta,
                 "limit": limit
             }
+            if pais:
+                payload["pais"] = pais
 
             response_data = await self._make_request("POST", "/search", json=payload)
 
@@ -267,6 +271,20 @@ class MCPTalentClient:
         except Exception as e:
             logger.error(f"MCP stats error: {e}")
             return {"exito": False, "mensaje": str(e)}
+
+    async def get_countries(self) -> Dict[str, Any]:
+        """
+        Obtiene la lista de paises disponibles para filtrar.
+
+        Returns:
+            Dict con lista de paises
+        """
+        try:
+            response_data = await self._make_request("GET", "/countries")
+            return response_data
+        except Exception as e:
+            logger.error(f"MCP countries error: {e}")
+            return {"exito": False, "paises": [], "total": 0}
 
     async def close(self):
         """Cierra la conexion HTTP del cliente."""
