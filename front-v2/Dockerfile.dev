@@ -1,0 +1,19 @@
+# front-v2/Dockerfile.dev
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Instalar pnpm globalmente
+RUN npm install -g pnpm
+
+# Copiar archivos de dependencias
+COPY package.json pnpm-lock.yaml ./
+
+# Instalar dependencias (frozen-lockfile es más rápido)
+RUN pnpm install --frozen-lockfile
+
+# Exponer puerto
+EXPOSE 3000
+
+# Comando por defecto (sobrescrito por docker-compose, pero buena práctica)
+CMD ["pnpm", "run", "dev", "--turbo"]

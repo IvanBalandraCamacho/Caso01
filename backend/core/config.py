@@ -1,61 +1,118 @@
+"""
+Configuración de la aplicación.
+Carga variables de entorno y define configuración global.
+"""
+
 import os
 import secrets
 from pydantic_settings import BaseSettings
 from pydantic import Field
+from typing import Optional
 
 class Settings(BaseSettings):
-    """
-    Configuración centralizada de la aplicación cargada desde .env
-    """
-    DATABASE_URL: str
-    REDIS_URL: str
+    """Configuración centralizada de la aplicación cargada desde .env"""
     
-    # DEPRECADO: Qdrant local (mantener para compatibilidad temporal)
-    QDRANT_URL: str = "http://qdrant:6333"  # Opcional durante migración
+    # ========================================================================
+    # DATABASE
+    # ========================================================================
+    DATABASE_URL: str = "mysql+pymysql://user:password@ia_mysql:3306/caso01_db"
     
-    CORS_ALLOWED_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
+    # ========================================================================
+    # REDIS
+    # ========================================================================
+    REDIS_HOST: str = "ia_redis"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
+    REDIS_PASSWORD: Optional[str] = None
+    REDIS_URL: str = "redis://ia_redis:6379/0"
+    
+    # ========================================================================
+    # QDRANT
+    # ========================================================================
+    QDRANT_HOST: str = "ia_qdrant"
+    QDRANT_PORT: int = 6333
+    QDRANT_COLLECTION_NAME: str = "rfp_documents"
+    QDRANT_API_KEY: Optional[str] = None
+    QDRANT_URL: str = "http://ia_qdrant:6333"
+    
+    # ========================================================================
+    # JWT
+    # ========================================================================
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", secrets.token_urlsafe(32))
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-
-    # Google OAuth & Service Account
-    GOOGLE_SERVICE_ACCOUNT_FILE: str | None = None
-    GOOGLE_OAUTH_CLIENT_ID: str | None = None
-    GOOGLE_OAUTH_CLIENT_SECRET: str | None = None
-    GOOGLE_OAUTH_REDIRECT_URI: str | None = None
-
-    # LLM Provider Configuration
-    LLM_PROVIDER: str = "openai"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 43200  # 30 días
     
-    # OpenAI Configuration
-    OPENAI_API_KEY: str = Field(default="", description="OpenAI API Key")
+    # ========================================================================
+    # GCP SERVICES (NUEVO)
+    # ========================================================================
+    
+    # Project
+    GOOGLE_CLOUD_PROJECT: str = "tivit-caso01"
+    GCP_REGION: str = "us-central1"
+    GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = None
+    GCS_BUCKET_NAME: str = "caso01-documents"
+    
+    # Gemini API
+    GOOGLE_API_KEY: Optional[str] = None
+    GEMINI_MODEL: str = "gemini-2.0-flash-exp"
+    GEMINI_TEMPERATURE: float = 0.7
+    GEMINI_MAX_TOKENS: int = 8192
+    
+    # Document AI
+    DOCUMENT_AI_PROCESSOR_ID: Optional[str] = None
+    DOCUMENT_AI_LOCATION: str = "us"
+    DOCUMENT_AI_ENABLED: bool = True
+    
+    # Natural Language API
+    ENABLE_NATURAL_LANGUAGE: bool = True
+    
+    # ========================================================================
+    # LLM PROVIDERS
+    # ========================================================================
+    
+    # OpenAI (fallback)
+    OPENAI_API_KEY: Optional[str] = None
     OPENAI_MODEL: str = "gpt-4o-mini"
     
-    # Multi-LLM Configuration
+    # Multi-LLM
+    LLM_PROVIDER: str = "gemini"  # gemini, openai, vertex
     MULTI_LLM_ENABLED: bool = True
     
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        # If OPENAI_API_KEY is not set, try to read from token.txt
-        if not self.OPENAI_API_KEY:
-            try:
-                token_file = os.path.join(os.path.dirname(__file__), "..", "..", "token.txt")
-                with open(token_file, "r") as f:
-                    self.OPENAI_API_KEY = f.read().strip()
-            except FileNotFoundError:
-                pass
+    # ========================================================================
+    # RAG SERVICE
+    # ========================================================================
+    RAG_SERVICE_URL: str = "http://rag-service:8080"
+    RAG_SERVICE_API_KEY: Optional[str] = None
+    RAG_SERVICE_TIMEOUT: float = 120.0
+    RAG_SERVICE_ENABLED: bool = True
     
-    # RAG External Service Configuration (NUEVO)
-    RAG_SERVICE_URL: str = "http://localhost:8080"
-    RAG_SERVICE_API_KEY: str | None = None
-    RAG_SERVICE_TIMEOUT: float = 120.0  # 120 segundos para documentos grandes
-    RAG_SERVICE_ENABLED: bool = True  # Ahora habilitado por defecto
-
+    # ========================================================================
+    # FILE UPLOAD
+    # ========================================================================
+    MAX_FILE_SIZE: int = 52428800  # 50MB
+    ALLOWED_EXTENSIONS: str = ".pdf,.docx,.xlsx,.csv,.txt"
+    
+    # ========================================================================
+    # CELERY
+    # ========================================================================
+    CELERY_BROKER_URL: str = "redis://ia_redis:6379/0"
+    CELERY_RESULT_BACKEND: str = "redis://ia_redis:6379/0"
+    
+    # ========================================================================
+    # CORS
+    # ========================================================================
+    CORS_ALLOWED_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
+    
+    # ========================================================================
+    # LOGGING
+    # ========================================================================
+    LOG_LEVEL: str = "INFO"
+    
     class Config:
         env_file = ".env"
         env_file_encoding = 'utf-8'
-        extra = "ignore"  # Ignora variables extra del .env que no estén en el modelo
-        case_sensitive = False # Permite que las variables de entorno sean case-insensitive
+        case_sensitive = True
+        extra = "ignore"
 
-# Instancia única de la configuración
+
 settings = Settings()

@@ -1,0 +1,6 @@
+PROYECTO ALPHA - CONFIDENCIAL
+    Cliente: TechCorp Inc.
+    Presupuesto: $50,000 USD
+    Fecha entrega: 2025-12-31
+    Equipo asignado:
+    - Project Manager: Juan Pérez

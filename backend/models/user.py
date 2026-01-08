@@ -39,6 +39,7 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(255), nullable=True)
+    profile_picture = Column(String(500), nullable=True)  # URL o path de la foto de perfil
     
     # Flags de estado
     is_active = Column(Boolean, default=True, nullable=False)
@@ -50,6 +51,7 @@ class User(Base):
     
     # Relaciones
     workspaces = relationship("Workspace", back_populates="owner", cascade="all, delete-orphan")
+    conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email})>"

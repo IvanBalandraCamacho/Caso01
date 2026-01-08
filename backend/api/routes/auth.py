@@ -9,7 +9,7 @@ Este módulo proporciona endpoints para:
 - Logout (opcional)
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
@@ -267,3 +267,128 @@ def logout(
     """
     logger.info(f"Usuario hizo logout: {current_user.email}")
     return {"message": "Logout exitoso"}
+
+
+@router.put(
+    "/auth/me",
+    response_model=schemas.UserPublic,
+    summary="Actualizar perfil del usuario"
+)
+def update_profile(
+    user_update: schemas.UserUpdate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(database.get_db)
+):
+    """
+    Actualiza la información del perfil del usuario autenticado.
+    
+    Args:
+        user_update: Datos a actualizar (full_name, email)
+        current_user: Usuario obtenido del token JWT
+        db: Sesión de base de datos
+        
+    Returns:
+        Usuario actualizado
+        
+    Raises:
+        HTTPException 400: Si el email ya está en uso por otro usuario
+    """
+    # Si se está actualizando el email, verificar que no exista
+    if user_update.email and user_update.email != current_user.email:
+        existing_user = db.query(User).filter(
+            User.email == user_update.email,
+            User.id != current_user.id
+        ).first()
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El email ya está en uso"
+            )
+        current_user.email = user_update.email
+    
+    # Actualizar campos
+    if user_update.full_name is not None:
+        current_user.full_name = user_update.full_name
+    
+    db.commit()
+    db.refresh(current_user)
+    
+    logger.info(f"Perfil actualizado para: {current_user.email}")
+    return current_user
+
+
+@router.post(
+    "/auth/upload-profile-picture",
+    response_model=schemas.UserPublic,
+    summary="Subir foto de perfil"
+)
+async def upload_profile_picture(
+    file: UploadFile,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(database.get_db)
+):
+    """
+    Sube una foto de perfil para el usuario autenticado.
+    
+    Args:
+        file: Archivo de imagen
+        current_user: Usuario obtenido del token JWT
+        db: Sesión de base de datos
+        
+    Returns:
+        Usuario actualizado con la URL de la foto
+        
+    Raises:
+        HTTPException 400: Si el archivo no es válido
+    """
+    import os
+    import shutil
+    from pathlib import Path
+    
+    # Validar tipo de archivo
+    if not file.content_type or not file.content_type.startswith('image/'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El archivo debe ser una imagen"
+        )
+    
+    # Validar tamaño (max 5MB)
+    file.file.seek(0, 2)  # Ir al final del archivo
+    file_size = file.file.tell()
+    file.file.seek(0)  # Volver al inicio
+    
+    if file_size > 5 * 1024 * 1024:  # 5MB
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El archivo no debe superar 5MB"
+        )
+    
+    # Crear directorio si no existe
+    profile_pictures_dir = Path("uploaded_files/profile_pictures")
+    profile_pictures_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Generar nombre único para el archivo
+    file_extension = os.path.splitext(file.filename)[1]
+    unique_filename = f"{current_user.id}{file_extension}"
+    file_path = profile_pictures_dir / unique_filename
+    
+    # Guardar archivo
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        logger.error(f"Error guardando foto de perfil: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error al guardar la imagen"
+        )
+    
+    # Actualizar URL en base de datos
+    profile_picture_url = f"/uploaded_files/profile_pictures/{unique_filename}"
+    current_user.profile_picture = profile_picture_url
+    
+    db.commit()
+    db.refresh(current_user)
+    
+    logger.info(f"Foto de perfil actualizada para: {current_user.email}")
+    return current_user

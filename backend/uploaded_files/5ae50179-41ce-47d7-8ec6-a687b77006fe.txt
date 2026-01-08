@@ -1,0 +1,6 @@
+Este es un manual de la empresa.
+    Políticas de la empresa:
+    - Horario: Lunes a Viernes 9:00 - 18:00
+    - Vacaciones: 15 días al año
+    - Trabajo remoto: Permitido 2 días por semana
+    Contacto de soporte: soporte@empresa.com

@@ -29,7 +29,7 @@ class Document(Base):
     # Conversación donde se debe enviar el mensaje automático
     conversation_id = Column(
         CHAR(36),
-        ForeignKey("conversations.id", ondelete="SET NULL"),
+        ForeignKey("conversations.id", ondelete="CASCADE"),
         nullable=True
     )
 

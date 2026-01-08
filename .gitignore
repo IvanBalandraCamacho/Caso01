@@ -10,9 +10,24 @@ __pycache__/
 .venv/
 venv/
 
+#Archivos
+/backend/uploaded_files/*
+#Instrucciones
+instructions.md
+claude.md
 # Config y entorno
 .env
 *.env
+.env.local
+.env.*.local
+backend/credentials.json
+backend/caso01-gcp-key.json
+backend/*-gcp-key.json
+**/*-key.json
+**/*-credentials.json
+
+# Testing
+/testsprite_tests
 
 # Archivos temporales
 *.log
@@ -31,9 +46,13 @@ frontend/out/
 frontend/.turbo/
 frontend/.vercel/
 
+# Front-v2 (carpeta temporal/experimental)
+
 # ===== EDITORES =====
 .vscode/
 .idea/
 *.swp
 *.swo
 .DS_Store
+
+.config/

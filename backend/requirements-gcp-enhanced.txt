@@ -1,0 +1,19 @@
+# Dependencias adicionales para servicios GCP/Gemini mejorados
+
+# Gemini 2.0 Flash (nuevo SDK)
+google-generativeai>=0.3.0
+
+# Document AI
+google-cloud-documentai>=2.20.0
+
+# Natural Language API (opcional - análisis semántico)
+google-cloud-language>=2.11.0
+
+# Vision API (opcional - análisis de imágenes)
+google-cloud-vision>=3.4.0
+
+# BigQuery ML (opcional - analytics)
+google-cloud-bigquery>=3.11.0
+
+# Vertex AI Search (opcional - si migran de Qdrant)
+google-cloud-discoveryengine>=0.11.0

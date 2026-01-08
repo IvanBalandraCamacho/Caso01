@@ -1,0 +1,58 @@
+"use client";
+
+import { useCopilotReadable } from "@copilotkit/react-core";
+import { useEffect, useState } from "react";
+import { getDocumentContentApi } from "@/lib/api";
+
+interface UseCopilotDocumentContextProps {
+  workspaceId: string;
+  documentId?: string;
+}
+
+export function useCopilotDocumentContext({
+  workspaceId,
+  documentId,
+}: UseCopilotDocumentContextProps) {
+  const [documentContent, setDocumentContent] = useState<string>("");
+  const [documentMetadata, setDocumentMetadata] = useState<any>(null);
+
+  useEffect(() => {
+    if (documentId) {
+      loadDocumentContent();
+    }
+  }, [documentId]);
+
+  const loadDocumentContent = async () => {
+    try {
+      const content = await getDocumentContentApi(documentId!);
+      setDocumentContent(content.text);
+      setDocumentMetadata(content.metadata);
+    } catch (error) {
+      console.error("Error loading document:", error);
+    }
+  };
+
+  // Registrar contenido del documento para el copiloto
+  useCopilotReadable({
+    description: "Contenido completo del documento RFP actual",
+    value: documentContent,
+  });
+
+  // Registrar metadata del documento
+  useCopilotReadable({
+    description: "Metadata del documento (nombre, tipo, tamaño)",
+    value: JSON.stringify(documentMetadata || {}),
+  });
+
+  // Registrar información del workspace
+  useCopilotReadable({
+    description: "ID del workspace actual",
+    value: workspaceId,
+  });
+
+  return {
+    documentContent,
+    documentMetadata,
+    isLoaded: !!documentContent,
+  };
+}

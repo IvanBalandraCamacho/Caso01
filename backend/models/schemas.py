@@ -2,6 +2,7 @@ from pydantic import BaseModel, validator
 from datetime import datetime, timezone # <-- AÑADIR timezone
 import uuid
 import mimetypes
+from typing import Dict, Any, Optional
 from fastapi import UploadFile
 
 # --- Workspace Schemas ---
@@ -21,6 +22,7 @@ class WorkspacePublic(WorkspaceBase):
     id: str
     created_at: datetime
     is_active: bool
+    default_conversation_id: str | None = None
 
     class Config:
         from_attributes = True 
@@ -39,10 +41,12 @@ class DocumentCreate(DocumentBase):
 class DocumentPublic(DocumentBase):
     id: str
     workspace_id: str
-    status: str
+    conversation_id: str | None = None  # ID de conversación si es documento específico
+    status: str  # PENDING, PROCESSING, COMPLETED, FAILED
     chunk_count: int
     created_at: datetime
-    suggestionAlert: str | None = None   # <-- NUEVO
+    suggestion_short: str | None = None  # Resumen corto generado
+    suggestion_full: str | None = None   # Análisis completo generado
     
     class Config:
         from_attributes = True
@@ -149,11 +153,12 @@ class ConversationUpdate(BaseModel):
 class ConversationPublic(BaseModel):
     """Schema para devolver una conversación."""
     id: str
-    workspace_id: str
+    workspace_id: str | None = None
     title: str
     created_at: datetime
     updated_at: datetime
     message_count: int = 0  # Calculado
+    has_proposal: bool = False
     
     class Config:
         from_attributes = True
@@ -183,6 +188,10 @@ class DownloadableDocumentResponse(BaseModel):
     word_count: int
     message: str
 
+class ProposalDownloadRequest(BaseModel):
+    raw_markdown: str
+    cliente: Optional[str] = "documento"
+
 
 # --- User Schemas (Autenticación) ---
 
@@ -200,10 +209,15 @@ class UserLogin(BaseModel):
 class UserPublic(UserBase):
     id: str
     is_active: bool
+    profile_picture: str | None = None
     created_at: datetime
     
     class Config:
         from_attributes = True
+
+class UserUpdate(BaseModel):
+    full_name: str | None = None
+    email: str | None = None
 
 class Token(BaseModel):
     access_token: str

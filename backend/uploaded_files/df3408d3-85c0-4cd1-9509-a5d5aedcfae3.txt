@@ -1,0 +1,6 @@
+CAMPAÑA DE MARKETING - Q4 2025
+    Objetivo: Aumentar ventas en 30%
+    Presupuesto: $20,000 USD
+    KPIs:
+    - CTR: 5%
+    - Conversión: 2%

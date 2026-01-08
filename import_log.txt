@@ -1,0 +1,10 @@
+Step 1: Importing os... OK
+Step 2 FAILED: 2 validation errors for Settings
+DATABASE_URL
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+REDIS_URL
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+Step 3 FAILED: No module named 'models'
+Step 4: GCPServices imported... OK

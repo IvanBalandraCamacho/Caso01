@@ -14,6 +14,12 @@ from core.auth import get_current_active_user
 from models.user import User
 from datetime import datetime
 import io
+from prompts.chat_prompts import (
+    DOCUMENT_SYNTHESIS_PROMPT_TEMPLATE,
+    DOC_INSTRUCTIONS_SUMMARY,
+    DOC_INSTRUCTIONS_KEY_POINTS,
+    DOC_INSTRUCTIONS_COMPLETE
+)
 
 router = APIRouter()
 
@@ -67,78 +73,19 @@ def _generate_document_content(
     
     # Determinar el tipo de documento a generar
     if document_type == "summary":
-        doc_instructions = """
-Crea un RESUMEN EJECUTIVO conciso de la conversación:
-- Máximo 500 palabras
-- Enfócate en los puntos más importantes
-- Conclusiones principales
-- Recomendaciones clave
-"""
+        doc_instructions = DOC_INSTRUCTIONS_SUMMARY
     elif document_type == "key_points":
-        doc_instructions = """
-Extrae y organiza los PUNTOS CLAVE de la conversación:
-- Lista los temas principales discutidos
-- Hallazgos importantes
-- Decisiones tomadas
-- Acciones recomendadas
-- Formato: listas con viñetas y secciones claras
-"""
+        doc_instructions = DOC_INSTRUCTIONS_KEY_POINTS
     else:  # complete
-        doc_instructions = """
-Crea un DOCUMENTO COMPLETO Y PROFESIONAL con toda la información de la conversación:
-- Mínimo 1000 palabras
-- Incluye TODAS las ideas, análisis y recomendaciones discutidas
-- Estructura profesional con múltiples secciones
-- Detalles técnicos y ejemplos específicos
-- Formato Markdown profesional
-"""
+        doc_instructions = DOC_INSTRUCTIONS_COMPLETE
     
     # Construir prompt para el LLM
-    synthesis_prompt = f"""Eres un experto en crear documentos profesionales editables. Tu tarea es sintetizar el contenido de esta conversación en un documento bien estructurado.
-
-=== CONTEXTO DE DOCUMENTOS ===
-{documents_context}
-
-=== CONVERSACIÓN COMPLETA ===
-{conversation_context}
-
-=== TIPO DE DOCUMENTO SOLICITADO ===
-{doc_instructions}
-
-=== INSTRUCCIONES DE FORMATO ===
-1. Usa formato Markdown profesional:
-   - # para título principal
-   - ## para secciones principales
-   - ### para subsecciones
-   - **Negrita** para énfasis
-   - Listas numeradas para procedimientos
-   - Listas con viñetas para puntos clave
-   - Tablas si es apropiado
-   - Bloques de código con ```
-
-2. Estructura sugerida (ajusta según el tipo):
-   - **Título del Documento**
-   - **Resumen Ejecutivo / Introducción**
-   - **Desarrollo / Análisis Principal**
-   - **Hallazgos / Resultados**
-   - **Recomendaciones**
-   - **Conclusiones**
-   - **Próximos Pasos** (si aplica)
-
-3. REGLAS IMPORTANTES:
-   ✅ Base tu contenido en TODA la conversación anterior
-   ✅ NO omitas información relevante
-   ✅ Sé específico y detallado
-   ✅ El documento debe ser EDITABLE por el usuario
-   ✅ Mantén un tono profesional pero accesible
-   ✅ Incluye ejemplos y datos específicos mencionados
-
-"""
-    
-    if custom_instructions:
-        synthesis_prompt += f"\n=== INSTRUCCIONES ADICIONALES DEL USUARIO ===\n{custom_instructions}\n"
-    
-    synthesis_prompt += "\n=== GENERA EL DOCUMENTO AHORA (solo el contenido en Markdown, sin meta-comentarios) ===\n"
+    synthesis_prompt = DOCUMENT_SYNTHESIS_PROMPT_TEMPLATE.format(
+        documents_context=documents_context,
+        conversation_context=conversation_context,
+        doc_instructions=doc_instructions,
+        custom_instructions=custom_instructions or "N/A"
+    )
     
     # Generar contenido con el LLM usando generate_response sin chunks
     content = llm_service.generate_response(
@@ -147,6 +94,7 @@ Crea un DOCUMENTO COMPLETO Y PROFESIONAL con toda la información de la conversa
     )
     
     return content
+
 
 
 def _add_metadata_header(content: str, conversation: Conversation, format: str) -> str:

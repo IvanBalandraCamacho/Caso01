@@ -19,12 +19,26 @@ python-jose[cryptography]  # JWT tokens
 pymysql
 cryptography  # Requerido por PyMySQL
 sqlalchemy
+alembic
 redis
 celery
+# --- Async Utilities ---
+nest_asyncio
 
 # --- IA y LLM ---
 openai>=1.54.0  # Cliente requerido para OpenAI
 tenacity>=8.0.0  # Para retry logic en llamadas a LLM
+copilotkit  # SDK oficial para integración con CopilotKit
+
+# --- GCP Services ---
+google-cloud-secret-manager
+google-cloud-storage
+google-cloud-tasks
+google-cloud-logging
+google-cloud-aiplatform==1.40.0
+google-cloud-documentai==2.20.1
+google-cloud-language==2.13.0
+google-generativeai==0.8.3
 
 # --- HTTP Client (para servicio RAG externo) ---
 httpx

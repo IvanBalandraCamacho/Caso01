@@ -1,57 +1,67 @@
 services:
   # 1. Backend API (FastAPI)
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
     container_name: ia_backend
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - ./backend/caso01-gcp-key.json:/app/caso01-gcp-key.json:ro
     env_file:
-      - ./backend/.env
+      - .env
     environment:
       # Database & Services
-      - DATABASE_URL=mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
+      - DATABASE_URL=mysql+pymysql://${MYSQL_USER:-admin}:${MYSQL_PASSWORD:-supersecret}@mysql:3306/${MYSQL_DATABASE:-ia_db}
       - REDIS_URL=redis://redis:6379
       - QDRANT_URL=http://qdrant:6333
-      # RAG External Service (ahora disponible)
       - RAG_SERVICE_URL=http://rag-service:8080
       - RAG_SERVICE_API_KEY=${RAG_SERVICE_API_KEY:-}
       - RAG_SERVICE_ENABLED=true
+      # GCP Configuration (NUEVO)
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-tivit-caso01}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/caso01-gcp-key.json
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - DOCUMENT_AI_PROCESSOR_ID=${DOCUMENT_AI_PROCESSOR_ID:-}
+      - DOCUMENT_AI_LOCATION=${DOCUMENT_AI_LOCATION:-us}
+      - ENABLE_NATURAL_LANGUAGE=${ENABLE_NATURAL_LANGUAGE:-true}
+      # LLM
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     depends_on:
-      - mysql
-      - redis
-      - qdrant
-      - rag-service
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      qdrant:
+        condition: service_started
+      rag-service:
+        condition: service_started
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
-  # 2. Frontend (Next.js)
+# 2. Frontend (Next.js - front-v2)
   frontend:
     build:
-      context: ./frontend
-      target: deps 
-    container_name: ia_frontend
+      context: ./front-v2
+      dockerfile: Dockerfile.dev
+    container_name: ia_frontend_v2
+    restart: always
     ports:
       - "3000:3000"
-    volumes:
-      # Monta solo las carpetas de código fuente y archivos de config
-      - ./frontend/src:/app/src
-      - ./frontend/public:/app/public
-      - ./frontend/components.json:/app/components.json
-      - ./frontend/next.config.mjs:/app/next.config.mjs
-      - ./frontend/postcss.config.mjs:/app/postcss.config.mjs
-      - ./frontend/tailwind.config.ts:/app/tailwind.config.ts
-      - ./frontend/tsconfig.json:/app/tsconfig.json
-      - ./frontend/package.json:/app/package.json
-      - ./frontend/package-lock.json:/app/package-lock.json
-      
-      # Mantenemos un volumen para el caché de build de Next.js
-      - /app/.next
     environment:
+      - NODE_ENV=development
       - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
+      - NEXT_PUBLIC_COPILOT_ENABLED=true
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./front-v2:/app           
+      - /app/node_modules         
+      - /app/.next                
+    command: pnpm run dev --turbo         
     depends_on:
       - backend
-    command: npm run dev
 
   # 3. Base de Datos (Metadata)
   mysql:
@@ -67,6 +77,12 @@ services:
       - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
 
   # 4. Cache y Message Broker (Redis)
   redis:
@@ -87,45 +103,62 @@ services:
 
   # 6. Servicio RAG (NUEVO)
   rag-service:
-    build: ./rag-service
+    build:
+      context: ./rag-service
+      dockerfile: Dockerfile.dev
     container_name: ia_rag_service
     ports:
-      - "8080:8080"
+      - "8082:8080"
     env_file:
       - ./backend/.env
     environment:
       - REDIS_URL=redis://redis:6379
+      - QDRANT_URL=http://qdrant:6333
     depends_on:
       - redis
+      - qdrant
     volumes:
       - rag_data:/app/data
+    command: uvicorn main:app --host 0.0.0.0 --port 8080 --reload
 
-  # 6. Worker Asíncrono (Celery)
   celery_worker:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
     container_name: ia_celery_worker
     command: celery -A core.celery_app worker --loglevel=info
     volumes:
       - ./backend:/app
+      - ./backend/caso01-gcp-key.json:/app/caso01-gcp-key.json:ro
     env_file:
-      - ./backend/.env
+      - .env
     environment:
       - PYTHONPATH=/app
-      - DATABASE_URL=mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
+      - DATABASE_URL=mysql+pymysql://${MYSQL_USER:-admin}:${MYSQL_PASSWORD:-supersecret}@mysql:3306/${MYSQL_DATABASE:-ia_db}
       - REDIS_URL=redis://redis:6379
       - QDRANT_URL=http://qdrant:6333
-      # RAG External Service
       - RAG_SERVICE_URL=http://rag-service:8080
       - RAG_SERVICE_API_KEY=${RAG_SERVICE_API_KEY:-}
       - RAG_SERVICE_ENABLED=true
-      # OpenAI API Key
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # GCP Configuration (NUEVO)
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-tivit-caso01}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/caso01-gcp-key.json
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - DOCUMENT_AI_PROCESSOR_ID=${DOCUMENT_AI_PROCESSOR_ID:-}
+      - DOCUMENT_AI_LOCATION=${DOCUMENT_AI_LOCATION:-us}
+      - ENABLE_NATURAL_LANGUAGE=${ENABLE_NATURAL_LANGUAGE:-true}
     depends_on:
-      - backend
-      - redis
-      - mysql
-      - qdrant
-      - rag-service
+      mysql:
+        condition: service_healthy
+      backend:
+        condition: service_started
+      redis:
+        condition: service_started
+      qdrant:
+        condition: service_started
+      rag-service:
+        condition: service_started
 
 volumes:
   mysql_data:
