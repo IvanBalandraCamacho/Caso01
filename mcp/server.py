@@ -184,16 +184,21 @@ def load_and_process_data() -> pd.DataFrame:
 
 def get_column_value(row: pd.Series, possible_names: list, default: str = "") -> str:
     """Obtiene valor de columna buscando varios nombres posibles."""
+    # Primero buscar coincidencia exacta
     for name in possible_names:
         if name in row.index:
             val = row[name]
-            if pd.notna(val):
-                return str(val)
+            if pd.notna(val) and str(val).strip():
+                return str(val).strip()
+    
+    # Luego buscar coincidencia parcial (case insensitive)
+    for name in possible_names:
         for col in row.index:
             if name.lower() in col.lower():
                 val = row[col]
-                if pd.notna(val):
-                    return str(val)
+                if pd.notna(val) and str(val).strip():
+                    return str(val).strip()
+    
     return default
 
 
@@ -257,12 +262,19 @@ def initialize_vector_db(force_rebuild: bool = False):
     # Preparar datos para LanceDB
     records = []
     for idx, (_, row) in enumerate(df.iterrows()):
+        cert = get_column_value(row, ["Certificação", "Certificacao", "Certificación"])
+        inst = get_column_value(row, ["Instituição", "Instituicao", "Institución"])
+        
+        # Debug: log de los primeros 3 registros
+        if idx < 3:
+            logger.info(f"Registro {idx}: certificacion='{cert}', institucion='{inst}'")
+        
         records.append({
             "id": idx,
             "nombre": get_column_value(row, ["[Colaborador] Nome", "Nome"]),
             "cargo": get_column_value(row, ["[Colaborador] Cargo", "Cargo"]),
-            "certificacion": get_column_value(row, ["Certificação", "Certificacao", "Certificación"]),
-            "institucion": get_column_value(row, ["Instituição", "Instituicao", "Institución"]),
+            "certificacion": cert,
+            "institucion": inst,
             "pais": get_column_value(row, ["[Colaborador] País", "[Colaborador] Pais", "Pais", "País"]),
             "fecha_emision": get_column_value(row, ["Data de emissão", "Data de emissao", "Data"]),
             "search_context": row["search_context"],

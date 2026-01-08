@@ -98,10 +98,8 @@ class FileUtil:
         try:
             # Crear un archivo temporal con extensión .pdf
             with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
-                content = await file.read() 
-                logger.info(content)
+                content = await file.read()
                 tmp_file.write(content)
-                logger.info(tmp_file)
                 tmp_path = tmp_file.name
             try:
                 # Extraer texto del archivo .pdf

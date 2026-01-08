@@ -206,7 +206,7 @@ export default function TalentModal({
       title: "Nombre",
       dataIndex: "nombre",
       key: "nombre",
-      width: 180,
+      width: 200,
       render: (text, record) => (
         <div>
           <span className="font-medium text-white">{text}</span>
@@ -223,10 +223,10 @@ export default function TalentModal({
       title: "Cargo",
       dataIndex: "cargo",
       key: "cargo",
-      width: 150,
+      width: 250,
       render: (text) => (
         <Tooltip title={text}>
-          <span className="text-zinc-400 truncate block max-w-[140px]">{text}</span>
+          <span className="text-zinc-400 block max-w-[240px] whitespace-normal">{text}</span>
         </Tooltip>
       )
     },
@@ -234,7 +234,7 @@ export default function TalentModal({
       title: "Pais",
       dataIndex: "pais",
       key: "pais",
-      width: 100,
+      width: 120,
       render: (text) => (
         <Tag color="blue" icon={<MapPin className="w-3 h-3 inline mr-1" />}>
           {text}
@@ -247,7 +247,7 @@ export default function TalentModal({
       title: "Match",
       dataIndex: "bestScore",
       key: "bestScore",
-      width: 80,
+      width: 90,
       render: (score) => {
         const percentage = Math.round(score * 100);
         const color = percentage >= 80 ? "green" : percentage >= 60 ? "gold" : "default";
@@ -316,7 +316,7 @@ export default function TalentModal({
       }
       open={open}
       onCancel={onClose}
-      width={950}
+      width={1100}
       centered
       footer={
         <div className="flex justify-between items-center">
@@ -387,7 +387,7 @@ export default function TalentModal({
           pagination={{ pageSize: 10, showSizeChanger: false }}
           size="small"
           className="talent-table"
-          scroll={{ y: 400 }}
+          scroll={{ y: 450 }}
           expandable={{
             expandedRowRender,
             expandedRowKeys,

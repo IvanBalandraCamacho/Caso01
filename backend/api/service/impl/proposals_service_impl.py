@@ -61,7 +61,6 @@ class ProposalsServiceImpl(ProposalsService):
         user: User
     ) -> Dict[str, Any]:
         if file:
-            logger.info(file)
             FileUtil.validate_supported_file(file)
             try:
                 # Validar y extraer texto soportando PDF o DOCX
