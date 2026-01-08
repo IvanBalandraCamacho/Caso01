@@ -1532,7 +1532,7 @@ export default function Sidebar() {
         footer={null}
         centered
         width={500}
-        styles={{
+styles={{
           content: {
             background: "#1E1F20",
             borderRadius: "24px",
@@ -1545,7 +1545,7 @@ export default function Sidebar() {
             backdropFilter: "blur(8px)",
             background: "rgba(0, 0, 0, 0.8)"
           }
-        }}
+        } as any}
         closeIcon={<span className="text-zinc-500 hover:text-white transition-colors text-xl">×</span>}
       >
         <div className="mb-8">

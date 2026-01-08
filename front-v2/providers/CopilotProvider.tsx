@@ -8,11 +8,13 @@ interface CopilotProviderProps {
 }
 
 // Variable de entorno para habilitar/deshabilitar CopilotKit
-const COPILOT_ENABLED = process.env.NEXT_PUBLIC_COPILOT_ENABLED === "true";
+// Por defecto habilitado en desarrollo, explícitamente "false" lo deshabilita
+const COPILOT_ENABLED = process.env.NEXT_PUBLIC_COPILOT_ENABLED !== "false";
 
 export function CopilotProvider({ children }: CopilotProviderProps) {
-  // Si CopilotKit está deshabilitado, renderizar solo los hijos
+  // Si CopilotKit está explícitamente deshabilitado, renderizar solo los hijos
   if (!COPILOT_ENABLED) {
+    console.warn("[CopilotProvider] CopilotKit está deshabilitado. Set NEXT_PUBLIC_COPILOT_ENABLED=true para habilitarlo.");
     return <>{children}</>;
   }
 

@@ -19,7 +19,7 @@ export function ValuePropositionModal({ open, onClose }: ValuePropositionModalPr
       footer={null}
       width={900}
       centered
-      styles={{
+styles={{
         body: {
           padding: '40px',
           background: '#0A0A0B',
@@ -28,7 +28,7 @@ export function ValuePropositionModal({ open, onClose }: ValuePropositionModalPr
           background: '#0A0A0B',
           border: '1px solid rgba(227, 24, 55, 0.2)',
         },
-      }}
+      } as any}
     >
       <div style={{ textAlign: 'center', marginBottom: '32px' }}>
         <div

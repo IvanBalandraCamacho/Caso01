@@ -160,13 +160,14 @@ export function InteractiveAnalysisResults({
     ],
     handler: async ({ action, memberName, memberData }) => {
       if (action === "add" && memberData) {
+        const data = memberData as { rol?: string; experiencia?: string; skills?: string[] };
         setLocalResult(prev => ({
           ...prev,
           equipo_sugerido: [...prev.equipo_sugerido, {
             nombre: memberName,
-            rol: memberData.rol || "",
-            experiencia: memberData.experiencia || "",
-            skills: memberData.skills || []
+            rol: data.rol || "",
+            experiencia: data.experiencia || "",
+            skills: data.skills || []
           }]
         }));
         return `Miembro ${memberName} agregado al equipo`;

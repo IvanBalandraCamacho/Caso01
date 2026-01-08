@@ -23,9 +23,12 @@ interface MCPCandidate {
 interface ExtractedDataPanelProps {
   data: any;
   setData: (data: any) => void;
+  workspaceId?: string;
+  onSave?: (data: any) => Promise<void>;
+  isSaving?: boolean;
 }
 
-export default function ExtractedDataPanel({ data, setData }: ExtractedDataPanelProps) {
+export default function ExtractedDataPanel({ data, setData, workspaceId, onSave, isSaving }: ExtractedDataPanelProps) {
   
   // Estado para modal y candidatos seleccionados
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -279,8 +282,14 @@ export default function ExtractedDataPanel({ data, setData }: ExtractedDataPanel
         </div>
       </div>
 
-      <Button type="primary" className="w-full bg-[#E31837] hover:!bg-[#C01530] mt-6 h-10 flex items-center justify-center gap-2">
-        <Save className="w-4 h-4" /> Guardar en Dashboard
+      <Button 
+        type="primary" 
+        className="w-full bg-[#E31837] hover:!bg-[#C01530] mt-6 h-10 flex items-center justify-center gap-2"
+        onClick={() => onSave?.(data)}
+        loading={isSaving}
+        disabled={!onSave || isSaving}
+      >
+        <Save className="w-4 h-4" /> {isSaving ? "Guardando..." : "Guardar en Dashboard"}
       </Button>
     </div>
   );

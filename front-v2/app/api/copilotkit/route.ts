@@ -6,10 +6,19 @@ import {
 import { NextRequest } from "next/server";
 import OpenAI from "openai";
 
-// Crear cliente OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy initialization para evitar errores durante el build
+let openaiClient: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI {
+  if (!openaiClient) {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error("OPENAI_API_KEY environment variable is not configured");
+    }
+    openaiClient = new OpenAI({ apiKey });
+  }
+  return openaiClient;
+}
 
 // URL del backend para obtener contexto RAG
 const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || "http://backend:8000/api/v1";
@@ -72,52 +81,112 @@ SIEMPRE extrae los datos REALES del contexto de los documentos proporcionados.
 NO inventes datos - usa SOLO información del contexto RAG.
 Si no hay suficiente información en el contexto, indícalo claramente.`;
 
-// Crear el runtime con action para búsqueda RAG
-const runtime = new CopilotRuntime({
-  actions: [
-    {
-      name: "searchRAGDocuments",
-      description: "Busca información relevante en los documentos del workspace usando RAG. Úsalo SIEMPRE antes de responder preguntas sobre el contenido del documento o generar visualizaciones.",
-      parameters: [
+// Lazy initialization de runtime y adapter
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let runtime: any = null;
+let serviceAdapter: OpenAIAdapter | null = null;
+
+function getRuntime() {
+  if (!runtime) {
+    runtime = new CopilotRuntime({
+      actions: [
         {
-          name: "query",
-          type: "string",
-          description: "La consulta de búsqueda para encontrar información relevante",
-          required: true,
-        },
-        {
-          name: "workspaceId",
-          type: "string",
-          description: "ID del workspace donde buscar (obtenerlo del contexto)",
-          required: true,
+          name: "searchRAGDocuments",
+          description: "Busca información relevante en los documentos del workspace usando RAG. Úsalo SIEMPRE antes de responder preguntas sobre el contenido del documento o generar visualizaciones.",
+          parameters: [
+            {
+              name: "query",
+              type: "string",
+              description: "La consulta de búsqueda para encontrar información relevante",
+              required: true,
+            },
+            {
+              name: "workspaceId",
+              type: "string",
+              description: "ID del workspace donde buscar (obtenerlo del contexto)",
+              required: true,
+            },
+          ],
+          handler: async ({ query, workspaceId }: { query: string; workspaceId: string }) => {
+            console.log(`[CopilotKit Action] searchRAGDocuments called: ${query}, workspace: ${workspaceId}`);
+            const context = getRAGContext(query, workspaceId);
+            if (context) {
+              return `Información encontrada en los documentos:\n\n${context}`;
+            }
+            return "No se encontró información relevante en los documentos del workspace.";
+          },
         },
       ],
-      handler: async ({ query, workspaceId }: { query: string; workspaceId: string }) => {
-        console.log(`[CopilotKit Action] searchRAGDocuments called: ${query}, workspace: ${workspaceId}`);
-        const context = await getRAGContext(query, workspaceId);
-        if (context) {
-          return `Información encontrada en los documentos:\n\n${context}`;
-        }
-        return "No se encontró información relevante en los documentos del workspace.";
-      },
-    },
-  ],
-});
+    });
+  }
+  return runtime;
+}
 
-// Crear el adapter de OpenAI
-const serviceAdapter = new OpenAIAdapter({
-  openai,
-  model: "gpt-4o-mini",
-});
+function getServiceAdapter(): OpenAIAdapter {
+  if (!serviceAdapter) {
+    serviceAdapter = new OpenAIAdapter({
+      openai: getOpenAIClient(),
+      model: "gpt-4o-mini",
+    });
+  }
+  return serviceAdapter;
+}
 
 export const POST = async (req: NextRequest) => {
   try {
     // Clonar el request para leer el body
     const body = await req.json();
     
-    // Extraer workspaceId de las propiedades del request
+    // Extraer workspaceId de múltiples fuentes posibles
+    let workspaceId: string | undefined;
+    
+    // 1. Buscar en properties (forma directa)
     const properties = body.properties || {};
-    const workspaceId = properties.workspace_id || properties.workspaceId;
+    workspaceId = properties.workspace_id || properties.workspaceId;
+    
+    // 2. Buscar en el contexto de mensajes del sistema
+    if (!workspaceId) {
+      const messages = body.messages || [];
+      for (const msg of messages) {
+        if (msg.role === "system" && typeof msg.content === "string") {
+          // Buscar patrón workspace_id en el contenido
+          const match = msg.content.match(/workspace[_\s]?(?:id)?[:\s]+([a-f0-9-]+)/i);
+          if (match) {
+            workspaceId = match[1];
+            break;
+          }
+        }
+      }
+    }
+    
+    // 3. Buscar en el contexto de readables (CopilotKit los envía así)
+    if (!workspaceId && body.context?.readables) {
+      for (const readable of body.context.readables) {
+        if (readable.value?.workspace_id) {
+          workspaceId = readable.value.workspace_id;
+          break;
+        }
+        if (readable.value?.workspaceId) {
+          workspaceId = readable.value.workspaceId;
+          break;
+        }
+      }
+    }
+    
+    // 4. Buscar en el último mensaje de usuario (puede contener el ID en instrucciones)
+    if (!workspaceId) {
+      const messages = body.messages || [];
+      for (const msg of messages) {
+        if (typeof msg.content === "string") {
+          const match = msg.content.match(/workspace[:\s]+([a-f0-9-]+)/i);
+          if (match) {
+            workspaceId = match[1];
+          }
+        }
+      }
+    }
+    
+    console.log(`[CopilotKit] Detected workspaceId: ${workspaceId || 'none'}`);
     
     // Extraer el último mensaje del usuario para buscar contexto RAG
     let userQuery = "";
@@ -162,9 +231,9 @@ export const POST = async (req: NextRequest) => {
       body: JSON.stringify(modifiedBody),
     });
 
-    const { handleRequest } = copilotRuntimeNextJSAppRouterEndpoint({
-      runtime,
-      serviceAdapter,
+const { handleRequest } = copilotRuntimeNextJSAppRouterEndpoint({
+      runtime: getRuntime(),
+      serviceAdapter: getServiceAdapter(),
       endpoint: "/api/copilotkit",
     });
 

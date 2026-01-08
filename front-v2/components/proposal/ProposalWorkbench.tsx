@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useCopilotReadable } from "@copilotkit/react-core";
 import { App, Spin, Button, Tooltip, Select } from "antd";
 import {
   LoadingOutlined,
@@ -18,7 +19,8 @@ import {
   generateProposalDocumentApi,
   fetchWorkspaceDetails,
   fetchWorkspaceDocuments,
-  fetchDocumentContent
+  fetchDocumentContent,
+  updateWorkspaceApi
 } from "@/lib/api";
 
 // Componentes internos
@@ -40,6 +42,7 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
   const [extractedData, setExtractedData] = useState<any>(initialData || {});
   const [loadingData, setLoadingData] = useState(!initialData);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [proposalReady, setProposalReady] = useState(false);
   const [lastBlob, setLastBlob] = useState<Blob | null>(null);
   const [documentUrl, setDocumentUrl] = useState<string | null>(null);
@@ -47,6 +50,37 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
   const [documents, setDocuments] = useState<any[]>([]);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [generatedDocUrl, setGeneratedDocUrl] = useState<string | null>(null);
+
+  // Refs para URLs - evitar memory leaks
+  const documentUrlRef = useRef<string | null>(null);
+  const generatedDocUrlRef = useRef<string | null>(null);
+
+  // Actualizar refs cuando cambien las URLs
+  useEffect(() => {
+    documentUrlRef.current = documentUrl;
+  }, [documentUrl]);
+
+  useEffect(() => {
+    generatedDocUrlRef.current = generatedDocUrl;
+  }, [generatedDocUrl]);
+
+  // Cleanup de URLs al desmontar el componente
+  useEffect(() => {
+    return () => {
+      if (documentUrlRef.current) {
+        window.URL.revokeObjectURL(documentUrlRef.current);
+      }
+      if (generatedDocUrlRef.current) {
+        window.URL.revokeObjectURL(generatedDocUrlRef.current);
+      }
+    };
+  }, []);
+
+  // Exponer workspaceId al contexto de CopilotKit para que el backend pueda hacer RAG
+  useCopilotReadable({
+    description: "ID del workspace actual para búsqueda RAG en documentos",
+    value: { workspace_id: workspaceId, workspaceId },
+  });
 
   // 1. Cargar Datos y Documento
   useEffect(() => {
@@ -124,11 +158,6 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
     };
 
     loadAll();
-    
-    return () => {
-        if (documentUrl) window.URL.revokeObjectURL(documentUrl);
-        if (generatedDocUrl) window.URL.revokeObjectURL(generatedDocUrl);
-    };
   }, [workspaceId, initialData]);
 
   const handleDocumentChange = async (docId: string) => {
@@ -217,6 +246,41 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
       router.push(`/workspace/${workspaceId}`);
   };
 
+  // Guardar datos del workspace en el Dashboard
+  const handleSaveToWorkspace = async (data: any) => {
+    setIsSaving(true);
+    try {
+      // Preparar datos para actualizar el workspace
+      const updateData = {
+        client_company: data.cliente || null,
+        operation_name: data.nombre_operacion || null,
+        country: data.pais || null,
+        tvt: parseFloat(data.tvt) || null,
+        tech_stack: typeof data.stack_tecnologico === 'string' 
+          ? data.stack_tecnologico.split(',').map((t: string) => t.trim()).filter(Boolean)
+          : (data.stack_tecnologico || null),
+        opportunity_type: data.oportunidad || null,
+        category: data.categoria || null,
+        objective: data.objetivo || null,
+        estimated_time: data.tiempo_aproximado || null,
+        resource_count: parseInt(data.nro_recursos) || null,
+        // Guardar datos adicionales en instructions como JSON
+        instructions: JSON.stringify({
+          ...data,
+          saved_at: new Date().toISOString()
+        })
+      };
+
+      await updateWorkspaceApi(workspaceId, updateData);
+      message.success("Datos guardados exitosamente en el Dashboard");
+    } catch (error) {
+      console.error("Error guardando datos:", error);
+      message.error("Error al guardar los datos");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (loadingData) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-[#131314] text-white">
@@ -297,24 +361,29 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
              <MessageOutlined /> Asistente de Análisis
            </div>
            <div className="flex-1 relative custom-copilot-wrapper">
-             <CopilotChat 
-                className="h-full w-full border-none shadow-none"
-                instructions={`
-                    Estás en la Mesa de Trabajo de Propuestas.
-                    Contexto: Propuesta para ${extractedData.cliente}.
-                    Datos actuales: ${JSON.stringify(extractedData)}.
-                    
-                    TU OBJETIVO: Ayudar al usuario a completar o corregir los datos de la columna derecha.
-                    
-                    SI EL USUARIO PIDE UN CAMBIO (ej: "El TVT es 1M"):
-                    1. Usa la herramienta "updateExtractedData" para cambiarlo visualmente.
-                    2. Dile al usuario: "He actualizado el dato. Dale a 'Generar Propuesta' para ver el cambio en el documento."
-                `}
-                labels={{
-                  title: "Asistente",
-                  initial: "Revisa los datos a la derecha. ¿Necesitas corregir algo antes de generar?",
-                }}
-             />
+<CopilotChat 
+                 className="h-full w-full border-none shadow-none"
+                 instructions={`
+                     Estás en la Mesa de Trabajo de Propuestas para el workspace ${workspaceId}.
+                     Contexto: Propuesta para ${extractedData.cliente}.
+                     Datos actuales: ${JSON.stringify(extractedData)}.
+                     
+                     TU OBJETIVO: Ayudar al usuario a completar o corregir los datos de la columna derecha.
+                     
+                     IMPORTANTE: 
+                     - El workspace_id es: ${workspaceId}
+                     - Tienes acceso al documento del RFP mediante búsqueda RAG usando la acción searchRAGDocuments.
+                     - Cuando el usuario pregunte sobre el documento, busca primero con searchRAGDocuments.
+                     
+                     SI EL USUARIO PIDE UN CAMBIO (ej: "El TVT es 1M"):
+                     1. Usa la herramienta "updateExtractedData" para cambiarlo visualmente.
+                     2. Dile al usuario: "He actualizado el dato. Dale a 'Generar Propuesta' para ver el cambio en el documento."
+                 `}
+                 labels={{
+                   title: "Asistente",
+                   initial: "Revisa los datos a la derecha. Puedo buscar información en el documento y ayudarte a corregir cualquier campo.",
+                 }}
+              />
            </div>
         </div>
       </div>
@@ -387,7 +456,10 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
       <div className="w-[400px] flex-shrink-0 bg-[#1E1F20] h-full overflow-y-auto p-6 shadow-xl z-20 border-l border-zinc-800">
          <ExtractedDataPanel 
             data={extractedData} 
-            setData={setExtractedData} 
+            setData={setExtractedData}
+            workspaceId={workspaceId}
+            onSave={handleSaveToWorkspace}
+            isSaving={isSaving}
          />
       </div>
     </div>

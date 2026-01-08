@@ -539,7 +539,7 @@ export interface TalentCandidate {
   institucion: string;
   pais: string;
   fecha_emision: string;
-  score: float;
+  score: number;
 }
 
 /**

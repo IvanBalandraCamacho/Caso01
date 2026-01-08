@@ -91,7 +91,7 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
       footer={null}
       width={700}
       centered
-      styles={{
+styles={{
         body: {
           padding: '40px',
           background: '#0A0A0B',
@@ -100,7 +100,7 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
           background: '#0A0A0B',
           border: '1px solid rgba(227, 24, 55, 0.2)',
         },
-      }}
+      } as any}
     >
       <div style={{ textAlign: 'center', marginBottom: '32px' }}>
         <div
