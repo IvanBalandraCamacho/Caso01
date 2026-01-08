@@ -90,7 +90,7 @@ export function FilePreviewModal({
     }
 
     if (error) {
-      return <Alert message="Error" description={error} type="error" showIcon />;
+      return <Alert title="Error" description={error} type="error" showIcon />;
     }
 
     if (!contentUrl) return null;

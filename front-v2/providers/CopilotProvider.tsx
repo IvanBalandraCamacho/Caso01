@@ -1,7 +1,7 @@
 "use client";
 
 import { CopilotKit } from "@copilotkit/react-core";
-import { ReactNode } from "react";
+import { ReactNode, useState, useEffect, useRef } from "react";
 
 interface CopilotProviderProps {
   children: ReactNode;
@@ -11,22 +11,38 @@ interface CopilotProviderProps {
 // Por defecto habilitado en desarrollo, explícitamente "false" lo deshabilita
 const COPILOT_ENABLED = process.env.NEXT_PUBLIC_COPILOT_ENABLED !== "false";
 
+// URL del runtime - constante para evitar re-renders
+const RUNTIME_URL = "/api/copilotkit";
+
 export function CopilotProvider({ children }: CopilotProviderProps) {
+  const [isReady, setIsReady] = useState(false);
+  const initialized = useRef(false);
+
+  // Inicializar una sola vez al montar
+  useEffect(() => {
+    if (!initialized.current) {
+      initialized.current = true;
+      // Pequeño delay para asegurar que el cliente está completamente hidratado
+      const timer = setTimeout(() => {
+        setIsReady(true);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
   // Si CopilotKit está explícitamente deshabilitado, renderizar solo los hijos
   if (!COPILOT_ENABLED) {
-    console.warn("[CopilotProvider] CopilotKit está deshabilitado. Set NEXT_PUBLIC_COPILOT_ENABLED=true para habilitarlo.");
     return <>{children}</>;
   }
 
-  // Usar el API Route interno de Next.js que maneja el runtime de CopilotKit
-  // Esto evita problemas de CORS y red entre contenedores Docker
-  const runtimeUrl = "/api/copilotkit";
-
-  console.log("CopilotProvider initialized with runtimeUrl:", runtimeUrl);
+  // Mostrar children sin CopilotKit mientras se inicializa para evitar errores
+  if (!isReady) {
+    return <>{children}</>;
+  }
 
   return (
     <CopilotKit 
-      runtimeUrl={runtimeUrl}
+      runtimeUrl={RUNTIME_URL}
       showDevConsole={false}
     >
       {children}

@@ -53,7 +53,7 @@ export const WorkspaceHealthBar: React.FC<WorkspaceHealthBarProps> = ({ workspac
       <Progress 
         percent={health.percentage} 
         strokeColor={getStatusColor()} 
-        trailColor="#27272a"
+        railColor="#27272a"
         showInfo={false}
         status={health.percentage === 100 ? "success" : "active"}
         className="m-0"
@@ -61,7 +61,7 @@ export const WorkspaceHealthBar: React.FC<WorkspaceHealthBarProps> = ({ workspac
 
       {health.percentage < 100 && (
         <Alert
-          message={
+          title={
             <div className="text-xs">
               <span className="font-bold">Falta completar: </span>
               <span className="text-zinc-300">
@@ -79,7 +79,7 @@ export const WorkspaceHealthBar: React.FC<WorkspaceHealthBarProps> = ({ workspac
 
       {health.percentage === 100 && (
         <Alert
-          message="Oportunidad 100% completada. ¡Lista para generar propuesta!"
+          title="Oportunidad 100% completada. ¡Lista para generar propuesta!"
           type="success"
           showIcon
           icon={<CheckCircleOutlined className="text-[#52c41a]" />}

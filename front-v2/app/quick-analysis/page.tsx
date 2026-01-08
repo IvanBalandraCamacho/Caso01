@@ -170,7 +170,7 @@ export default function QuickAnalysisPage() {
                         '0%': '#E31837',
                         '100%': '#FF6B00',
                       }}
-                      trailColor="#27272a"
+                      railColor="#27272a"
                       showInfo={false}
                       size={["100%", 8]}
                     />
