@@ -6,113 +6,91 @@ Carga variables de entorno y define configuración global.
 import os
 import secrets
 from pydantic_settings import BaseSettings
-from pydantic import Field
 from typing import Optional
 
 class Settings(BaseSettings):
     """Configuración centralizada de la aplicación cargada desde .env"""
     
     # ========================================================================
-    # DATABASE
+    # PROJECT & ENVIRONMENT
     # ========================================================================
-    DATABASE_URL: str = "mysql+pymysql://user:password@ia_mysql:3306/caso01_db"
+    ENV: str = os.getenv("ENV", "development") # development, production
+    GOOGLE_CLOUD_PROJECT: str = os.getenv("GOOGLE_CLOUD_PROJECT", "squad-ia-latam")
+    GCP_REGION: str = os.getenv("GCP_REGION", "us-central1")
     
     # ========================================================================
-    # REDIS
+    # DATABASE (PostgreSQL)
     # ========================================================================
-    REDIS_HOST: str = "ia_redis"
-    REDIS_PORT: int = 6379
+    DB_USER: str = os.getenv("DB_USER", "postgres")
+    DB_PASSWORD: str = os.getenv("DB_PASSWORD", "postgres")
+    DB_NAME: str = os.getenv("DB_NAME", "caso01_db")
+    DB_HOST: str = os.getenv("DB_HOST", "db-postgres17") # Nombre del servicio en docker-compose
+    DB_PORT: str = os.getenv("DB_PORT", "5432")
+    
+    # Nombre de conexión de Cloud SQL (formato: project:region:instance)
+    # Se inyectará automáticamente en Cloud Run o lo defines manual
+    INSTANCE_CONNECTION_NAME: Optional[str] = os.getenv("INSTANCE_CONNECTION_NAME")
+
+    @property
+    def DATABASE_URL(self) -> str:
+        """
+        Construye la URL de conexión dinámicamente:
+        - Si existe INSTANCE_CONNECTION_NAME -> Conexión por Unix Socket (Cloud Run)
+        - Si no -> Conexión TCP estándar (Local/Docker)
+        """
+        if self.INSTANCE_CONNECTION_NAME:
+            # Conexión via Unix Socket para Cloud Run
+            # postgresql+psycopg2://USER:PASS@/DB_NAME?host=/cloudsql/INSTANCE_CONNECTION_NAME
+            return f"postgresql+psycopg2://{self.DB_USER}:{self.DB_PASSWORD}@/{self.DB_NAME}?host=/cloudsql/{self.INSTANCE_CONNECTION_NAME}"
+        
+        # Conexión estándar TCP para Desarrollo Local
+        return f"postgresql+psycopg2://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+
+    # ========================================================================
+    # REDIS (Cola de Tareas & Cache)
+    # ========================================================================
+    REDIS_HOST: str = os.getenv("REDIS_HOST", "ia_redis")
+    REDIS_PORT: int = int(os.getenv("REDIS_PORT", 6379))
     REDIS_DB: int = 0
-    REDIS_PASSWORD: Optional[str] = None
-    REDIS_URL: str = "redis://ia_redis:6379/0"
+    REDIS_PASSWORD: Optional[str] = os.getenv("REDIS_PASSWORD", None)
+
+    @property
+    def REDIS_URL(self) -> str:
+        if self.REDIS_PASSWORD:
+            return f"redis://:{self.REDIS_PASSWORD}@{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
+        return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
     
     # ========================================================================
-    # QDRANT
+    # GCP SERVICES
     # ========================================================================
-    QDRANT_HOST: str = "ia_qdrant"
-    QDRANT_PORT: int = 6333
-    QDRANT_COLLECTION_NAME: str = "rfp_documents"
-    QDRANT_API_KEY: Optional[str] = None
-    QDRANT_URL: str = "http://ia_qdrant:6333"
+    GCS_BUCKET_NAME: str = os.getenv("BUCKET_NAME", "caso01-documents")
     
     # ========================================================================
-    # JWT
+    # JWT & SECURITY
     # ========================================================================
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", secrets.token_urlsafe(32))
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 43200  # 30 días
     
     # ========================================================================
-    # GCP SERVICES (NUEVO)
+    # LLM & RAG CONFIG
     # ========================================================================
+    OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
+    GOOGLE_API_KEY: Optional[str] = os.getenv("GOOGLE_API_KEY")
+    GEMINI_MODEL: str = "gemini-1.5-flash" 
     
-    # Project
-    GOOGLE_CLOUD_PROJECT: str = "tivit-caso01"
-    GCP_REGION: str = "us-central1"
-    GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = None
-    GCS_BUCKET_NAME: str = "caso01-documents"
-    
-    # Gemini API
-    GOOGLE_API_KEY: Optional[str] = None
-    GEMINI_MODEL: str = "gemini-2.0-flash-exp"
-    GEMINI_TEMPERATURE: float = 0.7
-    GEMINI_MAX_TOKENS: int = 8192
-    
-    # Document AI
-    DOCUMENT_AI_PROCESSOR_ID: Optional[str] = None
-    DOCUMENT_AI_LOCATION: str = "us"
-    DOCUMENT_AI_ENABLED: bool = True
-    
-    # Natural Language API
-    ENABLE_NATURAL_LANGUAGE: bool = True
+    # RAG Service (URL interna o externa)
+    RAG_SERVICE_URL: str = os.getenv("RAG_SERVICE_URL", "http://rag-service:8080")
     
     # ========================================================================
-    # LLM PROVIDERS
+    # GENERAL
     # ========================================================================
-    
-    # OpenAI (fallback)
-    OPENAI_API_KEY: Optional[str] = None
-    OPENAI_MODEL: str = "gpt-4o-mini"
-    
-    # Multi-LLM
-    LLM_PROVIDER: str = "gemini"  # gemini, openai, vertex
-    MULTI_LLM_ENABLED: bool = True
-    
-    # ========================================================================
-    # RAG SERVICE
-    # ========================================================================
-    RAG_SERVICE_URL: str = "http://rag-service:8080"
-    RAG_SERVICE_API_KEY: Optional[str] = None
-    RAG_SERVICE_TIMEOUT: float = 120.0
-    RAG_SERVICE_ENABLED: bool = True
-    
-    # ========================================================================
-    # FILE UPLOAD
-    # ========================================================================
-    MAX_FILE_SIZE: int = 52428800  # 50MB
-    ALLOWED_EXTENSIONS: str = ".pdf,.docx,.xlsx,.csv,.txt"
-    
-    # ========================================================================
-    # CELERY
-    # ========================================================================
-    CELERY_BROKER_URL: str = "redis://ia_redis:6379/0"
-    CELERY_RESULT_BACKEND: str = "redis://ia_redis:6379/0"
-    
-    # ========================================================================
-    # CORS
-    # ========================================================================
-    CORS_ALLOWED_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
-    
-    # ========================================================================
-    # LOGGING
-    # ========================================================================
-    LOG_LEVEL: str = "INFO"
-    
-    class Config:
-        env_file = ".env"
-        env_file_encoding = 'utf-8'
-        case_sensitive = True
-        extra = "ignore"
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+    CORS_ALLOWED_ORIGINS: str = os.getenv("CORS_ALLOWED_ORIGINS", "*")
 
+    class Config:
+        # Pydantic v2 config
+        case_sensitive = True
+        extra = "ignore" # Ignorar variables extra en .env
 
 settings = Settings()

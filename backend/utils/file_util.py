@@ -1,14 +1,21 @@
-from fastapi import UploadFile, HTTPException
 import os
+import shutil
 import tempfile
-import pdfplumber
-from typing import Optional
-from exceptions import ExternalServiceError, InvalidFileError 
 import logging
+import pdfplumber
 import docx
+from pathlib import Path
+from typing import Optional
+from fastapi import UploadFile, HTTPException
+from google.cloud import storage
+from exceptions import ExternalServiceError, InvalidFileError
 
 logger = logging.getLogger(__name__)
 
+# Configuración de entorno
+BUCKET_NAME = os.getenv("BUCKET_NAME")
+# Directorio local de respaldo si no hay nube
+UPLOAD_DIR = Path(__file__).parent.parent / "uploaded_files"
 
 class FileUtil:
     
@@ -16,9 +23,7 @@ class FileUtil:
     def validate_supported_file(file: Optional[UploadFile] = None) -> None:
         """
         Valida que el archivo subido sea PDF o DOCX y que no esté vacío.
-        Lanza InvalidFileError o HTTPException si la validación falla.
         """
-        
         if not file or not getattr(file, "filename", None):
             raise InvalidFileError(detail="No se proporcionó ningún archivo.")
 
@@ -30,33 +35,100 @@ class FileUtil:
         else:
             raise HTTPException(status_code=400, detail="Formato no soportado. Se acepta .pdf o .docx.")
 
-        # si el objeto UploadFile tiene size (según implementaciones), validar > 0
         if getattr(file, "size", None) is not None and file.size == 0:
             raise InvalidFileError(detail="El archivo no puede estar vacío.")
-        
+
+    @staticmethod
+    async def save_upload_file(file: UploadFile, destination_filename: str) -> str:
+        """
+        Guarda el archivo. Si BUCKET_NAME existe, va a GCS. Si no, a disco local.
+        Retorna la ruta (gs://... o ruta local absoluta).
+        """
+        try:
+            # Asegurar que el puntero está al inicio antes de guardar
+            await file.seek(0)
+
+            # --- MODO NUBE (Google Cloud Storage) ---
+            if BUCKET_NAME:
+                logger.info(f"Subiendo archivo a GCS Bucket: {BUCKET_NAME}")
+                client = storage.Client()
+                bucket = client.bucket(BUCKET_NAME)
+                blob = bucket.blob(destination_filename)
+                
+                # upload_from_file lee el archivo desde la posición actual
+                blob.upload_from_file(file.file, content_type=file.content_type)
+                
+                return f"gs://{BUCKET_NAME}/{destination_filename}"
+
+            # --- MODO LOCAL (Fallback) ---
+            else:
+                logger.info("Bucket no configurado. Guardando en local.")
+                UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+                file_path = UPLOAD_DIR / destination_filename
+                
+                with open(file_path, "wb") as buffer:
+                    shutil.copyfileobj(file.file, buffer)
+                
+                return str(file_path)
+
+        except Exception as e:
+            logger.error(f"Error guardando archivo: {str(e)}")
+            raise ExternalServiceError(detail=f"Error al guardar el archivo: {str(e)}")
+        finally:
+            # Opcional: regresar el puntero al inicio por si se usa después
+            await file.seek(0)
+
+    @staticmethod
+    def delete_file(file_path: str):
+        """Elimina el archivo local o del bucket de GCS"""
+        try:
+            if file_path.startswith("gs://"):
+                # Formato: gs://bucket-name/filename.ext
+                parts = file_path.replace("gs://", "").split("/", 1)
+                if len(parts) < 2: 
+                    return
+                
+                bucket_name_ref, blob_name = parts[0], parts[1]
+                client = storage.Client()
+                bucket = client.bucket(bucket_name_ref)
+                blob = bucket.blob(blob_name)
+                blob.delete()
+                logger.info(f"Archivo eliminado de GCS: {blob_name}")
+            else:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    logger.info(f"Archivo local eliminado: {file_path}")
+        except Exception as e:
+            logger.error(f"Error eliminando archivo {file_path}: {str(e)}")
+            # No lanzamos error para no romper flujos de limpieza, solo log
+
     @staticmethod
     async def extract_text(file: Optional[UploadFile] = None) -> str:
         """
         Extrae texto del archivo, soportando PDF y DOCX.
+        Utiliza archivos temporales del sistema (/tmp) que son efímeros.
         """
         if not file:
             raise InvalidFileError(detail="No se proporcionó ningún archivo para extraer texto.")
+        
+        # Asegurar puntero al inicio
+        await file.seek(0)
 
-        # Validar y extraer texto soportando PDF, DOCX, XLSX, CSV, TXT
         filename = file.filename.lower()
         if filename.endswith(".pdf"):
             return await FileUtil.extract_text_from_pdf(file)
+        
         elif filename.endswith(".xlsx") or filename.endswith(".csv"):
-            # Excel/CSV: retornar mensaje informativo
             return f"[Archivo {filename}: Tipo tabular detectado. Requiere procesamiento especializado]"
+        
         elif filename.endswith(".txt"):
-            # TXT: lectura directa
             content = await file.read()
             return content.decode('utf-8', errors='replace')
+        
         elif filename.endswith(".docx"):
             tmp_path = None
             try:
-                # Crear un archivo temporal con extensión .docx
+                # Crear tempfile en disco (/tmp en linux/cloud run)
                 with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as tmp_file:
                     content = await file.read()
                     logger.info(f"Procesando archivo DOCX ({len(content)} bytes)")
@@ -64,7 +136,6 @@ class FileUtil:
                     tmp_path = tmp_file.name
 
                 try:
-                    # Extraer texto del archivo .docx
                     doc = docx.Document(tmp_path)
                     paragraphs = [p.text for p in doc.paragraphs if p.text]
                     doc_text = "\n".join(paragraphs)
@@ -79,12 +150,12 @@ class FileUtil:
             except InvalidFileError:
                 raise
             except Exception as e:
-                raise ExternalServiceError(detail=f"Error interno al manejar el archivo temporal: {e.__class__.__name__}")
+                raise ExternalServiceError(detail=f"Error interno al manejar el archivo temporal DOCX: {e.__class__.__name__}")
             finally:
                 if tmp_path and os.path.exists(tmp_path):
                     os.unlink(tmp_path)
+                await file.seek(0) # Resetear puntero
         else:
-            # no debería llegar aquí si se chequeó previamente
             raise HTTPException(status_code=400, detail="Formato no soportado. Se acepta .pdf o .docx.")
 
     @staticmethod
@@ -96,15 +167,12 @@ class FileUtil:
         pdf_text = ""
         
         try:
-            # Crear un archivo temporal con extensión .pdf
             with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
                 content = await file.read() 
-                logger.info(content)
                 tmp_file.write(content)
-                logger.info(tmp_file)
                 tmp_path = tmp_file.name
+            
             try:
-                # Extraer texto del archivo .pdf
                 with pdfplumber.open(tmp_path) as pdf:
                     for page in pdf.pages:
                         page_text = page.extract_text()
@@ -121,7 +189,8 @@ class FileUtil:
         except InvalidFileError:
             raise
         except Exception as e:
-            raise ExternalServiceError(detail=f"Error interno al manejar el archivo temporal: {e.__class__.__name__}")
+            raise ExternalServiceError(detail=f"Error interno al manejar el archivo temporal PDF: {e.__class__.__name__}")
         finally:
             if tmp_path and os.path.exists(tmp_path):
                 os.unlink(tmp_path)
+            await file.seek(0) # Resetear puntero

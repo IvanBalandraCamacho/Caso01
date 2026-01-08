@@ -4,23 +4,21 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool
 from core.config import settings
 
-# Crear el motor de SQLAlchemy usando la URL de la config con CONNECTION POOL
+# Crear el motor de SQLAlchemy
 engine = create_engine(
     settings.DATABASE_URL,
     poolclass=QueuePool,
-    pool_size=20,           # Conexiones permanentes en el pool
-    max_overflow=10,        # Conexiones adicionales permitidas
-    pool_pre_ping=True,     # Verificar conexiones antes de usarlas
-    pool_recycle=3600       # Reciclar conexiones cada 1 hora
+    pool_size=10,           # Reducido un poco para Cloud Run (serverless prefiere muchas conexiones cortas o pocas largas)
+    max_overflow=20,        # Permitir picos de tráfico
+    pool_pre_ping=True,     # VITAL: Verifica si la conexión sigue viva antes de usarla
+    pool_recycle=1800,      # Reciclar cada 30 min (evita timeouts de firewalls de GCP)
+    pool_timeout=30         # No esperar más de 30s por una conexión
 )
 
-# Crear una fábrica de sesiones (SessionLocal)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Crear una clase Base de la que heredarán nuestros modelos
 Base = declarative_base()
 
-# Función de dependencia para obtener una sesión en los endpoints
 def get_db():
     db = SessionLocal()
     try:

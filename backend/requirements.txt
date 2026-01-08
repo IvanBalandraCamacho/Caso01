@@ -1,6 +1,6 @@
 # --- Framework ---
 fastapi
-uvicorn[standard]
+uvicorn[standard]==0.27.0
 python-dotenv
 pydantic
 python-multipart
@@ -32,13 +32,16 @@ copilotkit  # SDK oficial para integración con CopilotKit
 
 # --- GCP Services ---
 google-cloud-secret-manager
-google-cloud-storage
 google-cloud-tasks
 google-cloud-logging
 google-cloud-aiplatform==1.40.0
 google-cloud-documentai==2.20.1
 google-cloud-language==2.13.0
 google-generativeai==0.8.3
+google-cloud-storage==2.14.0
+psycopg2-binary==2.9.9
+gunicorn==21.2.0
+
 
 # --- HTTP Client (para servicio RAG externo) ---
 httpx
