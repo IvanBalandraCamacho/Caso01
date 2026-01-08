@@ -349,6 +349,9 @@ export const uploadDocumentApi = async (
     `/workspaces/${workspaceId}/upload`,
     formData,
     {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
       onUploadProgress: onProgress
         ? (progressEvent) => {
           const total = progressEvent.total || 0;
@@ -530,6 +533,9 @@ export const uploadDocumentToConversation = async (
     `/workspaces/${workspaceId}/conversations/${conversationId}/upload`,
     formData,
     {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
       onUploadProgress: onProgress
         ? (progressEvent) => {
           const total = progressEvent.total || 0;
@@ -979,6 +985,9 @@ export const analyzeDocumentApi = async (
   formData.append("file", file);
 
   const { data } = await api.post<AnalysisResponse>("/task/analyze", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
     onUploadProgress: onProgress
       ? (progressEvent) => {
         const total = progressEvent.total || 0;
