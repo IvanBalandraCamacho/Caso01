@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "standalone", // Necesario para Docker - en Windows local puede dar error de symlinks
+  // output: "standalone", // Deshabilitado para compilación local en Windows - habilitar para Docker
   
   // typescript: {
   //   ignoreBuildErrors: true,  // ⚠️ Deshabilitado para detectar errores en build

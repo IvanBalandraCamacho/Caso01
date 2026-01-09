@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Input, Typography, Avatar, Spin, Modal, Upload } from "antd";
+import { Button, Input, Avatar, Spin, Modal } from "antd";
 import { 
   UserOutlined, 
   MailOutlined, 
@@ -15,13 +15,8 @@ import {
   ClockCircleOutlined,
   TrophyOutlined
 } from "@ant-design/icons";
-import type { UploadFile } from "antd";
 import { showToast } from "@/components/Toast";
 import { useUser } from "@/hooks/useUser";
-import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { dt } from "@/lib/design-tokens";
-
-const { Text, Title } = Typography;
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -78,7 +73,7 @@ export default function ProfilePage() {
 
       showToast("Perfil actualizado exitosamente", "success");
       setIsEditing(false);
-      window.location.reload(); // Recargar para actualizar el contexto
+      window.location.reload();
     } catch (error) {
       console.error('Error:', error);
       showToast("Error al actualizar perfil", "error");
@@ -184,85 +179,38 @@ export default function ProfilePage() {
 
   if (userLoading) {
     return (
-      <div style={{ 
-        minHeight: '100vh', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a1c 100%)',
-      }}>
+      <div className="min-h-screen flex items-center justify-center bg-[#131314]">
         <Spin size="large" />
       </div>
     );
   }
 
   return (
-    <div 
-      className="bg-gradient-animated"
-      style={{
-        minHeight: '100vh',
-        padding: dt.spacing.xl,
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-    >
-      <FloatingParticles />
-      
-      {/* Gradiente radial */}
-      <div className="bg-radial-glow" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} />
-
-      <div style={{ maxWidth: '1200px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
-        {/* Header con botón volver */}
-        <div style={{ marginBottom: dt.spacing.xl }}>
-          <Button
-            type="text"
-            icon={<ArrowLeftOutlined />}
+    <div className="min-h-screen bg-[#131314] p-6">
+      <div className="max-w-5xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <button
             onClick={() => router.push('/')}
-            className="transition-smooth"
-            style={{
-              color: dt.colors.dark.textSubtle,
-              padding: '8px 16px',
-              height: 'auto',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-              e.currentTarget.style.color = '#E31837';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-              e.currentTarget.style.color = dt.colors.dark.textSubtle;
-            }}
+            className="flex items-center gap-2 text-zinc-400 hover:text-[#E31837] transition-colors px-3 py-2 rounded-lg hover:bg-zinc-800/50"
           >
-            Volver al inicio
-          </Button>
+            <ArrowLeftOutlined />
+            <span>Volver al inicio</span>
+          </button>
         </div>
 
-        {/* Grid con perfil y estadísticas */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-          gap: dt.spacing.xl,
-        }}>
-          {/* Tarjeta de perfil */}
-          <div 
-            className="glass-card"
-            style={{
-              padding: '40px',
-              borderRadius: '24px',
-              textAlign: 'center',
-            }}
-          >
+        {/* Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          {/* Tarjeta de Perfil */}
+          <div className="bg-[#1E1F20] rounded-2xl border border-zinc-800 p-8 text-center">
             {/* Avatar */}
-            <div style={{ position: 'relative', display: 'inline-block', marginBottom: dt.spacing.xl }}>
+            <div className="relative inline-block mb-6">
               <input
                 type="file"
                 id="profile-picture-input"
                 accept="image/*"
-                style={{ display: 'none' }}
+                className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) handleUploadPhoto(file);
@@ -272,33 +220,19 @@ export default function ProfilePage() {
                 size={120}
                 icon={!user?.profile_picture ? <UserOutlined /> : undefined}
                 src={user?.profile_picture ? `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'}${user.profile_picture}` : undefined}
+                className="cursor-pointer"
                 style={{
                   background: user?.profile_picture ? 'transparent' : 'linear-gradient(135deg, #E31837 0%, #FF6B00 100%)',
                   fontSize: '48px',
-                  cursor: 'pointer',
                 }}
                 onClick={() => document.getElementById('profile-picture-input')?.click()}
               />
               <div 
-                style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  right: 0,
-                  width: '40px',
-                  height: '40px',
-                  background: isUploadingPhoto 
-                    ? 'linear-gradient(135deg, #6B7280 0%, #4B5563 100%)'
-                    : 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: isUploadingPhoto ? 'not-allowed' : 'pointer',
-                  border: '3px solid #0a0a0a',
-                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)',
-                  pointerEvents: isUploadingPhoto ? 'none' : 'auto',
-                }}
-                className="hover-lift transition-smooth"
+                className={`absolute bottom-0 right-0 w-10 h-10 rounded-full flex items-center justify-center border-[3px] border-[#131314] cursor-pointer transition-all hover:scale-110 ${
+                  isUploadingPhoto 
+                    ? 'bg-zinc-600 cursor-not-allowed' 
+                    : 'bg-gradient-to-br from-emerald-500 to-emerald-600'
+                }`}
                 onClick={() => {
                   if (!isUploadingPhoto) {
                     document.getElementById('profile-picture-input')?.click();
@@ -306,37 +240,30 @@ export default function ProfilePage() {
                 }}
               >
                 {isUploadingPhoto ? (
-                  <div className="spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }} />
+                  <Spin size="small" />
                 ) : (
-                  <CameraOutlined style={{ color: '#FFFFFF', fontSize: '18px' }} />
+                  <CameraOutlined className="text-white text-lg" />
                 )}
               </div>
             </div>
 
-            <Title level={3} style={{ color: '#FFFFFF', margin: `0 0 ${dt.spacing.xs} 0` }}>
+            <h2 className="text-2xl font-bold text-white mb-1">
               {user?.full_name || 'Usuario'}
-            </Title>
-            <Text style={{ color: dt.colors.dark.textSubtle, display: 'block', marginBottom: dt.spacing.xl }}>
-              {user?.email}
-            </Text>
+            </h2>
+            <p className="text-zinc-400 mb-8">{user?.email}</p>
 
             {/* Botones de acción */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: dt.spacing.md }}>
+            <div className="space-y-3">
               <Button
                 icon={isEditing ? <SaveOutlined /> : <EditOutlined />}
                 onClick={() => isEditing ? handleSaveProfile() : setIsEditing(true)}
                 loading={isSaving}
-                className="hover-shine transition-smooth"
+                className="w-full h-12 rounded-xl font-semibold border-0"
                 style={{
-                  width: '100%',
-                  height: '48px',
                   background: isEditing 
                     ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
                     : 'linear-gradient(135deg, #E31837 0%, #C41530 100%)',
-                  border: 'none',
-                  borderRadius: '12px',
                   color: '#FFFFFF',
-                  fontWeight: 600,
                 }}
               >
                 {isEditing ? 'Guardar Cambios' : 'Editar Perfil'}
@@ -351,15 +278,7 @@ export default function ProfilePage() {
                       email: user?.email || "",
                     });
                   }}
-                  className="transition-smooth"
-                  style={{
-                    width: '100%',
-                    height: '48px',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '12px',
-                    color: dt.colors.dark.text,
-                  }}
+                  className="w-full h-12 rounded-xl bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700 hover:border-zinc-600"
                 >
                   Cancelar
                 </Button>
@@ -368,15 +287,7 @@ export default function ProfilePage() {
               <Button
                 icon={<LockOutlined />}
                 onClick={() => setShowPasswordModal(true)}
-                className="transition-smooth"
-                style={{
-                  width: '100%',
-                  height: '48px',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: '12px',
-                  color: dt.colors.dark.text,
-                }}
+                className="w-full h-12 rounded-xl bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700 hover:border-zinc-600"
               >
                 Cambiar Contraseña
               </Button>
@@ -385,12 +296,7 @@ export default function ProfilePage() {
                 icon={<LogoutOutlined />}
                 onClick={handleLogout}
                 danger
-                className="transition-smooth"
-                style={{
-                  width: '100%',
-                  height: '48px',
-                  borderRadius: '12px',
-                }}
+                className="w-full h-12 rounded-xl"
               >
                 Cerrar Sesión
               </Button>
@@ -398,88 +304,46 @@ export default function ProfilePage() {
           </div>
 
           {/* Información del perfil */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: dt.spacing.xl }}>
+          <div className="space-y-6">
             {/* Formulario */}
-            <div 
-              className="glass-card"
-              style={{
-                padding: '40px',
-                borderRadius: '24px',
-              }}
-            >
-              <Title level={4} style={{ color: '#FFFFFF', marginBottom: dt.spacing.xl }}>
-                Información Personal
-              </Title>
+            <div className="bg-[#1E1F20] rounded-2xl border border-zinc-800 p-8">
+              <h3 className="text-lg font-bold text-white mb-6">Información Personal</h3>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              <div className="space-y-5">
                 {/* Nombre */}
                 <div>
-                  <Text style={{ 
-                    color: dt.colors.dark.text, 
-                    display: 'block', 
-                    marginBottom: dt.spacing.sm,
-                    fontSize: '14px',
-                    fontWeight: 600,
-                  }}>
-                    <UserOutlined style={{ marginRight: '8px' }} />
+                  <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-2">
+                    <UserOutlined />
                     Nombre completo
-                  </Text>
+                  </label>
                   <Input
                     value={formData.full_name}
                     onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                     disabled={!isEditing}
-                    className="input-enhanced"
-                    style={{
-                      background: isEditing ? 'rgba(26, 26, 28, 0.6)' : 'rgba(255, 255, 255, 0.02)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '12px',
-                      padding: '14px 18px',
-                      color: dt.colors.dark.text,
-                      fontSize: '15px',
-                    }}
+                    className={`h-12 rounded-xl ${isEditing ? 'bg-zinc-900' : 'bg-zinc-900/50'} border-zinc-700 text-white`}
                   />
                 </div>
 
                 {/* Email */}
                 <div>
-                  <Text style={{ 
-                    color: dt.colors.dark.text, 
-                    display: 'block', 
-                    marginBottom: dt.spacing.sm,
-                    fontSize: '14px',
-                    fontWeight: 600,
-                  }}>
-                    <MailOutlined style={{ marginRight: '8px' }} />
+                  <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-2">
+                    <MailOutlined />
                     Email
-                  </Text>
+                  </label>
                   <Input
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     disabled={!isEditing}
-                    className="input-enhanced"
-                    style={{
-                      background: isEditing ? 'rgba(26, 26, 28, 0.6)' : 'rgba(255, 255, 255, 0.02)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '12px',
-                      padding: '14px 18px',
-                      color: dt.colors.dark.text,
-                      fontSize: '15px',
-                    }}
+                    className={`h-12 rounded-xl ${isEditing ? 'bg-zinc-900' : 'bg-zinc-900/50'} border-zinc-700 text-white`}
                   />
                 </div>
 
                 {/* Fecha de registro */}
                 <div>
-                  <Text style={{ 
-                    color: dt.colors.dark.text, 
-                    display: 'block', 
-                    marginBottom: dt.spacing.sm,
-                    fontSize: '14px',
-                    fontWeight: 600,
-                  }}>
-                    <ClockCircleOutlined style={{ marginRight: '8px' }} />
+                  <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-2">
+                    <ClockCircleOutlined />
                     Miembro desde
-                  </Text>
+                  </label>
                   <Input
                     value={user?.created_at ? new Date(user.created_at).toLocaleDateString('es-ES', {
                       year: 'numeric',
@@ -487,93 +351,39 @@ export default function ProfilePage() {
                       day: 'numeric'
                     }) : 'N/A'}
                     disabled
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.02)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '12px',
-                      padding: '14px 18px',
-                      color: dt.colors.dark.textSubtle,
-                      fontSize: '15px',
-                    }}
+                    className="h-12 rounded-xl bg-zinc-900/50 border-zinc-700 text-zinc-400"
                   />
                 </div>
               </div>
             </div>
 
-            {/* Estadísticas rápidas */}
-            <div 
-              className="glass-card"
-              style={{
-                padding: '40px',
-                borderRadius: '24px',
-              }}
-            >
-              <Title level={4} style={{ color: '#FFFFFF', marginBottom: dt.spacing.xl }}>
-                Estadísticas
-              </Title>
+            {/* Estadísticas */}
+            <div className="bg-[#1E1F20] rounded-2xl border border-zinc-800 p-8">
+              <h3 className="text-lg font-bold text-white mb-6">Estadísticas</h3>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: dt.spacing.lg }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{
-                    width: '48px',
-                    height: '48px',
-                    margin: '0 auto 12px',
-                    borderRadius: '12px',
-                    background: 'linear-gradient(135deg, #E31837 0%, #C41530 100%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                    <FileTextOutlined style={{ fontSize: '20px', color: '#FFFFFF' }} />
+              <div className="grid grid-cols-3 gap-4">
+                <div className="text-center">
+                  <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-[#E31837] to-[#C41530] flex items-center justify-center">
+                    <FileTextOutlined className="text-xl text-white" />
                   </div>
-                  <Title level={3} style={{ color: '#FFFFFF', margin: '0 0 4px 0' }}>
-                    0
-                  </Title>
-                  <Text style={{ color: dt.colors.dark.textSubtle, fontSize: '12px' }}>
-                    Workspaces
-                  </Text>
+                  <p className="text-2xl font-bold text-white">0</p>
+                  <p className="text-xs text-zinc-500">Workspaces</p>
                 </div>
 
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{
-                    width: '48px',
-                    height: '48px',
-                    margin: '0 auto 12px',
-                    borderRadius: '12px',
-                    background: 'linear-gradient(135deg, #3B82F6 0%, #1E40AF 100%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                    <FileTextOutlined style={{ fontSize: '20px', color: '#FFFFFF' }} />
+                <div className="text-center">
+                  <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center">
+                    <FileTextOutlined className="text-xl text-white" />
                   </div>
-                  <Title level={3} style={{ color: '#FFFFFF', margin: '0 0 4px 0' }}>
-                    0
-                  </Title>
-                  <Text style={{ color: dt.colors.dark.textSubtle, fontSize: '12px' }}>
-                    Documentos
-                  </Text>
+                  <p className="text-2xl font-bold text-white">0</p>
+                  <p className="text-xs text-zinc-500">Documentos</p>
                 </div>
 
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{
-                    width: '48px',
-                    height: '48px',
-                    margin: '0 auto 12px',
-                    borderRadius: '12px',
-                    background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                    <TrophyOutlined style={{ fontSize: '20px', color: '#FFFFFF' }} />
+                <div className="text-center">
+                  <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center">
+                    <TrophyOutlined className="text-xl text-white" />
                   </div>
-                  <Title level={3} style={{ color: '#FFFFFF', margin: '0 0 4px 0' }}>
-                    0
-                  </Title>
-                  <Text style={{ color: dt.colors.dark.textSubtle, fontSize: '12px' }}>
-                    RFPs
-                  </Text>
+                  <p className="text-2xl font-bold text-white">0</p>
+                  <p className="text-xs text-zinc-500">RFPs</p>
                 </div>
               </div>
             </div>
@@ -583,74 +393,52 @@ export default function ProfilePage() {
 
       {/* Modal de cambio de contraseña */}
       <Modal
-        title={<span style={{ color: '#FFFFFF' }}>Cambiar Contraseña</span>}
+        title={<span className="text-white">Cambiar Contraseña</span>}
         open={showPasswordModal}
         onCancel={() => setShowPasswordModal(false)}
         footer={null}
+        className="dark-modal"
         styles={{
           body: {
-            background: 'rgba(26, 26, 28, 0.95)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
+            background: '#1E1F20',
           },
           header: {
-            background: 'transparent',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+            background: '#1E1F20',
+            borderBottom: '1px solid #27272a',
+          },
+          mask: {
+            backdropFilter: 'blur(4px)',
           },
         }}
       >
-        <div style={{ padding: '20px 0', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div className="py-4 space-y-5">
           <div>
-            <Text style={{ color: dt.colors.dark.text, display: 'block', marginBottom: '8px' }}>
-              Contraseña actual
-            </Text>
+            <label className="text-sm text-zinc-300 block mb-2">Contraseña actual</label>
             <Input.Password
               value={passwordData.current_password}
               onChange={(e) => setPasswordData({ ...passwordData, current_password: e.target.value })}
               placeholder="Tu contraseña actual"
-              style={{
-                background: 'rgba(26, 26, 28, 0.6)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '12px',
-                padding: '12px 16px',
-                color: '#FFFFFF',
-              }}
+              className="h-12 rounded-xl bg-zinc-900 border-zinc-700 text-white"
             />
           </div>
 
           <div>
-            <Text style={{ color: dt.colors.dark.text, display: 'block', marginBottom: '8px' }}>
-              Nueva contraseña
-            </Text>
+            <label className="text-sm text-zinc-300 block mb-2">Nueva contraseña</label>
             <Input.Password
               value={passwordData.new_password}
               onChange={(e) => setPasswordData({ ...passwordData, new_password: e.target.value })}
               placeholder="Mínimo 8 caracteres"
-              style={{
-                background: 'rgba(26, 26, 28, 0.6)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '12px',
-                padding: '12px 16px',
-                color: '#FFFFFF',
-              }}
+              className="h-12 rounded-xl bg-zinc-900 border-zinc-700 text-white"
             />
           </div>
 
           <div>
-            <Text style={{ color: dt.colors.dark.text, display: 'block', marginBottom: '8px' }}>
-              Confirmar nueva contraseña
-            </Text>
+            <label className="text-sm text-zinc-300 block mb-2">Confirmar nueva contraseña</label>
             <Input.Password
               value={passwordData.confirm_password}
               onChange={(e) => setPasswordData({ ...passwordData, confirm_password: e.target.value })}
               placeholder="Repite la nueva contraseña"
-              style={{
-                background: 'rgba(26, 26, 28, 0.6)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '12px',
-                padding: '12px 16px',
-                color: '#FFFFFF',
-              }}
+              className="h-12 rounded-xl bg-zinc-900 border-zinc-700 text-white"
             />
           </div>
 
@@ -658,14 +446,9 @@ export default function ProfilePage() {
             type="primary"
             onClick={handleChangePassword}
             loading={isSaving}
-            className="hover-shine"
+            className="w-full h-12 rounded-xl border-0 mt-2"
             style={{
-              width: '100%',
-              height: '48px',
               background: 'linear-gradient(135deg, #E31837 0%, #C41530 100%)',
-              border: 'none',
-              borderRadius: '12px',
-              marginTop: '8px',
             }}
           >
             Cambiar Contraseña

@@ -10,16 +10,13 @@ import {
   SendHorizontal, 
   Mic, 
 } from "lucide-react"
-import { DashboardStats, TodoList, UpcomingDeadlines, ComplianceScore } from "@/components/ui/DashboardWidgets"
-import { AnalysisTemplates } from "@/components/ui/AnalysisTemplates"
-import { LayoutGrid } from "lucide-react"
+import { DashboardStats, TodoList, UpcomingDeadlines } from "@/components/ui/DashboardWidgets"
 import { WorkspacesTable } from "@/components/WorkspacesTable"
 
 export default function Home() {
   const { user } = useUser()
   const router = useRouter()
   const [message, setMessage] = useState("")
-  const [showTemplates, setShowTemplates] = useState(false)
 
   const handleSendMessage = useCallback(() => {
     if (!message.trim()) return
@@ -51,13 +48,6 @@ export default function Home() {
             />
           </div>
           <div className="flex gap-4 items-center">
-          <button 
-            onClick={() => setShowTemplates(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#1E1F20] hover:bg-zinc-800 border border-zinc-800 rounded-xl text-sm font-medium transition-colors"
-          >
-            <LayoutGrid size={16} className="text-[#E31837]" />
-            Plantillas
-          </button>
             <UserMenu user={user} />
           </div>
         </header>
@@ -133,20 +123,15 @@ export default function Home() {
               </div>
 
               {/* Widgets Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Left Column: Todo List */}
-                <div className="lg:col-span-1 h-full">
+                <div className="h-full">
                   <TodoList />
                 </div>
 
-                {/* Middle Column: Deadlines */}
-                <div className="lg:col-span-1 h-full">
+                {/* Right Column: Deadlines */}
+                <div className="h-full">
                   <UpcomingDeadlines />
-                </div>
-
-                {/* Right Column: Compliance or other widgets */}
-                <div className="lg:col-span-1 flex flex-col gap-6">
-                  <ComplianceScore score={75} />
                 </div>
               </div>
 
@@ -158,12 +143,6 @@ export default function Home() {
             </div>
           </div>
         </div>
-
-        {/* Templates Modal */}
-        <AnalysisTemplates 
-          open={showTemplates} 
-          onClose={() => setShowTemplates(false)} 
-        />
       </main>
     </div>
   )
