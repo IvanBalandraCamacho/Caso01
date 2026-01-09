@@ -270,10 +270,10 @@ export default function ProfilePage() {
               />
               <Avatar 
                 size={120}
-                icon={!user?.profile_picture ? <UserOutlined /> : undefined}
-                src={user?.profile_picture ? `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'}${user.profile_picture}` : undefined}
+                icon={!(user as any)?.profile_picture ? <UserOutlined /> : undefined}
+                src={(user as any)?.profile_picture ? `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'}${(user as any).profile_picture}` : undefined}
                 style={{
-                  background: user?.profile_picture ? 'transparent' : 'linear-gradient(135deg, #E31837 0%, #FF6B00 100%)',
+                  background: (user as any)?.profile_picture ? 'transparent' : 'linear-gradient(135deg, #E31837 0%, #FF6B00 100%)',
                   fontSize: '48px',
                   cursor: 'pointer',
                 }}
@@ -588,7 +588,7 @@ export default function ProfilePage() {
         onCancel={() => setShowPasswordModal(false)}
         footer={null}
         styles={{
-          content: {
+          body: {
             background: 'rgba(26, 26, 28, 0.95)',
             backdropFilter: 'blur(20px)',
             border: '1px solid rgba(255, 255, 255, 0.1)',

@@ -12,28 +12,43 @@ logger = logging.getLogger(__name__)
 
 
 class VectorStore:
-    def __init__(self):
-        self.qdrant_url = os.getenv("QDRANT_URL", "http://qdrant:6333")
-        # ACTUALIZACIÓN: Usando documents_v2 para el nuevo modelo de 768 dimensiones
-        self.collection_name = "documents_v2"
-        # ACTUALIZACIÓN: Modelo multilingüe superior (E5 Base)
-        self.embedding_model_name = "intfloat/multilingual-e5-base"
-        self.vector_size = 768  # Size for multilingual-e5-base
+    _instance = None
+    _initialized = False
 
-        # Initialize Qdrant Client
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(VectorStore, cls).__new__(cls)
+        return cls._instance
+
+    def __init__(self):
+        # Solo inicializar una vez
+        if VectorStore._initialized:
+            return
+            
+        self.qdrant_url = os.getenv("QDRANT_URL", "http://qdrant:6333")
+        self.collection_name = "documents_v2"
+        self.embedding_model_name = "intfloat/multilingual-e5-base"
+        self.vector_size = 768
+
+        # Initialize Qdrant Client (lightweight)
         logger.info(f"VECTOR_STORE: Connecting to Qdrant at {self.qdrant_url}...")
         self.client = QdrantClient(url=self.qdrant_url, timeout=60)
 
-        # Initialize Embedding Model (Local CPU)
-        logger.info(
-            f"VECTOR_STORE: Loading embedding model '{self.embedding_model_name}'..."
-        )
-        self.embedding_model = SentenceTransformer(
-            self.embedding_model_name, device="cpu"
-        )
-        logger.info("VECTOR_STORE: Model loaded.")
-
+        # NO cargar el modelo aquí - lazy loading
+        self.embedding_model = None
+        
         self._ensure_collection()
+        VectorStore._initialized = True
+        logger.info("VECTOR_STORE: Initialized (model will load on first use)")
+
+    def _load_embedding_model(self):
+        """Load embedding model only when needed (lazy loading)"""
+        if self.embedding_model is None:
+            logger.info(f"VECTOR_STORE: Loading embedding model '{self.embedding_model_name}'...")
+            self.embedding_model = SentenceTransformer(
+                self.embedding_model_name, device="cpu"
+            )
+            logger.info("VECTOR_STORE: Model loaded successfully")
 
     def _ensure_collection(self):
         """Ensure the collection exists with the correct config."""
@@ -54,18 +69,14 @@ class VectorStore:
     def get_embedding(self, text: str, is_query: bool = False) -> List[float]:
         """
         Generate embedding for a single string.
-        E5 models require 'query: ' prefix for queries and 'passage: ' for documents (optional but recommended).
-        For simplicity and standard E5 usage:
-        - Queries MUST have "query: " prefix.
-        - Documents (passages) usually used as is or with "passage: ".
-        We will use "query: " for search queries and raw text for documents (symmetric is fine for base, but prefix is better).
-        Let's stick to adding "query: " only for search queries as per E5 instructions for asymmetric tasks.
+        Lazy loads the model on first call.
         """
+        # Cargar modelo solo cuando se necesite
+        self._load_embedding_model()
+        
         if is_query:
             text = f"query: {text}"
         else:
-            # E5 technically recommends "passage: " for documents but often works fine without if trained symmetrically.
-            # However, standard E5 practice acts as asymmetric. We'll add "passage: " to be safe and consistent.
             text = f"passage: {text}"
 
         embedding = self.embedding_model.encode(text, convert_to_numpy=True)
@@ -74,23 +85,20 @@ class VectorStore:
     def upsert_documents(self, documents: List[Dict[str, Any]]) -> int:
         """
         Upsert documents/chunks into Qdrant.
-        Expects list of dicts with: content, metadata (including document_id, workspace_id, etc.)
         """
         points = []
         for doc in documents:
             content = doc["content"]
             metadata = doc["metadata"]
 
-            # Generate embedding (is_query=False)
+            # Generate embedding (this will lazy load the model)
             vector = self.get_embedding(content, is_query=False)
 
-            # Generate deterministic ID if not provided, or use random
             if "chunk_id" in metadata:
                 point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, metadata["chunk_id"]))
             else:
                 point_id = str(uuid.uuid4())
 
-            # Ensure payload has the content for retrieval
             payload = metadata.copy()
             payload["content"] = content
 
@@ -116,13 +124,12 @@ class VectorStore:
         """
         Search for similar documents.
         """
-        # Generate embedding (is_query=True)
+        # Generate embedding (this will lazy load the model)
         query_vector = self.get_embedding(query, is_query=True)
 
         # Build filters
         must_filters = []
 
-        # Filter by Workspace (Strict)
         if workspace_id:
             must_filters.append(
                 qmodels.FieldCondition(
@@ -130,7 +137,6 @@ class VectorStore:
                 )
             )
 
-        # Filter by Conversation (Contextual)
         if conversation_id:
             must_filters.append(
                 qmodels.Filter(
@@ -151,7 +157,7 @@ class VectorStore:
             query=query_vector,
             query_filter=qmodels.Filter(must=must_filters) if must_filters else None,
             limit=limit,
-            score_threshold=None,  # Disable threshold for debugging/re-calibration
+            score_threshold=None,
             with_payload=True,
         ).points
 
@@ -186,5 +192,5 @@ class VectorStore:
         )
 
 
-# Singleton instance
+# Singleton instance (pero el modelo se cargará lazy)
 vector_store = VectorStore()

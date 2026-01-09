@@ -1195,6 +1195,7 @@ export const fetchDocumentContent = async (
   return data;
 };
 
+export const getDocumentContentApi = fetchDocumentContent;
 
 // ============================================
 // PROPOSAL & RFP API FUNCTIONS

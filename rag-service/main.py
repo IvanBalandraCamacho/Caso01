@@ -13,9 +13,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, validator
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-# Import the new VectorStore module
-from vector_store import vector_store
-
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -35,13 +32,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Pydantic models
+# LAZY LOADING: No importar vector_store al inicio
+vector_store = None
+
+def get_vector_store():
+    """Lazy initialization of vector store"""
+    global vector_store
+    if vector_store is None:
+        logger.info("Initializing vector store...")
+        from vector_store import vector_store as vs
+        vector_store = vs
+        logger.info("Vector store initialized successfully")
+    return vector_store
+
+# Pydantic models (sin cambios)
 class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=1000)
     workspace_id: Optional[str] = None
     conversation_id: Optional[str] = None
     limit: int = Field(5, ge=1, le=50)
-    threshold: float = Field(0.0, ge=0.0, le=1.0) # Default 0.0 for cosine similarity
+    threshold: float = Field(0.0, ge=0.0, le=1.0)
 
     @validator('query')
     def query_not_empty(cls, v):
@@ -55,7 +65,7 @@ class RAGIngestRequest(BaseModel):
     content: str = Field(..., min_length=1)
     metadata: Dict[str, Any] = Field(default_factory=dict)
     user_id: Optional[str] = None
-    conversation_id: Optional[str] = None # Added to support conversation-specific docs
+    conversation_id: Optional[str] = None
 
     @validator('content')
     def content_not_empty(cls, v):
@@ -83,9 +93,8 @@ class SearchResult(BaseModel):
     metadata: Dict[str, Any]
 
 # Utils
-# deolver a 512 y 50, cambiado por prueba de consumo de tokens y mejora de respuestas (codigo mirai)
 def chunk_text(text: str, chunk_size: int = 2000, overlap: int = 200) -> List[str]:
-    """Smart chunking with langchain (using smaller chunks for local models)"""
+    """Smart chunking with langchain"""
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=overlap,
@@ -95,6 +104,27 @@ def chunk_text(text: str, chunk_size: int = 2000, overlap: int = 200) -> List[st
     return text_splitter.split_text(text)
 
 # Endpoints
+@app.get("/")
+async def root():
+    """Root endpoint - permite que Cloud Run detecte que el servicio está listo"""
+    return {"status": "ready", "service": "RAG Service"}
+
+@app.get("/health")
+async def health_check(request: Request):
+    """Health check - ahora sin verificar Qdrant para inicio rápido"""
+    return {"status": "healthy", "service": "RAG Service (Qdrant + Local Embeddings)"}
+
+@app.get("/health/ready")
+async def readiness_check(request: Request):
+    """Readiness check - verifica que todo esté inicializado"""
+    try:
+        vs = get_vector_store()
+        vs.client.get_collections()
+        return {"status": "ready", "service": "RAG Service"}
+    except Exception as e:
+        logger.error(f"Readiness check failed: {e}")
+        raise HTTPException(status_code=503, detail=str(e))
+
 @app.post("/ingest_text", response_model=IngestResponse)
 async def ingest_text_content(
     request: Request,
@@ -102,6 +132,8 @@ async def ingest_text_content(
 ):
     """Index text content"""
     try:
+        vs = get_vector_store()  # Lazy load
+        
         text_content = rag_request.content
         chunks = chunk_text(text_content)
         
@@ -120,15 +152,15 @@ async def ingest_text_content(
             if rag_request.user_id:
                 metadata["user_id"] = rag_request.user_id
             
-            if rag_request.conversation_id: # If passed in metadata
-                 metadata["conversation_id"] = rag_request.conversation_id
+            if rag_request.conversation_id:
+                metadata["conversation_id"] = rag_request.conversation_id
 
             documents_to_upsert.append({
                 "content": chunk,
                 "metadata": metadata
             })
 
-        count = vector_store.upsert_documents(documents_to_upsert)
+        count = vs.upsert_documents(documents_to_upsert)
 
         logger.info(f"Indexed doc {rag_request.document_id} with {count} chunks")
 
@@ -146,6 +178,8 @@ async def ingest_text_content(
 async def ingest_batch(request: Request, batch_request: BatchIngestRequest):
     """Batch index documents"""
     try:
+        vs = get_vector_store()  # Lazy load
+        
         results = []
         total_chunks = 0
         
@@ -172,7 +206,7 @@ async def ingest_batch(request: Request, batch_request: BatchIngestRequest):
                         "metadata": metadata
                     })
                 
-                count = vector_store.upsert_documents(documents_to_upsert)
+                count = vs.upsert_documents(documents_to_upsert)
                 total_chunks += count
                 
                 results.append(IngestResponse(
@@ -202,7 +236,9 @@ async def ingest_batch(request: Request, batch_request: BatchIngestRequest):
 async def search_documents(request: Request, search_request: SearchRequest):
     """Search documents"""
     try:
-        results = vector_store.search(
+        vs = get_vector_store()  # Lazy load
+        
+        results = vs.search(
             query=search_request.query,
             workspace_id=search_request.workspace_id,
             conversation_id=search_request.conversation_id,
@@ -220,22 +256,14 @@ async def search_documents(request: Request, search_request: SearchRequest):
 async def delete_document(request: Request, document_id: str):
     """Delete document"""
     try:
-        vector_store.delete_document(document_id)
+        vs = get_vector_store()  # Lazy load
+        vs.delete_document(document_id)
         return {"status": "success", "message": f"Document {document_id} deleted"}
     except Exception as e:
         logger.error(f"Delete error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/health")
-async def health_check(request: Request):
-    """Health check"""
-    try:
-        # Check Qdrant connection via vector_store
-        vector_store.client.get_collections()
-        return {"status": "healthy", "service": "RAG Service (Qdrant + Local Embeddings)"}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run(app, host="0.0.0.0", port=port)

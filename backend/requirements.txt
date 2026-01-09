@@ -1,36 +1,23 @@
-# --- Framework ---
-fastapi
+fastapi==0.115.12
 uvicorn[standard]==0.27.0
-python-dotenv
-pydantic
+python-dotenv==1.0.0
+pydantic>=2.7.0
+pydantic-settings>=2.2.0
 python-multipart
-
-# --- Configuración ---
-pydantic-settings
-
-# --- Seguridad ---
 pyjwt
 passlib[bcrypt]
 bcrypt==4.0.1
-slowapi  # Rate limiting
-python-jose[cryptography]  # JWT tokens
-
-# --- Base de datos y Cache ---
-pymysql
-cryptography  # Requerido por PyMySQL
+slowapi
+python-jose[cryptography]
+psycopg2-binary==2.9.9
 sqlalchemy
 alembic
 redis
 celery
-# --- Async Utilities ---
 nest_asyncio
-
-# --- IA y LLM ---
-openai>=1.54.0  # Cliente requerido para OpenAI
-tenacity>=8.0.0  # Para retry logic en llamadas a LLM
-copilotkit  # SDK oficial para integración con CopilotKit
-
-# --- GCP Services ---
+openai>=1.54.0
+tenacity>=8.0.0
+copilotkit==0.1.74
 google-cloud-secret-manager
 google-cloud-tasks
 google-cloud-logging
@@ -39,18 +26,12 @@ google-cloud-documentai==2.20.1
 google-cloud-language==2.13.0
 google-generativeai==0.8.3
 google-cloud-storage==2.14.0
-psycopg2-binary==2.9.9
 gunicorn==21.2.0
-
-
-# --- HTTP Client (para servicio RAG externo) ---
 httpx
-
-# --- Procesamiento de Documentos ---
 pandas
 openpyxl
 python-docx
 python-pptx
 pypdf
 pdfplumber
-reportlab  # Para generar PDFs con formato profesional
+reportlab

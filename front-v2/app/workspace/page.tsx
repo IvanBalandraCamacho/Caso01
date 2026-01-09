@@ -137,7 +137,7 @@ export default function WorkspacePage() {
         centered
         width={500}
         styles={{
-          content: {
+          body: {
             background: "#1E1F20",
             borderRadius: "24px", // Más redondeado estilo Material 3
             padding: "32px", // Más padding interno
