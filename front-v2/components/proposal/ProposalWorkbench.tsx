@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useCopilotReadable } from "@copilotkit/react-core";
+import { useCopilotReadable, useCopilotAction } from "@copilotkit/react-core";
 import { App, Spin, Button, Tooltip, Select } from "antd";
 import {
   LoadingOutlined,
@@ -80,6 +80,253 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
   useCopilotReadable({
     description: "ID del workspace actual para búsqueda RAG en documentos",
     value: { workspace_id: workspaceId, workspaceId },
+  });
+
+  // Exponer datos extraídos actuales para que CopilotKit los conozca
+  useCopilotReadable({
+    description: "Datos extraídos actuales de la propuesta (cliente, TVT, stack, equipo, etc.)",
+    value: extractedData,
+  });
+
+  // ==================== ACCIONES DE COPILOTKIT ====================
+  
+  // Función helper para actualizar campos (usada por múltiples acciones)
+  const updateFieldHandler = useCallback(async (fieldName: string, newValue: string) => {
+    // Mapeo de nombres alternativos
+    const fieldMap: Record<string, string> = {
+      "cliente": "cliente",
+      "client": "cliente",
+      "company": "cliente",
+      "empresa": "cliente",
+      "tvt": "tvt",
+      "presupuesto": "tvt",
+      "budget": "tvt",
+      "precio": "tvt",
+      "pais": "pais",
+      "country": "pais",
+      "país": "pais",
+      "stack": "stack_tecnologico",
+      "stack_tecnologico": "stack_tecnologico",
+      "tecnologias": "stack_tecnologico",
+      "tech_stack": "stack_tecnologico",
+      "objetivo": "objetivo",
+      "objective": "objetivo",
+      "categoria": "categoria",
+      "category": "categoria",
+      "nombre_operacion": "nombre_operacion",
+      "operacion": "nombre_operacion",
+      "proyecto": "nombre_operacion",
+      "tiempo_aproximado": "tiempo_aproximado",
+      "tiempo": "tiempo_aproximado",
+      "nro_recursos": "nro_recursos",
+      "recursos": "nro_recursos",
+      "moneda": "moneda",
+      "currency": "moneda",
+      "oportunidad": "oportunidad",
+    };
+    
+    const normalizedField = fieldMap[fieldName.toLowerCase()] || fieldName;
+    
+    console.log(`[CopilotAction] updateField llamado: ${normalizedField} = ${newValue}`);
+    
+    setExtractedData((prev: any) => ({
+      ...prev,
+      [normalizedField]: newValue
+    }));
+    
+    message.success(`Campo "${normalizedField}" actualizado`);
+    
+    return `✅ Campo "${normalizedField}" actualizado a: "${newValue}". Los cambios se reflejan en el panel derecho.`;
+  }, [message]);
+  
+  // Acción para actualizar un campo específico
+  useCopilotAction({
+    name: "updateField",
+    description: "Actualiza un campo específico de los datos extraídos. Usa SIEMPRE esta acción cuando el usuario quiera cambiar cualquier valor.",
+    parameters: [
+      {
+        name: "fieldName",
+        type: "string",
+        description: "Campo a actualizar: cliente, nombre_operacion, tvt, pais, stack_tecnologico, categoria, oportunidad, objetivo, tiempo_aproximado, nro_recursos, moneda",
+        required: true,
+      },
+      {
+        name: "newValue",
+        type: "string",
+        description: "El nuevo valor para el campo",
+        required: true,
+      },
+    ],
+    handler: async ({ fieldName, newValue }) => {
+      return updateFieldHandler(fieldName, newValue);
+    },
+  });
+
+  // Acción para actualizar múltiples campos a la vez
+  useCopilotAction({
+    name: "updateMultipleFields",
+    description: "Actualiza varios campos de los datos extraídos de una vez. Útil cuando hay varios cambios que hacer.",
+    parameters: [
+      {
+        name: "updates",
+        type: "object",
+        description: "Objeto con los campos a actualizar y sus nuevos valores. Ej: { cliente: 'ACME', tvt: '500000', pais: 'Chile' }",
+        required: true,
+      },
+    ],
+    handler: async ({ updates }) => {
+      console.log(`[CopilotAction] updateMultipleFields llamado:`, updates);
+      
+      setExtractedData((prev: any) => ({
+        ...prev,
+        ...updates
+      }));
+      
+      const fieldsUpdated = Object.keys(updates).join(", ");
+      message.success(`Campos actualizados: ${fieldsUpdated}`);
+      return `✅ Campos actualizados: ${fieldsUpdated}. Los cambios se reflejan en el panel derecho.`;
+    },
+  });
+
+  // Acción para agregar un miembro al equipo sugerido
+  useCopilotAction({
+    name: "addTeamMember",
+    description: "Agrega un nuevo miembro al equipo sugerido de la propuesta",
+    parameters: [
+      {
+        name: "nombre",
+        type: "string",
+        description: "Nombre o rol del recurso (ej: 'Tech Lead', 'Desarrollador Senior')",
+        required: true,
+      },
+      {
+        name: "experiencia",
+        type: "string",
+        description: "Nivel de experiencia requerido (ej: '5+ años', 'Senior', 'Mid-level')",
+        required: false,
+      },
+      {
+        name: "rol",
+        type: "string",
+        description: "Rol específico en el proyecto",
+        required: false,
+      },
+    ],
+    handler: async ({ nombre, experiencia = "Por definir", rol = nombre }) => {
+      console.log(`[CopilotAction] addTeamMember llamado: ${nombre}, ${experiencia}, ${rol}`);
+      
+      let newCount = 0;
+      setExtractedData((prev: any) => {
+        newCount = (prev.nro_recursos || 0) + 1;
+        return {
+          ...prev,
+          equipo_sugerido: [
+            ...(prev.equipo_sugerido || []),
+            { nombre, experiencia, rol }
+          ],
+          nro_recursos: newCount
+        };
+      });
+      
+      message.success(`Agregado al equipo: ${nombre}`);
+      return `✅ Agregado al equipo: ${nombre} (${experiencia}). Total recursos actualizado.`;
+    },
+  });
+
+  // Acción para agregar una tecnología al stack
+  useCopilotAction({
+    name: "addTechnology",
+    description: "Agrega una tecnología al stack tecnológico del proyecto",
+    parameters: [
+      {
+        name: "technology",
+        type: "string",
+        description: "Nombre de la tecnología a agregar (ej: 'React', 'Python', 'AWS')",
+        required: true,
+      },
+    ],
+    handler: async ({ technology }) => {
+      console.log(`[CopilotAction] addTechnology llamado: ${technology}`);
+      
+      setExtractedData((prev: any) => {
+        const currentStack = prev.stack_tecnologico || "";
+        const stackArray = currentStack.split(",").map((t: string) => t.trim()).filter(Boolean);
+        
+        if (!stackArray.includes(technology)) {
+          stackArray.push(technology);
+        }
+        
+        return {
+          ...prev,
+          stack_tecnologico: stackArray.join(", ")
+        };
+      });
+      
+      message.success(`Tecnología agregada: ${technology}`);
+      return `✅ Tecnología "${technology}" agregada al stack.`;
+    },
+  });
+
+  // Acción para agregar una pregunta sugerida
+  useCopilotAction({
+    name: "addQuestion",
+    description: "Agrega una pregunta a la lista de preguntas sugeridas para aclarar con el cliente",
+    parameters: [
+      {
+        name: "question",
+        type: "string",
+        description: "La pregunta a agregar",
+        required: true,
+      },
+    ],
+    handler: async ({ question }) => {
+      console.log(`[CopilotAction] addQuestion llamado: ${question}`);
+      
+      setExtractedData((prev: any) => ({
+        ...prev,
+        preguntas_sugeridas: [
+          ...(prev.preguntas_sugeridas || []),
+          question
+        ]
+      }));
+      
+      message.success("Pregunta agregada");
+      return `✅ Pregunta agregada: "${question}"`;
+    },
+  });
+
+  // Acción para limpiar/resetear un campo
+  useCopilotAction({
+    name: "clearField",
+    description: "Limpia o resetea un campo específico",
+    parameters: [
+      {
+        name: "fieldName",
+        type: "string",
+        description: "Nombre del campo a limpiar",
+        required: true,
+      },
+    ],
+    handler: async ({ fieldName }) => {
+      console.log(`[CopilotAction] clearField llamado: ${fieldName}`);
+      
+      const defaultValues: Record<string, any> = {
+        equipo_sugerido: [],
+        preguntas_sugeridas: [],
+        fechas_y_plazos: [],
+        stack_tecnologico: "",
+        nro_recursos: 0,
+        tvt: 0,
+      };
+      
+      setExtractedData((prev: any) => ({
+        ...prev,
+        [fieldName]: defaultValues[fieldName] ?? ""
+      }));
+      
+      message.success(`Campo "${fieldName}" limpiado`);
+      return `✅ Campo "${fieldName}" limpiado.`;
+    },
   });
 
   // 1. Cargar Datos y Documento
@@ -355,35 +602,39 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
            )}
         </div>
         
-        {/* Chat Copilot */}
-        <div className="flex-1 flex flex-col bg-[#1E1F20] overflow-hidden relative">
-           <div className="text-[10px] uppercase font-bold text-zinc-400 p-2 text-center tracking-wider bg-[#131314] border-b border-zinc-800 flex items-center justify-center gap-2">
-             <MessageOutlined /> Asistente de Análisis
-           </div>
-           <div className="flex-1 relative custom-copilot-wrapper">
-<CopilotChat 
-                 className="h-full w-full border-none shadow-none"
-                 instructions={`
-                     Estás en la Mesa de Trabajo de Propuestas para el workspace ${workspaceId}.
-                     Contexto: Propuesta para ${extractedData.cliente}.
-                     Datos actuales: ${JSON.stringify(extractedData)}.
-                     
-                     TU OBJETIVO: Ayudar al usuario a completar o corregir los datos de la columna derecha.
-                     
-                     IMPORTANTE: 
-                     - El workspace_id es: ${workspaceId}
-                     - Tienes acceso al documento del RFP mediante búsqueda RAG usando la acción searchRAGDocuments.
-                     - Cuando el usuario pregunte sobre el documento, busca primero con searchRAGDocuments.
-                     
-                     SI EL USUARIO PIDE UN CAMBIO (ej: "El TVT es 1M"):
-                     1. Usa la herramienta "updateExtractedData" para cambiarlo visualmente.
-                     2. Dile al usuario: "He actualizado el dato. Dale a 'Generar Propuesta' para ver el cambio en el documento."
-                 `}
-                 labels={{
-                   title: "Asistente",
-                   initial: "Revisa los datos a la derecha. Puedo buscar información en el documento y ayudarte a corregir cualquier campo.",
-                 }}
-              />
+         {/* Chat Copilot */}
+         <div className="flex-1 flex flex-col bg-[#1E1F20] overflow-hidden relative">
+            <div className="text-[10px] uppercase font-bold text-zinc-400 p-2 text-center tracking-wider bg-[#131314] border-b border-zinc-800 flex items-center justify-center gap-2">
+              <MessageOutlined /> Asistente de Análisis
+            </div>
+            <div className="flex-1 relative custom-copilot-wrapper">
+ <CopilotChat 
+                  className="h-full w-full border-none shadow-none"
+                  instructions={`Eres el asistente de edición de propuestas de TIVIT. Tu ÚNICA función es modificar los datos del panel derecho cuando el usuario lo solicite.
+
+CONTEXTO ACTUAL:
+- Workspace: ${workspaceId}
+- Cliente: ${extractedData.cliente || "Sin definir"}
+- País: ${extractedData.pais || "Sin definir"}
+- TVT/Presupuesto: ${extractedData.tvt || "Sin definir"}
+- Stack: ${extractedData.stack_tecnologico || "Sin definir"}
+- Objetivo: ${extractedData.objetivo || "Sin definir"}
+
+INSTRUCCIÓN CRÍTICA: Cuando el usuario mencione CUALQUIER cambio o dato, DEBES usar la acción correspondiente inmediatamente:
+
+- "El cliente es X" → usa updateField("cliente", "X")
+- "El presupuesto es X" → usa updateField("tvt", "X")  
+- "El país es X" → usa updateField("pais", "X")
+- "Usa React, Node" → usa updateField("stack_tecnologico", "React, Node")
+- "Agrega un Tech Lead" → usa addTeamMember("Tech Lead", "Senior", "Líder técnico")
+- "Cambia el objetivo a X" → usa updateField("objetivo", "X")
+
+NUNCA respondas solo con texto si el usuario pide un cambio. SIEMPRE ejecuta la acción primero.`}
+                  labels={{
+                    title: "Asistente",
+                    initial: "Puedo editar los datos del panel derecho. Dime qué cambiar: cliente, presupuesto, país, tecnologías, objetivo, equipo...",
+                  }}
+               />
            </div>
         </div>
       </div>

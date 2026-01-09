@@ -1260,6 +1260,14 @@ async def chat_with_workspace(
                 content=full_response_text,
             )
             db_session.add(msg)
+            
+            # Si fue una propuesta, guardar el contenido en la conversación para persistencia
+            if intent == "GENERATE_PROPOSAL" and full_response_text:
+                conv = db_session.query(Conversation).filter(Conversation.id == conversation_id).first()
+                if conv:
+                    conv.proposal_content = full_response_text
+                    logger.info(f"✅ Propuesta guardada en conversation.proposal_content ({len(full_response_text)} chars)")
+            
             db_session.commit()
 
     return StreamingResponse(

@@ -314,6 +314,7 @@ export interface ConversationPublic {
   updated_at: string; // ISO 8601 date-time
   message_count: number; // default: 0
   has_proposal: boolean; // default: false
+  proposal_content?: string | null; // Markdown content of the generated proposal
 }
 
 // Alias for backwards compatibility

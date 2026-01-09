@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // output: "standalone", // Deshabilitado para compilación local en Windows - habilitar para Docker
+  output: "standalone", // Necesario para Docker/Cloud Run - puede dar error en Windows local
   
   // typescript: {
   //   ignoreBuildErrors: true,  // ⚠️ Deshabilitado para detectar errores en build

@@ -185,6 +185,7 @@ class ConversationPublic(BaseModel):
     updated_at: datetime
     message_count: int = 0  # Calculado
     has_proposal: bool = False
+    proposal_content: str | None = None  # Contenido de la propuesta (Markdown)
     
     class Config:
         from_attributes = True

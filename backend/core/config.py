@@ -54,9 +54,25 @@ class Settings(BaseSettings):
     
     # Gemini API
     GOOGLE_API_KEY: Optional[str] = None
-    GEMINI_MODEL: str = "gemini-2.0-flash-exp"
-    GEMINI_TEMPERATURE: float = 0.7
-    GEMINI_MAX_TOKENS: int = 8192
+    
+    # Gemini 3 Pro - Para generación de documentos y propuestas comerciales
+    # Thinking level: HIGH, Temperature: 0 (determinístico)
+    GEMINI_PRO_MODEL: str = "gemini-3-pro-preview"
+    GEMINI_PRO_THINKING_LEVEL: str = "HIGH"  # OFF, LOW, MEDIUM, HIGH
+    GEMINI_PRO_TEMPERATURE: float = 0.0
+    GEMINI_PRO_MAX_TOKENS: int = 65536
+    
+    # Gemini 3 Flash - Para chat, CopilotKit, nombres de workspace, etc.
+    # Thinking level: MEDIUM, Temperature: 1.5 (creativo)
+    GEMINI_FLASH_MODEL: str = "gemini-3-flash-preview"
+    GEMINI_FLASH_THINKING_LEVEL: str = "MEDIUM"  # OFF, LOW, MEDIUM, HIGH
+    GEMINI_FLASH_TEMPERATURE: float = 1.5
+    GEMINI_FLASH_MAX_TOKENS: int = 16384
+    
+    # Legacy - mantener compatibilidad
+    GEMINI_MODEL: str = "gemini-3-flash-preview"
+    GEMINI_TEMPERATURE: float = 1.5
+    GEMINI_MAX_TOKENS: int = 16384
     
     # Document AI
     DOCUMENT_AI_PROCESSOR_ID: Optional[str] = None

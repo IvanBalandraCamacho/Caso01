@@ -3,8 +3,13 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Instalar pnpm globalmente
-RUN npm install -g pnpm
+# Configurar npm para mejor resiliencia de red
+RUN npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000
+
+# Instalar pnpm globalmente con reintentos
+RUN npm install -g pnpm || npm install -g pnpm || npm install -g pnpm
 
 # Copiar archivos de dependencias
 COPY package.json pnpm-lock.yaml ./

@@ -17,6 +17,7 @@ class Conversation(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     has_proposal = Column(Boolean, default=False)
+    proposal_content = Column(Text, nullable=True)  # Contenido de la propuesta generada (Markdown)
     
     # ÍNDICES
     __table_args__ = (

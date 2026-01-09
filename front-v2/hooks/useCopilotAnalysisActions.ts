@@ -9,7 +9,8 @@ interface UseAnalysisActionsProps {
   workspaceId?: string;
 }
 
-export function useCopilotAnalysisActions({
+// Hook interno que usa CopilotKit - solo se llama cuando hay contexto
+function useCopilotAnalysisActionsInternal({
   analysisResult,
   onResultUpdate,
   workspaceId,
@@ -197,4 +198,10 @@ ${analysisResult.equipo_sugerido?.map((m: any) => `- ${m.nombre} (${m.experienci
       }
     },
   });
+}
+
+// Hook público - simplemente llama al interno
+// El CopilotProvider debe estar presente para que funcione
+export function useCopilotAnalysisActions(props: UseAnalysisActionsProps) {
+  useCopilotAnalysisActionsInternal(props);
 }
