@@ -142,21 +142,36 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
   // Acción para actualizar un campo específico
   useCopilotAction({
     name: "updateField",
-    description: "Actualiza un campo específico de los datos extraídos. Usa SIEMPRE esta acción cuando el usuario quiera cambiar cualquier valor.",
+    description: "OBLIGATORIO usar para cambiar cualquier dato de la propuesta. Campos: cliente, tvt, pais, stack_tecnologico, objetivo, categoria, nombre_operacion, tiempo_aproximado, nro_recursos, moneda",
     parameters: [
       {
         name: "fieldName",
         type: "string",
-        description: "Campo a actualizar: cliente, nombre_operacion, tvt, pais, stack_tecnologico, categoria, oportunidad, objetivo, tiempo_aproximado, nro_recursos, moneda",
+        description: "Campo: cliente|tvt|pais|stack_tecnologico|objetivo|categoria|nombre_operacion|tiempo_aproximado|nro_recursos|moneda",
         required: true,
       },
       {
         name: "newValue",
         type: "string",
-        description: "El nuevo valor para el campo",
+        description: "Nuevo valor",
         required: true,
       },
     ],
+    render: ({ status, args }) => {
+      if (status === "executing" || status === "complete") {
+        return (
+          <div className="bg-green-900/30 border border-green-700 rounded-lg p-3 my-2">
+            <div className="flex items-center gap-2">
+              <span className="text-green-400">✓</span>
+              <span className="text-green-300 text-sm">
+                {status === "executing" ? "Actualizando" : "Actualizado"}: <strong>{args.fieldName}</strong> → {args.newValue}
+              </span>
+            </div>
+          </div>
+        );
+      }
+      return null;
+    },
     handler: async ({ fieldName, newValue }) => {
       return updateFieldHandler(fieldName, newValue);
     },
@@ -165,15 +180,31 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
   // Acción para actualizar múltiples campos a la vez
   useCopilotAction({
     name: "updateMultipleFields",
-    description: "Actualiza varios campos de los datos extraídos de una vez. Útil cuando hay varios cambios que hacer.",
+    description: "Actualiza varios campos a la vez. Ej: {cliente:'ACME', tvt:'500000', pais:'Chile'}",
     parameters: [
       {
         name: "updates",
         type: "object",
-        description: "Objeto con los campos a actualizar y sus nuevos valores. Ej: { cliente: 'ACME', tvt: '500000', pais: 'Chile' }",
+        description: "Objeto con campos y valores: {cliente?, tvt?, pais?, stack_tecnologico?, objetivo?}",
         required: true,
       },
     ],
+    render: ({ status, args }) => {
+      if (status === "executing" || status === "complete") {
+        const fields = args.updates ? Object.keys(args.updates).join(", ") : "";
+        return (
+          <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-3 my-2">
+            <div className="flex items-center gap-2">
+              <span className="text-blue-400">✓</span>
+              <span className="text-blue-300 text-sm">
+                {status === "executing" ? "Actualizando" : "Actualizados"}: <strong>{fields}</strong>
+              </span>
+            </div>
+          </div>
+        );
+      }
+      return null;
+    },
     handler: async ({ updates }) => {
       console.log(`[CopilotAction] updateMultipleFields llamado:`, updates);
       
@@ -191,18 +222,18 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
   // Acción para agregar un miembro al equipo sugerido
   useCopilotAction({
     name: "addTeamMember",
-    description: "Agrega un nuevo miembro al equipo sugerido de la propuesta",
+    description: "Agrega persona al equipo. Ej: Tech Lead, Desarrollador Senior, QA",
     parameters: [
       {
         name: "nombre",
         type: "string",
-        description: "Nombre o rol del recurso (ej: 'Tech Lead', 'Desarrollador Senior')",
+        description: "Rol o nombre (ej: 'Tech Lead', 'Desarrollador Senior')",
         required: true,
       },
       {
         name: "experiencia",
         type: "string",
-        description: "Nivel de experiencia requerido (ej: '5+ años', 'Senior', 'Mid-level')",
+        description: "Nivel: Senior, Mid, Junior, o años de experiencia",
         required: false,
       },
       {
@@ -212,6 +243,22 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
         required: false,
       },
     ],
+    render: ({ status, args }) => {
+      if (status === "executing" || status === "complete") {
+        return (
+          <div className="bg-purple-900/30 border border-purple-700 rounded-lg p-3 my-2">
+            <div className="flex items-center gap-2">
+              <span className="text-purple-400">👤</span>
+              <span className="text-purple-300 text-sm">
+                {status === "executing" ? "Agregando" : "Agregado"}: <strong>{args.nombre}</strong>
+                {args.experiencia && ` (${args.experiencia})`}
+              </span>
+            </div>
+          </div>
+        );
+      }
+      return null;
+    },
     handler: async ({ nombre, experiencia = "Por definir", rol = nombre }) => {
       console.log(`[CopilotAction] addTeamMember llamado: ${nombre}, ${experiencia}, ${rol}`);
       
@@ -236,15 +283,30 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
   // Acción para agregar una tecnología al stack
   useCopilotAction({
     name: "addTechnology",
-    description: "Agrega una tecnología al stack tecnológico del proyecto",
+    description: "Agrega tecnología al stack (React, Python, AWS, etc)",
     parameters: [
       {
         name: "technology",
         type: "string",
-        description: "Nombre de la tecnología a agregar (ej: 'React', 'Python', 'AWS')",
+        description: "Tecnología a agregar",
         required: true,
       },
     ],
+    render: ({ status, args }) => {
+      if (status === "executing" || status === "complete") {
+        return (
+          <div className="bg-cyan-900/30 border border-cyan-700 rounded-lg p-3 my-2">
+            <div className="flex items-center gap-2">
+              <span className="text-cyan-400">💻</span>
+              <span className="text-cyan-300 text-sm">
+                Tecnología: <strong>{args.technology}</strong>
+              </span>
+            </div>
+          </div>
+        );
+      }
+      return null;
+    },
     handler: async ({ technology }) => {
       console.log(`[CopilotAction] addTechnology llamado: ${technology}`);
       
@@ -610,29 +672,25 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
             <div className="flex-1 relative custom-copilot-wrapper">
  <CopilotChat 
                   className="h-full w-full border-none shadow-none"
-                  instructions={`Eres el asistente de edición de propuestas de TIVIT. Tu ÚNICA función es modificar los datos del panel derecho cuando el usuario lo solicite.
+                  instructions={`Eres un asistente de edición de propuestas. SIEMPRE usa las acciones disponibles para modificar datos.
 
-CONTEXTO ACTUAL:
-- Workspace: ${workspaceId}
-- Cliente: ${extractedData.cliente || "Sin definir"}
-- País: ${extractedData.pais || "Sin definir"}
-- TVT/Presupuesto: ${extractedData.tvt || "Sin definir"}
-- Stack: ${extractedData.stack_tecnologico || "Sin definir"}
-- Objetivo: ${extractedData.objetivo || "Sin definir"}
+ACCIONES DISPONIBLES:
+- updateField(fieldName, newValue): Cambia un campo específico
+- addTeamMember(nombre, experiencia, rol): Agrega persona al equipo  
+- addTechnology(technology): Agrega tecnología al stack
+- updateMultipleFields(updates): Cambia varios campos a la vez
 
-INSTRUCCIÓN CRÍTICA: Cuando el usuario mencione CUALQUIER cambio o dato, DEBES usar la acción correspondiente inmediatamente:
+EJEMPLOS DE USO:
+- "El cliente es Banco Nacional" → updateField("cliente", "Banco Nacional")
+- "El presupuesto es 500000" → updateField("tvt", "500000")
+- "País: México" → updateField("pais", "México")
+- "Agrega React y Node" → updateField("stack_tecnologico", "React, Node")
+- "Agrega un Tech Lead senior" → addTeamMember("Tech Lead", "Senior", "Líder técnico")
 
-- "El cliente es X" → usa updateField("cliente", "X")
-- "El presupuesto es X" → usa updateField("tvt", "X")  
-- "El país es X" → usa updateField("pais", "X")
-- "Usa React, Node" → usa updateField("stack_tecnologico", "React, Node")
-- "Agrega un Tech Lead" → usa addTeamMember("Tech Lead", "Senior", "Líder técnico")
-- "Cambia el objetivo a X" → usa updateField("objetivo", "X")
-
-NUNCA respondas solo con texto si el usuario pide un cambio. SIEMPRE ejecuta la acción primero.`}
+REGLA: Cuando el usuario mencione un valor para un campo, EJECUTA la acción inmediatamente. NO respondas solo con texto.`}
                   labels={{
                     title: "Asistente",
-                    initial: "Puedo editar los datos del panel derecho. Dime qué cambiar: cliente, presupuesto, país, tecnologías, objetivo, equipo...",
+                    initial: "Puedo editar los datos. Dime qué cambiar: cliente, presupuesto, país, tecnologías, equipo...",
                   }}
                />
            </div>

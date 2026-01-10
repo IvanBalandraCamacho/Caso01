@@ -177,11 +177,10 @@ class ProposalsServiceImpl(ProposalsService):
                     # 3.5 Crear registro Document en la BD
                     try:
                         new_document = Document(
-                            id=uuid.UUID(document_id),  # Usar el mismo ID que se indexó en RAG
-                            workspace_id=new_workspace.id,
+                            id=document_id,  # String UUID - el modelo usa CHAR(36)
+                            workspace_id=str(new_workspace.id),
                             file_name=file_name,
                             file_type=file_type,
-                            file_size=file_size,
                             status="COMPLETED",  # Ya está procesado e indexado
                             chunk_count=0  # Se actualiza si RAG retorna el conteo
                         )
@@ -210,14 +209,14 @@ class ProposalsServiceImpl(ProposalsService):
                         db=db,
                         workspace_id=str(new_workspace.id),
                         user_id=str(user.id),
-                        analysis_result=analysis_result
+                        analysis_result=analysis_result_dict
                     )
                     
                     logger.info(f"Conversación inicial creada: {conversation_id}")
                     
                     # 5. Retornar ID junto con análisis
                     return {
-                        "analysis": analysis_result,
+                        "analysis": analysis_result_dict,
                         "workspace_id": str(new_workspace.id),
                         "conversation_id": conversation_id,
                         "document_id": document_id,

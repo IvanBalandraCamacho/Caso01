@@ -13,7 +13,7 @@ import {
 import Sidebar from '@/components/sidebar'
 import { UserMenu } from '@/components/UserMenu'
 import { useUser } from '@/hooks/useUser'
-import { analyzeDocumentApi, uploadDocumentApi } from '@/lib/api'
+import { analyzeDocumentApi } from '@/lib/api'
 
 const { Dragger } = Upload
 const { Title, Text } = Typography
@@ -90,18 +90,8 @@ export default function QuickAnalysisPage() {
       updateProgressMessage(75)
       onProgress({ percent: 75 })
       
-      // Subir el documento al workspace creado (en segundo plano)
-      try {
-        const formData = new FormData();
-        formData.append("file", file);
-        await uploadDocumentApi(response.workspace_id, formData);
-        setProgress(95)
-        updateProgressMessage(95)
-        onProgress({ percent: 95 })
-      } catch (uploadError) {
-        console.warn("Error subiendo documento al workspace:", uploadError);
-        // No fallar todo el proceso si solo falla el upload
-      }
+      // El documento ya se indexa en RAG durante el análisis en el backend
+      // No es necesario subirlo de nuevo
       
       setProgress(100)
       setProgressMessage("¡Listo! Redirigiendo...")
