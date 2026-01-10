@@ -152,6 +152,7 @@ export interface ChatRequest {
   query: string;
   conversation_id?: string | null;
   model?: string | null;
+  thinking_level?: 'OFF' | 'LOW' | 'MEDIUM' | 'HIGH' | null;
 }
 
 /**

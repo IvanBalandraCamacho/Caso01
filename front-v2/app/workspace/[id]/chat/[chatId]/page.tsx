@@ -33,6 +33,7 @@ import { UserMenu } from "@/components/UserMenu"
 import { useUser } from "@/hooks/useUser"
 import { useChatStream } from "@/hooks/useChatStream"
 import { useWorkspaceContext } from "@/context/WorkspaceContext"
+import { ThinkingLevelSelector, useThinkingLevel, type ThinkingLevel } from "@/components/chat/ThinkingLevelSelector"
 import { fetchConversationMessages, fetchConversationDocuments, fetchWorkspaceDocuments, deleteDocumentApi, downloadProposalFromMarkdown } from "@/lib/api"
 import { FilePreviewModal } from "@/components/FilePreviewModal"
 import type { DocumentPublic, DocumentChunk } from "@/types/api"
@@ -194,6 +195,7 @@ export default function ChatPage({
   const { user } = useUser()
   const { sendMessage: sendChatMessage } = useChatStream()
   const { selectedModel, setSelectedModel } = useWorkspaceContext()
+  const [thinkingLevel, setThinkingLevel] = useThinkingLevel("MEDIUM")
   
   // Sources from the current streaming response (separate from message content)
   const [currentSources, setCurrentSources] = useState<DocumentChunk[]>([])
@@ -490,7 +492,8 @@ export default function ChatPage({
         {
           query: currentMessage,
           conversation_id: chatId,
-          model: "string",
+          model: selectedModel,
+          thinking_level: thinkingLevel,
         },
         {
           onContentUpdate: (content: string) => {
@@ -953,21 +956,28 @@ export default function ChatPage({
             
             {/* Footer info */}
             <div className="flex justify-between items-center mt-3 px-2">
-               <div className="flex items-center">
-                  <Select
-                    value={selectedModel}
-                    onChange={setSelectedModel}
-                    suffixIcon={<ChevronDown className="text-zinc-500" size={12} />}
-                    size="small"
-                    variant="borderless"
-                    className="text-zinc-500 hover:text-zinc-300 transition-colors text-xs"
-                    classNames={{ popup: { root: "dark-select-dropdown" } }}
-                    styles={{ popup: { root: { background: '#1E1F20', border: '1px solid #333' } } }}
-                    options={[
-                      { label: "ChatGPT 4o-mini", value: "gpt-4o-mini" },
-                      { label: "Velvet 12B", value: "velvet-12b" },
-                    ]}
-                  />
+               <div className="flex items-center gap-3">
+                 <Select
+                   value={selectedModel}
+                   onChange={setSelectedModel}
+                   suffixIcon={<ChevronDown className="text-zinc-500" size={12} />}
+                   size="small"
+                   variant="borderless"
+                   className="text-zinc-500 hover:text-zinc-300 transition-colors text-xs"
+                   classNames={{ popup: { root: "dark-select-dropdown" } }}
+                   styles={{ popup: { root: { background: '#1E1F20', border: '1px solid #333' } } }}
+                   options={[
+                     { label: "ChatGPT 4o-mini", value: "gpt-4o-mini" },
+                     { label: "Velvet 12B", value: "velvet-12b" },
+                   ]}
+                 />
+                 <div className="w-px h-4 bg-white/10" />
+                 <ThinkingLevelSelector
+                   value={thinkingLevel}
+                   onChange={setThinkingLevel}
+                   size="small"
+                   style={{ minWidth: "120px" }}
+                 />
                </div>
                <p className="text-[11px] text-zinc-600 text-center">
                   TIVIT AI puede cometer errores.

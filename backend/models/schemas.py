@@ -25,6 +25,12 @@ class WorkspaceBase(BaseModel):
     resource_count: int | None = None
     category: str | None = None
     objective: str | None = None
+    
+    # --- Proposal Tracking Fields (Fase 1.1) ---
+    proposal_status: str | None = None  # pending, sent, accepted, rejected, won, lost
+    proposal_sent_at: datetime | None = None
+    tvt_id: str | None = None  # ID de propuesta comercial TIVIT
+    rfp_type: str | None = None  # security, technology, infrastructure, development, consulting, other
 
 class WorkspaceCreate(WorkspaceBase):
     """Schema para crear un Workspace (solo entrada)."""
@@ -107,6 +113,7 @@ class ChatRequest(BaseModel):
     query: str
     conversation_id: str | None = None  # Opcional: ID de conversación existente
     model: str | None = None  # Opcional: modelo LLM a usar (gpt-4o-mini)
+    thinking_level: str | None = None  # Opcional: nivel de thinking (OFF, LOW, MEDIUM, HIGH)
     
     @validator('query')
     def query_must_not_be_empty(cls, v):
@@ -115,6 +122,15 @@ class ChatRequest(BaseModel):
         if len(v.strip()) < 3:
             raise ValueError('La consulta debe tener al menos 3 caracteres')
         return v.strip()
+    
+    @validator('thinking_level')
+    def validate_thinking_level(cls, v):
+        if v is None:
+            return v
+        valid_levels = ['OFF', 'LOW', 'MEDIUM', 'HIGH']
+        if v.upper() not in valid_levels:
+            raise ValueError(f'thinking_level debe ser uno de: {", ".join(valid_levels)}')
+        return v.upper()
     
 class DocumentChunk(BaseModel):
     """Representa un chunk de contexto recuperado."""
@@ -147,6 +163,12 @@ class WorkspaceUpdate(BaseModel):
     resource_count: int | None = None
     category: str | None = None
     objective: str | None = None
+    
+    # --- Proposal Tracking Fields (Fase 1.1) ---
+    proposal_status: str | None = None  # pending, sent, accepted, rejected, won, lost
+    proposal_sent_at: datetime | None = None
+    tvt_id: str | None = None  # ID de propuesta comercial TIVIT
+    rfp_type: str | None = None  # security, technology, infrastructure, development, consulting, other
 
 # --- Conversation Schemas ---
 

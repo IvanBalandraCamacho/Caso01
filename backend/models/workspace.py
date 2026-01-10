@@ -29,6 +29,12 @@ class Workspace(Base):
     # System Prompt
     instructions = Column(Text, nullable=True)
     
+    # --- Proposal Tracking Fields (Fase 1.1) ---
+    proposal_status = Column(String(20), nullable=True, default="pending")  # pending, sent, accepted, rejected, won, lost
+    proposal_sent_at = Column(DateTime(timezone=True), nullable=True)
+    tvt_id = Column(String(50), nullable=True)  # ID de propuesta comercial TIVIT
+    rfp_type = Column(String(50), nullable=True, default="other")  # security, technology, infrastructure, development, consulting, other
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     is_active = Column(Boolean, default=True)
     

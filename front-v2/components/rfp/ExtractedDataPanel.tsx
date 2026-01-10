@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import { useCopilotReadable, useCopilotAction } from "@copilotkit/react-core";
 import { Input, Button, Typography, Select, Tag, Tooltip } from "antd";
-import { Save, Sparkles, Users, MapPin, Award, Briefcase, X } from "lucide-react";
+import { Save, Sparkles, Users, MapPin, Award, Briefcase, X, FileText } from "lucide-react";
 import TalentModal from "./TalentModal";
+import ProposalStatusButtons, { ProposalStatusTimeline } from "./ProposalStatusButtons";
 
 const { TextArea } = Input;
 const { Text } = Typography;
@@ -26,9 +27,10 @@ interface ExtractedDataPanelProps {
   workspaceId?: string;
   onSave?: (data: any) => Promise<void>;
   isSaving?: boolean;
+  onStatusChange?: (status: string) => Promise<void>;
 }
 
-export default function ExtractedDataPanel({ data, setData, workspaceId, onSave, isSaving }: ExtractedDataPanelProps) {
+export default function ExtractedDataPanel({ data, setData, workspaceId, onSave, isSaving, onStatusChange }: ExtractedDataPanelProps) {
   
   // Estado para modal y candidatos seleccionados
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -278,6 +280,61 @@ export default function ExtractedDataPanel({ data, setData, workspaceId, onSave,
             onChange={(e) => handleChange("objetivo", e.target.value)}
             autoSize={{ minRows: 4, maxRows: 8 }}
             className="bg-[#131314]/50"
+          />
+        </div>
+
+        {/* TVT ID - ID de Propuesta Comercial (Fase 1.2) */}
+        <div className="bg-blue-950/30 p-4 rounded-lg border border-blue-900/50 ring-1 ring-blue-800/30 mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <FileText className="w-4 h-4 text-blue-400" />
+            <Text className="text-blue-400 font-bold text-xs uppercase tracking-wide">ID Propuesta Comercial (TVT)</Text>
+          </div>
+          <Input 
+            value={data.tvt_id || ""} 
+            onChange={(e) => handleChange("tvt_id", e.target.value)}
+            placeholder="Ej: TVT-2026-0001"
+            className="font-mono text-sm"
+          />
+          <p className="text-xs text-zinc-500 mt-1">
+            Ingresa el codigo TVT asignado a esta propuesta
+          </p>
+        </div>
+
+        {/* Estado de Propuesta (Fase 1.1) */}
+        <div className="bg-gradient-to-br from-zinc-900/60 to-zinc-800/40 p-4 rounded-lg border border-zinc-700/50 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles className="w-4 h-4 text-purple-400" />
+            <Text className="text-purple-400 font-bold text-xs uppercase tracking-wide">Estado de la Propuesta</Text>
+          </div>
+          
+          {/* Timeline visual */}
+          <ProposalStatusTimeline currentStatus={data.proposal_status || "pending"} />
+          
+          {/* Botones de cambio de estado */}
+          {onStatusChange && (
+            <ProposalStatusButtons
+              currentStatus={data.proposal_status || "pending"}
+              onStatusChange={onStatusChange}
+              size="small"
+            />
+          )}
+        </div>
+
+        {/* Tipo de RFP (Fase 2.1) */}
+        <div className="space-y-1 mb-4">
+          <Text className="text-xs text-zinc-400 block mb-1">Tipo de RFP</Text>
+          <Select 
+            className="w-full"
+            value={data.rfp_type || "other"}
+            onChange={(value) => handleChange("rfp_type", value)}
+            options={[
+              { value: "security", label: "Seguridad" },
+              { value: "technology", label: "Tecnologia" },
+              { value: "infrastructure", label: "Infraestructura" },
+              { value: "development", label: "Desarrollo" },
+              { value: "consulting", label: "Consultoria" },
+              { value: "other", label: "Otro" },
+            ]}
           />
         </div>
       </div>

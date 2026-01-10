@@ -54,15 +54,25 @@ class Gemini3FlashProvider(LLMProvider):
         logger.info(f"✅ Gemini 3 Flash Provider inicializado: {self.model_name}")
         logger.info(f"   Thinking level: {self.thinking_level}, Temperature: {self.temperature}")
     
-    def _get_thinking_config(self) -> types.ThinkingConfig:
-        """Obtiene la configuración de thinking mode."""
+    def _get_thinking_config(self, thinking_level: str = None) -> types.ThinkingConfig:
+        """Obtiene la configuración de thinking mode.
+        
+        Args:
+            thinking_level: Nivel de thinking (OFF, LOW, MEDIUM, HIGH). 
+                           Si es None, usa el nivel por defecto del provider.
+        
+        Returns:
+            ThinkingConfig con el budget correspondiente
+        """
+        level = thinking_level or self.thinking_level
+        
         thinking_map = {
             "OFF": types.ThinkingConfig(thinking_budget=0),
             "LOW": types.ThinkingConfig(thinking_budget=1024),
             "MEDIUM": types.ThinkingConfig(thinking_budget=8192),
             "HIGH": types.ThinkingConfig(thinking_budget=24576),
         }
-        return thinking_map.get(self.thinking_level, thinking_map["MEDIUM"])
+        return thinking_map.get(level.upper() if level else "MEDIUM", thinking_map["MEDIUM"])
     
     def _build_prompt(self, query: str, context_chunks: List[DocumentChunk]) -> str:
         """
@@ -107,7 +117,8 @@ REGLAS IMPORTANTES:
         self, 
         query: str, 
         context_chunks: List[DocumentChunk] = None, 
-        chat_history: List[dict] = None
+        chat_history: List[dict] = None,
+        thinking_level: str = None
     ) -> str:
         """
         Generate a complete response using RAG context.
@@ -116,6 +127,7 @@ REGLAS IMPORTANTES:
             query: User's question
             context_chunks: Relevant document chunks from RAG
             chat_history: List of previous messages
+            thinking_level: Override thinking level (OFF, LOW, MEDIUM, HIGH)
             
         Returns:
             Complete response as string
@@ -143,7 +155,7 @@ REGLAS IMPORTANTES:
                 config=types.GenerateContentConfig(
                     temperature=self.temperature,
                     max_output_tokens=self.max_tokens,
-                    thinking_config=self._get_thinking_config(),
+                    thinking_config=self._get_thinking_config(thinking_level),
                 ),
             )
             
@@ -175,7 +187,8 @@ REGLAS IMPORTANTES:
         self, 
         query: str, 
         context_chunks: List[DocumentChunk] = None, 
-        chat_history: List[dict] = None
+        chat_history: List[dict] = None,
+        thinking_level: str = None
     ) -> Generator[str, None, None]:
         """
         Generate a streaming response using RAG context.
@@ -184,6 +197,7 @@ REGLAS IMPORTANTES:
             query: User's question
             context_chunks: Relevant document chunks from RAG
             chat_history: List of previous messages
+            thinking_level: Override thinking level (OFF, LOW, MEDIUM, HIGH)
             
         Yields:
             Response chunks as they are generated (excludes thinking)
@@ -218,7 +232,7 @@ REGLAS IMPORTANTES:
                 config=types.GenerateContentConfig(
                     temperature=self.temperature,
                     max_output_tokens=self.max_tokens,
-                    thinking_config=self._get_thinking_config(),
+                    thinking_config=self._get_thinking_config(thinking_level),
                 ),
             )
             

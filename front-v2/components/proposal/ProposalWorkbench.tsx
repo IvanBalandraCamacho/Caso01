@@ -27,6 +27,8 @@ import {
 import AnalysisActionsPanel from "@/components/rfp/AnalysisActionsPanel";
 import DocumentPreviewPanel from "@/components/rfp/DocumentPreviewPanel";
 import ExtractedDataPanel from "@/components/rfp/ExtractedDataPanel";
+import ComplianceChecklist from "@/components/rfp/ComplianceChecklist";
+import ExecutiveSummaryPitch from "@/components/rfp/ExecutiveSummaryPitch";
 
 interface ProposalWorkbenchProps {
   workspaceId: string;
@@ -770,6 +772,26 @@ REGLA: Cuando el usuario mencione un valor para un campo, EJECUTA la acción inm
             onSave={handleSaveToWorkspace}
             isSaving={isSaving}
          />
+         
+         {/* Quick Wins Section */}
+         <div className="mt-6 space-y-6">
+           <div className="border-t border-zinc-700 pt-6">
+             <h3 className="text-white text-sm font-semibold mb-4 flex items-center gap-2">
+               <span className="text-[#FF6B00]">⚡</span> Herramientas Avanzadas
+             </h3>
+             
+             {/* Executive Summary Pitch */}
+             <ExecutiveSummaryPitch extractedData={extractedData} />
+             
+             {/* Compliance Checklist */}
+             <div className="mt-4">
+               <ComplianceChecklist 
+                 workspaceId={workspaceId}
+                 proposalContent={proposalReady ? "Propuesta generada" : undefined}
+               />
+             </div>
+           </div>
+         </div>
       </div>
     </div>
   );

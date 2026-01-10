@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 # from starlette.middleware.gzip import GZIPMiddleware
-from api.routes import health, workspaces, conversations, document_generation, auth, intention_task, tivit, notifications_ws, rag_proxy, general_chat, metrics, dashboard, workspace_analytics, templates, data_extraction, copilot, talent
+from api.routes import health, workspaces, conversations, document_generation, auth, intention_task, tivit, notifications_ws, rag_proxy, general_chat, metrics, dashboard, workspace_analytics, templates, data_extraction, copilot, talent, analytics, quick_wins
 # from api.routes import users  # Comentado: módulo no existe aún
 from exceptions import ServiceException
 from core.config import settings
@@ -132,6 +132,8 @@ app.include_router(rag_proxy.router, prefix="/api/v1/rag", tags=["RAG Service (P
 app.include_router(general_chat.router, prefix="/api/v1", tags=["General Chat"])
 app.include_router(copilot.router, prefix="/api/v1", tags=["CopilotKit"])
 app.include_router(talent.router, prefix="/api/v1", tags=["Talent Search"])
+app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
+app.include_router(quick_wins.router, prefix="/api/v1", tags=["Quick Wins"])
 
 # Tasks Router (sin prefijo v1 estricto, o interno)
 from api.routes import tasks

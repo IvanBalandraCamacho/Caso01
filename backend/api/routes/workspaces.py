@@ -1201,7 +1201,8 @@ async def chat_with_workspace(
                 relevant_chunks, 
                 chat_request.model, 
                 workspace_instructions,
-                chat_history=chat_history
+                chat_history=chat_history,
+                thinking_level=chat_request.thinking_level
             )
         elif intent == "REQUIREMENTS_MATRIX":
             response_stream = intention_task.requirements_matrix_chat(

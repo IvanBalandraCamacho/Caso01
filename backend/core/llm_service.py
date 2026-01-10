@@ -278,7 +278,8 @@ def generate_response_stream(
     model_override: str = None, 
     chat_history: List[dict] = None,
     use_pro: bool = False,
-    raw_document: str = None
+    raw_document: str = None,
+    thinking_level: str = None
 ) -> Generator[str, None, None]:
     """
     Genera una respuesta en streaming usando Flash (default) o Pro (explícito).
@@ -294,6 +295,7 @@ def generate_response_stream(
         chat_history: Historial de chat (opcional)
         use_pro: Si True, usa Gemini 3 Pro (para quick-analysis/propuestas)
         raw_document: Documento crudo (activa Pro automáticamente)
+        thinking_level: Nivel de thinking (OFF, LOW, MEDIUM, HIGH)
         
     Yields:
         Fragmentos de la respuesta
@@ -314,7 +316,12 @@ def generate_response_stream(
         )
     else:
         provider = get_provider()
-        return provider.generate_response_stream(query, context_chunks, chat_history=chat_history)
+        return provider.generate_response_stream(
+            query, 
+            context_chunks, 
+            chat_history=chat_history,
+            thinking_level=thinking_level
+        )
 
 
 def generate_response_stream_pro(

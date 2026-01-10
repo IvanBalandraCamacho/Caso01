@@ -380,22 +380,25 @@ He extraído los requisitos principales, tecnologías requeridas y he sugerido u
         workspace_instructions : str
     ):
         try:
-            prompt = AnalyzePrompts.create_markdown_analysis_prompt()
-            full_prompt = f"""
-                prompt : {prompt}
-                pregunta: {query}
-                system_instructions: {workspace_instructions}
-            """
-
-            response = self._analyze_with_ia_stream(full_prompt, relevant_chunks)
+            # Usar el nuevo System Prompt para generacion de propuestas
+            system_prompt = AnalyzePrompts.get_proposal_system_prompt()
             
-            #response_text = json.dumps(response, ensure_ascii=False, indent=2)
-            #nuevos_skills = self._consume_api(response_text)
+            # Construir el user prompt con el contexto
+            user_prompt = f"""
+{query}
 
-            #if "equipo_sugerido" in response:
-                #for miembro in response["equipo_sugerido"]:
-                   # if "skills" in miembro and isinstance(miembro["skills"], list):
-                       # miembro["skills"].extend(nuevos_skills)
+=== INSTRUCCIONES ADICIONALES DEL WORKSPACE ===
+{workspace_instructions}
+
+=== CONTEXTO DEL DOCUMENTO ===
+Analiza el documento y genera la propuesta tecnica segun las instrucciones del system prompt.
+"""
+
+            response = self._analyze_with_ia_stream_v2(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt, 
+                relevant_chunks=relevant_chunks
+            )
 
             return response
         except Exception as e:
@@ -403,6 +406,39 @@ He extraído los requisitos principales, tecnologías requeridas y he sugerido u
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Error al analizar el documento: {str(e)}"
+            )
+    
+    def _analyze_with_ia_stream_v2(
+        self, 
+        system_prompt: str,
+        user_prompt: str, 
+        relevant_chunks: Dict[str, Any]
+    ) -> Dict[str, Any]: 
+        """Metodo para generar propuestas usando system prompt + user prompt."""
+        try:
+            # Combinar system prompt con user prompt
+            # El system prompt va primero como contexto/instrucciones
+            combined_prompt = f"""
+=== SYSTEM ROLE ===
+{system_prompt}
+
+=== USER REQUEST ===
+{user_prompt}
+"""
+            # Usar Gemini 3 Pro para GENERATE_PROPOSAL (use_pro=True)
+            response = llm_service.generate_response_stream(
+                query=combined_prompt, 
+                context_chunks=relevant_chunks,
+                model_override="",
+                use_pro=True  # Usar Gemini 3 Pro para propuestas
+            ) 
+            logger.info(response)
+            return response
+        except Exception as e:
+            logger.error(f"Error al analizar stream chunks: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error en la comunicacion con la IA: {e.__class__.__name__}"
             )
             
 
