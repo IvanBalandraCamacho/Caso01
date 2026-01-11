@@ -6,91 +6,136 @@ Carga variables de entorno y define configuración global.
 import os
 import secrets
 from pydantic_settings import BaseSettings
+from pydantic import Field
 from typing import Optional
 
 class Settings(BaseSettings):
     """Configuración centralizada de la aplicación cargada desde .env"""
     
     # ========================================================================
-    # PROJECT & ENVIRONMENT
+    # DATABASE
     # ========================================================================
-    ENV: str = os.getenv("ENV", "development") # development, production
-    GOOGLE_CLOUD_PROJECT: str = os.getenv("GOOGLE_CLOUD_PROJECT", "squad-ia-latam")
-    GCP_REGION: str = os.getenv("GCP_REGION", "us-central1")
+    DATABASE_URL: str = "mysql+pymysql://user:password@ia_mysql:3306/caso01_db"
     
     # ========================================================================
-    # DATABASE (PostgreSQL)
+    # REDIS
     # ========================================================================
-    DB_USER: str = os.getenv("DB_USER", "postgres")
-    DB_PASSWORD: str = os.getenv("DB_PASSWORD", "postgres")
-    DB_NAME: str = os.getenv("DB_NAME", "caso01_db")
-    DB_HOST: str = os.getenv("DB_HOST", "db-postgres17") # Nombre del servicio en docker-compose
-    DB_PORT: str = os.getenv("DB_PORT", "5432")
-    
-    # Nombre de conexión de Cloud SQL (formato: project:region:instance)
-    # Se inyectará automáticamente en Cloud Run o lo defines manual
-    INSTANCE_CONNECTION_NAME: Optional[str] = os.getenv("INSTANCE_CONNECTION_NAME")
-
-    @property
-    def DATABASE_URL(self) -> str:
-        """
-        Construye la URL de conexión dinámicamente:
-        - Si existe INSTANCE_CONNECTION_NAME -> Conexión por Unix Socket (Cloud Run)
-        - Si no -> Conexión TCP estándar (Local/Docker)
-        """
-        if self.INSTANCE_CONNECTION_NAME:
-            # Conexión via Unix Socket para Cloud Run
-            # postgresql+psycopg2://USER:PASS@/DB_NAME?host=/cloudsql/INSTANCE_CONNECTION_NAME
-            return f"postgresql+psycopg2://{self.DB_USER}:{self.DB_PASSWORD}@/{self.DB_NAME}?host=/cloudsql/{self.INSTANCE_CONNECTION_NAME}"
-        
-        # Conexión estándar TCP para Desarrollo Local
-        return f"postgresql+psycopg2://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
-
-    # ========================================================================
-    # REDIS (Cola de Tareas & Cache)
-    # ========================================================================
-    REDIS_HOST: str = os.getenv("REDIS_HOST", "ia_redis")
-    REDIS_PORT: int = int(os.getenv("REDIS_PORT", 6379))
+    REDIS_HOST: str = "ia_redis"
+    REDIS_PORT: int = 6379
     REDIS_DB: int = 0
-    REDIS_PASSWORD: Optional[str] = os.getenv("REDIS_PASSWORD", None)
-
-    @property
-    def REDIS_URL(self) -> str:
-        if self.REDIS_PASSWORD:
-            return f"redis://:{self.REDIS_PASSWORD}@{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
-        return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
+    REDIS_PASSWORD: Optional[str] = None
+    REDIS_URL: str = "redis://ia_redis:6379/0"
     
     # ========================================================================
-    # GCP SERVICES
+    # QDRANT
     # ========================================================================
-    GCS_BUCKET_NAME: str = os.getenv("BUCKET_NAME", "caso01-documents")
+    QDRANT_HOST: str = "ia_qdrant"
+    QDRANT_PORT: int = 6333
+    QDRANT_COLLECTION_NAME: str = "rfp_documents"
+    QDRANT_API_KEY: Optional[str] = None
+    QDRANT_URL: str = "http://ia_qdrant:6333"
     
     # ========================================================================
-    # JWT & SECURITY
+    # JWT
     # ========================================================================
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", secrets.token_urlsafe(32))
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 43200  # 30 días
     
     # ========================================================================
-    # LLM & RAG CONFIG
+    # GCP SERVICES (NUEVO)
     # ========================================================================
-    OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
-    GOOGLE_API_KEY: Optional[str] = os.getenv("GOOGLE_API_KEY")
-    GEMINI_MODEL: str = "gemini-1.5-flash" 
     
-    # RAG Service (URL interna o externa)
-    RAG_SERVICE_URL: str = os.getenv("RAG_SERVICE_URL", "http://rag-service:8080")
+    # Project
+    GOOGLE_CLOUD_PROJECT: str = "tivit-caso01"
+    GCP_REGION: str = "us-central1"
+    GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = None
+    GCS_BUCKET_NAME: str = "caso01-documents"
+    
+    # Gemini API
+    GOOGLE_API_KEY: Optional[str] = None
+    
+    # Gemini 3 Pro - Para generación de documentos y propuestas comerciales
+    # Thinking level: HIGH, Temperature: 0 (determinístico)
+    GEMINI_PRO_MODEL: str = "gemini-3-pro-preview"
+    GEMINI_PRO_THINKING_LEVEL: str = "HIGH"  # OFF, LOW, MEDIUM, HIGH
+    GEMINI_PRO_TEMPERATURE: float = 0.0
+    GEMINI_PRO_MAX_TOKENS: int = 65536
+    
+    # Gemini 3 Flash - Para chat, CopilotKit, nombres de workspace, etc.
+    # Thinking level: MEDIUM, Temperature: 1.5 (creativo)
+    GEMINI_FLASH_MODEL: str = "gemini-3-flash-preview"
+    GEMINI_FLASH_THINKING_LEVEL: str = "MEDIUM"  # OFF, LOW, MEDIUM, HIGH
+    GEMINI_FLASH_TEMPERATURE: float = 1.5
+    GEMINI_FLASH_MAX_TOKENS: int = 16384
+    
+    # Legacy - mantener compatibilidad
+    GEMINI_MODEL: str = "gemini-3-flash-preview"
+    GEMINI_TEMPERATURE: float = 1.5
+    GEMINI_MAX_TOKENS: int = 16384
+    
+    # Document AI
+    DOCUMENT_AI_PROCESSOR_ID: Optional[str] = None
+    DOCUMENT_AI_LOCATION: str = "us"
+    DOCUMENT_AI_ENABLED: bool = True
+    
+    # Natural Language API
+    ENABLE_NATURAL_LANGUAGE: bool = True
     
     # ========================================================================
-    # GENERAL
+    # LLM PROVIDERS
     # ========================================================================
-    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
-    CORS_ALLOWED_ORIGINS: str = os.getenv("CORS_ALLOWED_ORIGINS", "*")
-
+    
+    # OpenAI (fallback)
+    OPENAI_API_KEY: Optional[str] = None
+    OPENAI_MODEL: str = "gpt-4o-mini"
+    
+    # Multi-LLM
+    LLM_PROVIDER: str = "gemini"  # gemini, openai, vertex
+    MULTI_LLM_ENABLED: bool = True
+    
+    # ========================================================================
+    # RAG SERVICE
+    # ========================================================================
+    RAG_SERVICE_URL: str = "http://rag-service:8080"
+    RAG_SERVICE_API_KEY: Optional[str] = None
+    RAG_SERVICE_TIMEOUT: float = 120.0
+    RAG_SERVICE_ENABLED: bool = True
+    
+    # ========================================================================
+    # MCP TALENT SERVICE
+    # ========================================================================
+    MCP_SERVICE_URL: str = "http://mcp-server:8083"
+    MCP_SERVICE_ENABLED: bool = True
+    MCP_SERVICE_TIMEOUT: float = 30.0
+    
+    # ========================================================================
+    # FILE UPLOAD
+    # ========================================================================
+    MAX_FILE_SIZE: int = 52428800  # 50MB
+    ALLOWED_EXTENSIONS: str = ".pdf,.docx,.xlsx,.csv,.txt"
+    
+    # ========================================================================
+    # CELERY
+    # ========================================================================
+    CELERY_BROKER_URL: str = "redis://ia_redis:6379/0"
+    CELERY_RESULT_BACKEND: str = "redis://ia_redis:6379/0"
+    
+    # ========================================================================
+    # CORS
+    # ========================================================================
+    CORS_ALLOWED_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
+    
+    # ========================================================================
+    # LOGGING
+    # ========================================================================
+    LOG_LEVEL: str = "INFO"
+    
     class Config:
-        # Pydantic v2 config
+        env_file = ".env"
+        env_file_encoding = 'utf-8'
         case_sensitive = True
-        extra = "ignore" # Ignorar variables extra en .env
+        extra = "ignore"
+
 
 settings = Settings()

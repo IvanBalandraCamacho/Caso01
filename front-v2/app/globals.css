@@ -1056,3 +1056,294 @@ textarea.ant-input:hover {
     transition-duration: 0.01ms !important;
   }
 }
+/* ============================================
+   COPILOTKIT DARK THEME OVERRIDES
+   ============================================ */
+
+/* Contenedor principal del chat - Fondo más claro */
+.custom-copilot-wrapper,
+.custom-copilot-wrapper > div,
+.custom-copilot-wrapper [role="presentation"] {
+  background: #1E1F20 !important;
+  background-color: #1E1F20 !important;
+  color: #e4e4e7 !important;
+}
+
+/* Contenedor del chat */
+.custom-copilot-wrapper .copilotKitChat,
+.custom-copilot-wrapper [class*="copilotKitChat"],
+.custom-copilot-wrapper [class*="chat"],
+.custom-copilot-wrapper [class*="Chat"] {
+  background: #1E1F20 !important;
+  background-color: #1E1F20 !important;
+  color: #e4e4e7 !important;
+  border: none !important;
+}
+
+/* Área de mensajes - Mantener fondo principal */
+.custom-copilot-wrapper [class*="messages"],
+.custom-copilot-wrapper [class*="Messages"],
+.custom-copilot-wrapper [class*="message-list"],
+.custom-copilot-wrapper [class*="messageList"],
+.custom-copilot-wrapper [class*="message-container"],
+.custom-copilot-wrapper [class*="messageContainer"],
+.custom-copilot-wrapper [class*="content"],
+.custom-copilot-wrapper [class*="window"] {
+  background: #1E1F20 !important;
+  background-color: #1E1F20 !important;
+}
+
+/* Mensajes del usuario - Burbujas blancas */
+.custom-copilot-wrapper [class*="user-message"],
+.custom-copilot-wrapper [class*="userMessage"],
+.custom-copilot-wrapper [class*="message-user"],
+.custom-copilot-wrapper [class*="messageUser"],
+.custom-copilot-wrapper [data-role="user"],
+.custom-copilot-wrapper [role="user"] {
+  background: white !important;
+  background-color: white !important;
+  color: #131314 !important;
+  border-radius: 12px !important;
+  padding: 10px 14px !important;
+}
+
+/* Hijos de mensajes del usuario también con texto oscuro */
+.custom-copilot-wrapper [class*="user-message"] *,
+.custom-copilot-wrapper [class*="userMessage"] *,
+.custom-copilot-wrapper [class*="message-user"] *,
+.custom-copilot-wrapper [class*="messageUser"] *,
+.custom-copilot-wrapper [data-role="user"] *,
+.custom-copilot-wrapper [role="user"] * {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: #131314 !important;
+}
+
+/* Mensajes del asistente - Burbujas blancas */
+.custom-copilot-wrapper [class*="assistant-message"],
+.custom-copilot-wrapper [class*="assistantMessage"],
+.custom-copilot-wrapper [class*="message-assistant"],
+.custom-copilot-wrapper [class*="messageAssistant"],
+.custom-copilot-wrapper [data-role="assistant"],
+.custom-copilot-wrapper [role="assistant"] {
+  background: white !important;
+  background-color: white !important;
+  color: #131314 !important;
+  border-radius: 12px !important;
+  padding: 10px 14px !important;
+}
+
+/* Contenido Markdown dentro de burbujas debe mantener color de fondo heredado */
+.custom-copilot-wrapper [class*="copilotKitMarkdown"],
+.custom-copilot-wrapper [class*="CopilotKitMarkdown"],
+.custom-copilot-wrapper [class*="markdown"] {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: inherit !important;
+}
+
+/* Hijos de mensajes del asistente transparentes */
+.custom-copilot-wrapper [class*="assistant-message"] *,
+.custom-copilot-wrapper [class*="assistantMessage"] *,
+.custom-copilot-wrapper [class*="message-assistant"] *,
+.custom-copilot-wrapper [class*="messageAssistant"] *,
+.custom-copilot-wrapper [data-role="assistant"] *,
+.custom-copilot-wrapper [role="assistant"] * {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: #131314 !important;
+}
+
+/* Burbujas y contenedores de mensajes */
+.custom-copilot-wrapper [class*="bubble"],
+.custom-copilot-wrapper [class*="Bubble"] {
+  background: inherit !important;
+  background-color: inherit !important;
+  border-radius: 12px !important;
+  padding: 8px 12px !important;
+}
+
+/* Input de texto */
+.custom-copilot-wrapper input,
+.custom-copilot-wrapper textarea,
+.custom-copilot-wrapper [class*="input"],
+.custom-copilot-wrapper [class*="Input"],
+.custom-copilot-wrapper [contenteditable="true"] {
+  background: #27272a !important;
+  background-color: #27272a !important;
+  border-color: #3f3f46 !important;
+  color: #e4e4e7 !important;
+}
+
+.custom-copilot-wrapper input::placeholder,
+.custom-copilot-wrapper textarea::placeholder {
+  color: #71717a !important;
+}
+
+.custom-copilot-wrapper input:focus,
+.custom-copilot-wrapper textarea:focus,
+.custom-copilot-wrapper [contenteditable="true"]:focus {
+  border-color: #E31837 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(227, 24, 55, 0.2) !important;
+  background: #27272a !important;
+  background-color: #27272a !important;
+}
+
+/* Botones */
+.custom-copilot-wrapper button {
+  background: #27272a !important;
+  background-color: #27272a !important;
+  border-color: #3f3f46 !important;
+  color: #e4e4e7 !important;
+}
+
+.custom-copilot-wrapper button:hover {
+  background: #E31837 !important;
+  background-color: #E31837 !important;
+  border-color: #E31837 !important;
+  color: white !important;
+}
+
+/* Botón de enviar */
+.custom-copilot-wrapper [class*="send-button"],
+.custom-copilot-wrapper [class*="sendButton"],
+.custom-copilot-wrapper [class*="submit"],
+.custom-copilot-wrapper button[type="submit"],
+.custom-copilot-wrapper button[aria-label*="Send"],
+.custom-copilot-wrapper button[aria-label*="send"] {
+  background: #E31837 !important;
+  background-color: #E31837 !important;
+  border-color: #E31837 !important;
+  color: white !important;
+}
+
+.custom-copilot-wrapper [class*="send-button"]:hover,
+.custom-copilot-wrapper [class*="sendButton"]:hover,
+.custom-copilot-wrapper button[type="submit"]:hover {
+  background: #C01530 !important;
+  background-color: #C01530 !important;
+  border-color: #C01530 !important;
+}
+
+/* Scrollbar personalizado para el chat */
+.custom-copilot-wrapper ::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-copilot-wrapper ::-webkit-scrollbar-track {
+  background: #131314 !important;
+  background-color: #131314 !important;
+}
+
+.custom-copilot-wrapper ::-webkit-scrollbar-thumb {
+  background: #3f3f46 !important;
+  background-color: #3f3f46 !important;
+  border-radius: 4px;
+}
+
+.custom-copilot-wrapper ::-webkit-scrollbar-thumb:hover {
+  background: #52525b !important;
+  background-color: #52525b !important;
+}
+
+/* Header del chat - Mismo color que el área de mensajes */
+.custom-copilot-wrapper [class*="header"],
+.custom-copilot-wrapper [class*="Header"],
+.custom-copilot-wrapper header {
+  background: #1E1F20 !important;
+  background-color: #1E1F20 !important;
+  border-bottom: 1px solid #27272a !important;
+  color: #e4e4e7 !important;
+}
+
+/* Footer del chat - Mismo color que el área de mensajes */
+.custom-copilot-wrapper [class*="footer"],
+.custom-copilot-wrapper [class*="Footer"],
+.custom-copilot-wrapper footer,
+.custom-copilot-wrapper [class*="input-container"],
+.custom-copilot-wrapper [class*="inputContainer"] {
+  background: #1E1F20 !important;
+  background-color: #1E1F20 !important;
+  border-top: 1px solid #27272a !important;
+}
+
+/* Sugerencias */
+.custom-copilot-wrapper [class*="suggestion"],
+.custom-copilot-wrapper [class*="Suggestion"] {
+  background: #27272a !important;
+  background-color: #27272a !important;
+  border-color: #3f3f46 !important;
+  color: #e4e4e7 !important;
+}
+
+.custom-copilot-wrapper [class*="suggestion"]:hover,
+.custom-copilot-wrapper [class*="Suggestion"]:hover {
+  background: #3f3f46 !important;
+  background-color: #3f3f46 !important;
+  border-color: #E31837 !important;
+}
+
+/* Loading state */
+.custom-copilot-wrapper [class*="loading"],
+.custom-copilot-wrapper [class*="Loading"],
+.custom-copilot-wrapper [class*="spinner"],
+.custom-copilot-wrapper [class*="Spinner"] {
+  color: #E31837 !important;
+}
+
+/* Links */
+.custom-copilot-wrapper a {
+  color: #E31837 !important;
+}
+
+.custom-copilot-wrapper a:hover {
+  color: #FF6B00 !important;
+}
+
+/* Code blocks */
+.custom-copilot-wrapper pre,
+.custom-copilot-wrapper code {
+  background: #0a0a0b !important;
+  background-color: #0a0a0b !important;
+  border-color: #27272a !important;
+  color: #e4e4e7 !important;
+}
+
+/* Dividers */
+.custom-copilot-wrapper hr,
+.custom-copilot-wrapper [class*="divider"],
+.custom-copilot-wrapper [class*="Divider"],
+.custom-copilot-wrapper [class*="separator"] {
+  border-color: #27272a !important;
+  background: #27272a !important;
+  background-color: #27272a !important;
+}
+
+/* Paneles y overlays */
+.custom-copilot-wrapper [class*="panel"],
+.custom-copilot-wrapper [class*="Panel"],
+.custom-copilot-wrapper [class*="overlay"],
+.custom-copilot-wrapper [class*="Overlay"],
+.custom-copilot-wrapper [class*="modal"],
+.custom-copilot-wrapper [class*="Modal"] {
+  background: #1E1F20 !important;
+  background-color: #1E1F20 !important;
+  color: #e4e4e7 !important;
+}
+
+/* Íconos y SVGs */
+.custom-copilot-wrapper svg {
+  color: inherit !important;
+}
+
+/* Asegurar que elementos con fondo blanco se vuelvan oscuros */
+.custom-copilot-wrapper [style*="background: white"],
+.custom-copilot-wrapper [style*="background-color: white"],
+.custom-copilot-wrapper [style*="background: #fff"],
+.custom-copilot-wrapper [style*="background-color: #fff"],
+.custom-copilot-wrapper [style*="background: rgb(255, 255, 255)"],
+.custom-copilot-wrapper [style*="background-color: rgb(255, 255, 255)"] {
+  background: #1E1F20 !important;
+  background-color: #1E1F20 !important;
+}

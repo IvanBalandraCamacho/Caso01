@@ -33,6 +33,7 @@ import { UserMenu } from "@/components/UserMenu"
 import { useUser } from "@/hooks/useUser"
 import { useChatStream } from "@/hooks/useChatStream"
 import { useWorkspaceContext } from "@/context/WorkspaceContext"
+import { ThinkingLevelSelector, useThinkingLevel, type ThinkingLevel } from "@/components/chat/ThinkingLevelSelector"
 import { fetchConversationMessages, fetchConversationDocuments, fetchWorkspaceDocuments, deleteDocumentApi, downloadProposalFromMarkdown } from "@/lib/api"
 import { FilePreviewModal } from "@/components/FilePreviewModal"
 import type { DocumentPublic, DocumentChunk } from "@/types/api"
@@ -194,6 +195,7 @@ export default function ChatPage({
   const { user } = useUser()
   const { sendMessage: sendChatMessage } = useChatStream()
   const { selectedModel, setSelectedModel } = useWorkspaceContext()
+  const [thinkingLevel, setThinkingLevel] = useThinkingLevel("MEDIUM")
   
   // Sources from the current streaming response (separate from message content)
   const [currentSources, setCurrentSources] = useState<DocumentChunk[]>([])
@@ -359,9 +361,44 @@ export default function ChatPage({
         
         if (conversation.has_proposal) {
           setProposalGenerated(true)
-          if (conversation.messages && conversation.messages.length > 0) {
-            const lastAssistantMessage = [...conversation.messages].reverse().find(m => m.role === "assistant")
-            if (lastAssistantMessage) setProposalMarkdown(lastAssistantMessage.content)
+          
+          // PRIORIDAD 1: Usar proposal_content del API si está disponible (más robusto)
+          if (conversation.proposal_content) {
+            setProposalMarkdown(conversation.proposal_content)
+          } 
+          // FALLBACK: Buscar en los mensajes del asistente
+          else if (conversation.messages && conversation.messages.length > 0) {
+            // Buscar en todos los mensajes del asistente (no solo el último)
+            const proposalMessage = conversation.messages.find(m => {
+              if (m.role !== "assistant") return false
+              const content = m.content.toLowerCase()
+              // Detectar si el mensaje contiene una propuesta comercial
+              return (
+                content.includes("propuesta comercial") ||
+                content.includes("propuesta técnica") ||
+                content.includes("## resumen ejecutivo") ||
+                content.includes("## alcance") ||
+                content.includes("## metodología") ||
+                content.includes("## cronograma") ||
+                content.includes("## equipo de trabajo") ||
+                content.includes("## inversión") ||
+                (content.includes("propuesta") && content.length > 2000) // Propuestas largas
+              )
+            })
+            if (proposalMessage) {
+              setProposalMarkdown(proposalMessage.content)
+            } else {
+              // Fallback: buscar el mensaje más largo del asistente (probablemente la propuesta)
+              const assistantMessages = conversation.messages.filter(m => m.role === "assistant")
+              if (assistantMessages.length > 0) {
+                const longestMessage = assistantMessages.reduce((prev, curr) => 
+                  curr.content.length > prev.content.length ? curr : prev
+                )
+                if (longestMessage.content.length > 1000) {
+                  setProposalMarkdown(longestMessage.content)
+                }
+              }
+            }
           }
         }
         
@@ -440,7 +477,7 @@ export default function ChatPage({
     const currentMessage = inputMessage
     setInputMessage("")
     setIsLoading(true)
-    setProposalGenerated(false)
+    // setProposalGenerated(false) // MANTENER VISIBLE: No ocultar el botón de propuesta al enviar mensajes nuevos
     detectedIntentRef.current = null
     setCurrentSources([])
     setIsStreaming(true)
@@ -455,7 +492,8 @@ export default function ChatPage({
         {
           query: currentMessage,
           conversation_id: chatId,
-          model: "string",
+          model: selectedModel,
+          thinking_level: thinkingLevel,
         },
         {
           onContentUpdate: (content: string) => {
@@ -486,14 +524,17 @@ export default function ChatPage({
           onComplete: (conversationId: string) => {
             setIsStreaming(false)
             if (detectedIntentRef.current === "GENERATE_PROPOSAL") {
-              setMessages((prev) => {
+              // Redirigir al Proposal Workbench para la experiencia unificada
+              router.push(`/workspace/${id}/proposal`);
+            } else {
+               // Lógica original para otros intents si es necesaria
+               setMessages((prev) => {
                 const lastMessage = prev[prev.length - 1]
                 if (lastMessage && lastMessage.role === "assistant") {
-                  setProposalMarkdown(lastMessage.content)
+                  // Actualizar estado local si es necesario, aunque al redirigir ya no importa tanto
                 }
                 return prev
               })
-              setProposalGenerated(true)
             }
             if (!firstChunkReceived) setIsLoading(false)
           },
@@ -730,6 +771,21 @@ export default function ChatPage({
                 <span className="absolute top-1 right-1 w-2 h-2 bg-[#E31837] rounded-full border-2 border-[#0A0A0B]"></span>
               )}
             </button>
+
+            {/* BOTÓN PERSISTENTE DE PROPUESTA */}
+            {proposalGenerated && (
+              <Button
+                type="text"
+                icon={<FileText size={18} className="text-[#E31837]" />}
+                loading={isDownloadingProposal}
+                onClick={handleDownloadProposal}
+                className="text-zinc-300 hover:text-white hover:bg-white/5 h-10 px-3 flex items-center gap-2"
+                title="Descargar Propuesta Comercial"
+              >
+                <span className="hidden sm:inline">Propuesta</span>
+              </Button>
+            )}
+
             <div className="w-px h-6 bg-white/10 mx-1"></div>
             <UserMenu user={user} />
           </div>
@@ -900,21 +956,28 @@ export default function ChatPage({
             
             {/* Footer info */}
             <div className="flex justify-between items-center mt-3 px-2">
-               <div className="flex items-center">
-                  <Select
-                    value={selectedModel}
-                    onChange={setSelectedModel}
-                    suffixIcon={<ChevronDown className="text-zinc-500" size={12} />}
-                    size="small"
-                    variant="borderless"
-                    className="text-zinc-500 hover:text-zinc-300 transition-colors text-xs"
-                    classNames={{ popup: { root: "dark-select-dropdown" } }}
-                    styles={{ popup: { root: { background: '#1E1F20', border: '1px solid #333' } } }}
-                    options={[
-                      { label: "ChatGPT 4o-mini", value: "gpt-4o-mini" },
-                      { label: "Velvet 12B", value: "velvet-12b" },
-                    ]}
-                  />
+               <div className="flex items-center gap-3">
+                 <Select
+                   value={selectedModel}
+                   onChange={setSelectedModel}
+                   suffixIcon={<ChevronDown className="text-zinc-500" size={12} />}
+                   size="small"
+                   variant="borderless"
+                   className="text-zinc-500 hover:text-zinc-300 transition-colors text-xs"
+                   classNames={{ popup: { root: "dark-select-dropdown" } }}
+                   styles={{ popup: { root: { background: '#1E1F20', border: '1px solid #333' } } }}
+                   options={[
+                     { label: "ChatGPT 4o-mini", value: "gpt-4o-mini" },
+                     { label: "Velvet 12B", value: "velvet-12b" },
+                   ]}
+                 />
+                 <div className="w-px h-4 bg-white/10" />
+                 <ThinkingLevelSelector
+                   value={thinkingLevel}
+                   onChange={setThinkingLevel}
+                   size="small"
+                   style={{ minWidth: "120px" }}
+                 />
                </div>
                <p className="text-[11px] text-zinc-600 text-center">
                   TIVIT AI puede cometer errores.

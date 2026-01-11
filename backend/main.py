@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 # from starlette.middleware.gzip import GZIPMiddleware
-from api.routes import health, workspaces, conversations, document_generation, auth, intention_task, tivit, notifications_ws, rag_proxy, general_chat, metrics, dashboard, workspace_analytics, templates, data_extraction, copilot
+from api.routes import health, workspaces, conversations, document_generation, auth, intention_task, tivit, notifications_ws, rag_proxy, general_chat, metrics, dashboard, workspace_analytics, templates, data_extraction, copilot, talent, analytics, quick_wins
 # from api.routes import users  # Comentado: módulo no existe aún
 from exceptions import ServiceException
 from core.config import settings
@@ -33,12 +33,10 @@ logger = logging.getLogger(__name__)
 limiter = Limiter(key_func=get_remote_address)
 
 # --- Definir orígenes permitidos (CORS) ---
-# raw_origins = os.getenv(
-#     "CORS_ALLOWED_ORIGINS",
-#     "http://localhost:3000,http://127.0.0.1:3000,http://0.0.0.0:3000,http://localhost:3000/*",
-# )
-# origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
-origins = ["*"]  # DEBUG: Allow all origins
+raw_origins = os.getenv("CORS_ALLOWED_ORIGINS", "")
+origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+if not origins:
+    origins = ["*"] # Fallback controlado, idealmente vacío en prod
 
 # NOTA: create_tables_with_retry() comentado porque usamos Alembic para migraciones
 # Si no usas Alembic, descomenta esta función para crear tablas automáticamente
@@ -70,7 +68,7 @@ def create_tables_with_retry(max_retries=5, delay=3):
                 raise
 
 
-create_tables_with_retry()
+# create_tables_with_retry()  # Comentado para producción, usar Alembic
 
 # Inicializar GCP services
 logger.info("📊 Inicializando GCP services...")
@@ -133,6 +131,9 @@ app.include_router(notifications_ws.router, prefix="/api/v1", tags=["Notificatio
 app.include_router(rag_proxy.router, prefix="/api/v1/rag", tags=["RAG Service (Proxy)"])
 app.include_router(general_chat.router, prefix="/api/v1", tags=["General Chat"])
 app.include_router(copilot.router, prefix="/api/v1", tags=["CopilotKit"])
+app.include_router(talent.router, prefix="/api/v1", tags=["Talent Search"])
+app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
+app.include_router(quick_wins.router, prefix="/api/v1", tags=["Quick Wins"])
 
 # Tasks Router (sin prefijo v1 estricto, o interno)
 from api.routes import tasks

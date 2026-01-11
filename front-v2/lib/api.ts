@@ -10,6 +10,7 @@ import {
   WorkspacePublic,
   WorkspaceCreate,
   WorkspaceUpdate,
+  WorkspaceHealth,
   ConversationPublic,
   ConversationWithMessages,
   ConversationCreate,
@@ -305,6 +306,15 @@ export const updateWorkspaceApi = async (
  */
 export const deleteWorkspaceApi = async (workspaceId: string): Promise<void> => {
   await api.delete(`/workspaces/${workspaceId}`);
+};
+
+/**
+ * Get workspace health (completion percentage and missing sections)
+ * GET /api/v1/workspaces/{workspace_id}/health
+ */
+export const fetchWorkspaceHealth = async (workspaceId: string): Promise<WorkspaceHealth> => {
+  const { data } = await api.get<WorkspaceHealth>(`/workspaces/${workspaceId}/health`);
+  return data;
 };
 
 /**
@@ -957,6 +967,11 @@ export const downloadDocumentDirect = async (
 // PROPOSAL/TASK ANALYSIS API FUNCTIONS
 // ============================================
 
+export interface AnalysisResponse {
+  analysis: ProposalAnalysis;
+  workspace_id: string;
+}
+
 /**
  * Analyze a document/RFP using AI
  * POST /api/v1/task/analyze
@@ -965,11 +980,11 @@ export const downloadDocumentDirect = async (
 export const analyzeDocumentApi = async (
   file: File,
   onProgress?: (progress: number) => void,
-): Promise<ProposalAnalysis> => {
+): Promise<AnalysisResponse> => {
   const formData = new FormData();
   formData.append("file", file);
 
-  const { data } = await api.post<ProposalAnalysis>("/task/analyze", formData, {
+  const { data } = await api.post<AnalysisResponse>("/task/analyze", formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
@@ -1086,6 +1101,67 @@ export const sugerirEquipo = async (
   requerimientos: TeamSuggestionRequest,
 ): Promise<TeamSuggestionResponse> => {
   const { data } = await api.post<TeamSuggestionResponse>("/equipos/sugerir", requerimientos);
+  return data;
+};
+
+// ============================================
+// MCP TALENT SEARCH API FUNCTIONS
+// ============================================
+
+import type {
+  TalentSearchRequest,
+  TalentSearchResponse,
+  EnrichTeamRequest,
+  EnrichTeamResponse,
+  TalentStats,
+} from "@/types/api";
+
+/**
+ * Search for talent using semantic search
+ * POST /api/v1/talent/search
+ */
+export const searchTalent = async (
+  request: TalentSearchRequest,
+): Promise<TalentSearchResponse> => {
+  const { data } = await api.post<TalentSearchResponse>("/talent/search", request);
+  return data;
+};
+
+/**
+ * Enrich team suggestions with real candidates from MCP
+ * POST /api/v1/talent/enrich-team
+ */
+export const enrichTeamWithCandidates = async (
+  request: EnrichTeamRequest,
+): Promise<EnrichTeamResponse> => {
+  const { data } = await api.post<EnrichTeamResponse>("/talent/enrich-team", request);
+  return data;
+};
+
+/**
+ * Get talent database statistics
+ * GET /api/v1/talent/stats
+ */
+export const getTalentStats = async (): Promise<TalentStats> => {
+  const { data } = await api.get<TalentStats>("/talent/stats");
+  return data;
+};
+
+/**
+ * Health check for MCP talent service
+ * GET /api/v1/talent/health
+ */
+export const talentHealthCheck = async (): Promise<{ status: string; total_registros: number; modelo_cargado: boolean }> => {
+  const { data } = await api.get("/talent/health");
+  return data;
+};
+
+/**
+ * Get available countries for talent filtering
+ * GET /api/v1/talent/countries
+ */
+export const getTalentCountries = async (): Promise<{ exito: boolean; paises: string[]; total: number }> => {
+  const { data } = await api.get("/talent/countries");
   return data;
 };
 

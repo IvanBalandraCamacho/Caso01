@@ -30,6 +30,9 @@ services:
       # LLM
       - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # MCP Talent Service
+      - MCP_SERVICE_URL=http://mcp-server:8083
+      - MCP_SERVICE_ENABLED=true
     depends_on:
       mysql:
         condition: service_healthy
@@ -55,6 +58,7 @@ services:
       - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
       - NEXT_PUBLIC_COPILOT_ENABLED=true
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - BACKEND_INTERNAL_URL=http://backend:8000/api/v1
     volumes:
       - ./front-v2:/app           
       - /app/node_modules         
@@ -121,6 +125,21 @@ services:
       - rag_data:/app/data
     command: uvicorn main:app --host 0.0.0.0 --port 8080 --reload
 
+  # 7. Servidor MCP - Buscador de Talento Semántico
+  mcp-server:
+    build:
+      context: ./mcp
+      dockerfile: Dockerfile.dev
+    container_name: ia_mcp_server
+    ports:
+      - "8083:8083"
+    volumes:
+      - ./mcp:/app
+      - mcp_lancedb_data:/app/lancedb_data
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+
   celery_worker:
     build:
       context: ./backend
@@ -148,6 +167,9 @@ services:
       - DOCUMENT_AI_PROCESSOR_ID=${DOCUMENT_AI_PROCESSOR_ID:-}
       - DOCUMENT_AI_LOCATION=${DOCUMENT_AI_LOCATION:-us}
       - ENABLE_NATURAL_LANGUAGE=${ENABLE_NATURAL_LANGUAGE:-true}
+      # MCP Talent Service
+      - MCP_SERVICE_URL=http://mcp-server:8083
+      - MCP_SERVICE_ENABLED=true
     depends_on:
       mysql:
         condition: service_healthy
@@ -159,8 +181,11 @@ services:
         condition: service_started
       rag-service:
         condition: service_started
+      mcp-server:
+        condition: service_started
 
 volumes:
   mysql_data:
   qdrant_data:
   rag_data:
+  mcp_lancedb_data:

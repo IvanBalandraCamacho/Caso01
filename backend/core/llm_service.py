@@ -1,21 +1,37 @@
 """
-LLM Service - Factory for OpenAI provider.
-Provides a unified interface to OpenAI LLM backend.
+LLM Service - Routing inteligente entre Gemini 3 Pro y Flash.
 
-Sistema LLM:
-- OpenAI GPT-4o-mini: Para todas las tareas
+Sistema LLM con dos modelos especializados:
+- Gemini 3 Pro: SOLO para quick-analysis y propuestas comerciales (thinking HIGH, temp 0)
+- Gemini 3 Flash: Chat, CopilotKit, tareas generales (thinking MEDIUM, temp 1.5)
+
+CONTROL DE COSTOS:
+- Gemini 3 Pro solo se usa cuando se pasa explícitamente `use_pro=True`
+- Pro NUNCA reintenta (una sola llamada por operación)
+- Por defecto TODO usa Flash
 """
-from typing import List, Generator
+from typing import List, Generator, Optional
+from enum import Enum
+import logging
+import time
+
 from core.config import settings
-from core.providers import LLMProvider, OpenAIProvider
+from core.providers import LLMProvider
+from core.providers.gemini_pro_provider import Gemini3ProProvider
+from core.providers.gemini_flash_provider import Gemini3FlashProvider
 from core.llm_router import LLMRouter, TaskType
 from models.schemas import DocumentChunk
 from core.llm_cache import get_llm_cache
 from core.llm_validators import ResponseValidator, get_metrics
-import logging
-import time
 
 logger = logging.getLogger(__name__)
+
+
+class ModelType(Enum):
+    """Tipos de modelo disponibles."""
+    PRO = "gemini_pro"      # Para documentos y propuestas (EXPLÍCITO)
+    FLASH = "gemini_flash"  # Para todo lo demás (DEFAULT)
+
 
 # Global provider instances
 _providers = {}
@@ -25,107 +41,143 @@ _cache = None
 
 def initialize_providers():
     """
-    Inicializa providers: OpenAI (prioridad), Gemini (deshabilitado temporalmente).
+    Inicializa ambos providers: Gemini 3 Pro y Flash.
     """
     global _providers, _router, _cache
     
-    logger.info("Inicializando sistema LLM...")
+    logger.info("Inicializando sistema LLM con Gemini 3 Pro y Flash...")
     
     # Inicializar caché
     _cache = get_llm_cache()
     if _cache:
         logger.info("✅ Sistema de caché LLM inicializado")
     
-    # 1. OpenAI (prioridad actual)
-    if hasattr(settings, 'OPENAI_API_KEY') and settings.OPENAI_API_KEY:
-        try:
-            _providers["openai_gpt4o_mini"] = OpenAIProvider(
-                api_key=settings.OPENAI_API_KEY,
-                model_name="gpt-4o-mini"
-            )
-            _providers["openai_gpt4"] = OpenAIProvider(
-                api_key=settings.OPENAI_API_KEY,
-                model_name="gpt-4"
-            )
-            # Usar OpenAI como default
-            _providers["gpt4o_mini"] = _providers["openai_gpt4o_mini"]
-            _providers["gpt4"] = _providers["openai_gpt4"]
-            logger.info("✅ OpenAI providers inicializados (PRINCIPAL)")
-        except Exception as e:
-            logger.error(f"❌ Error OpenAI: {e}")
+    # 1. Gemini 3 Flash (PROVIDER PRINCIPAL - DEFAULT)
+    try:
+        _providers[ModelType.FLASH] = Gemini3FlashProvider()
+        _providers["gemini_flash"] = _providers[ModelType.FLASH]
+        _providers["gemini"] = _providers[ModelType.FLASH]  # Alias para compatibilidad
+        _providers["default"] = _providers[ModelType.FLASH]
+        logger.info(f"✅ Gemini 3 Flash inicializado: {settings.GEMINI_FLASH_MODEL}")
+    except Exception as e:
+        logger.error(f"❌ Error inicializando Gemini 3 Flash: {e}")
+        raise RuntimeError(f"No se pudo inicializar Gemini 3 Flash: {e}")
     
-    # 2. Gemini Flash (deshabilitado temporalmente - descomentar para producción)
-    # try:
-    #     from core.gcp_service import gcp_service
-    #     if gcp_service.gemini_available:
-    #         from core.providers.gemini_flash_provider import GeminiFlashProvider
-    #         _providers["gemini_flash"] = GeminiFlashProvider()
-    #         _providers["gemini"] = _providers["gemini_flash"]
-    #         logger.info("✅ Gemini Flash provider inicializado")
-    # except Exception as e:
-    #     logger.warning(f"⚠️ No se pudo inicializar Gemini: {e}")
-
+    # 2. Gemini 3 Pro (SOLO para quick-analysis y propuestas - EXPLÍCITO)
+    try:
+        _providers[ModelType.PRO] = Gemini3ProProvider()
+        _providers["gemini_pro"] = _providers[ModelType.PRO]
+        logger.info(f"✅ Gemini 3 Pro inicializado: {settings.GEMINI_PRO_MODEL}")
+    except Exception as e:
+        logger.error(f"❌ Error inicializando Gemini 3 Pro: {e}")
+        logger.warning("⚠️ Continuando solo con Gemini 3 Flash")
+    
     # Inicializar router
     _router = LLMRouter()
     logger.info("✅ LLM Router inicializado")
     
     if not _providers:
-        raise RuntimeError("❌ No hay providers disponibles")
+        raise RuntimeError("❌ No hay providers disponibles. Configura GOOGLE_API_KEY en .env")
     
     logger.info(f"Sistema LLM listo con {len(_providers)} providers")
 
 
-def get_provider(model_name: str = None, task_type: str = None) -> LLMProvider:
+def get_provider(
+    model_name: str = None, 
+    task_type: str = None,
+    force_pro: bool = False
+) -> LLMProvider:
     """
     Obtiene el provider apropiado.
-    Prioridad: OpenAI GPT-4o-mini (Gemini deshabilitado temporalmente)
+    
+    REGLA: Siempre usa Flash EXCEPTO si force_pro=True explícitamente.
     
     Args:
-        model_name: Nombre específico del modelo (opcional)
-        task_type: Tipo de tarea (opcional)
+        model_name: Nombre específico del modelo (ignorado)
+        task_type: Tipo de tarea (ignorado)
+        force_pro: Si True, usa Gemini 3 Pro (para quick-analysis/propuestas)
         
     Returns:
-        LLMProvider instance
+        Provider instance (Pro o Flash)
     """
     if not _providers:
         initialize_providers()
     
-    # 1. Si se especifica modelo por nombre
-    if model_name and model_name in _providers:
-        logger.info(f"🎯 Usando modelo solicitado: {model_name}")
-        return _providers[model_name]
+    # SOLO usar Pro si se solicita EXPLÍCITAMENTE
+    if force_pro and ModelType.PRO in _providers:
+        logger.info("🎯 Usando Gemini 3 Pro (solicitado explícitamente)")
+        return _providers[ModelType.PRO]
     
-    # 2. Usar OpenAI GPT-4o-mini (Gemini deshabilitado temporalmente)
-    if "openai_gpt4o_mini" in _providers:
-        logger.info("🎯 Usando OpenAI GPT-4o-mini")
-        return _providers["openai_gpt4o_mini"]
+    # DEFAULT: Flash para todo
+    if ModelType.FLASH in _providers:
+        logger.debug("🎯 Usando Gemini 3 Flash (default)")
+        return _providers[ModelType.FLASH]
     
-    # 3. Fallback a Gemini si OpenAI no está disponible
-    if "gemini_flash" in _providers:
-        logger.info("🎯 Fallback a Gemini Flash")
-        return _providers["gemini_flash"]
-    
-    # 4. Último fallback - cualquier provider disponible
+    # Fallback
     if _providers:
         provider = next(iter(_providers.values()))
-        logger.warning(f"⚠️ Usando fallback provider: {provider.model_name if hasattr(provider, 'model_name') else 'unknown'}")
+        logger.warning(f"⚠️ Usando fallback provider")
         return provider
     
-    error_msg = "No LLM provider available. Please check your OPENAI_API_KEY in .env"
-    logger.error(f"❌ {error_msg}")
-    raise RuntimeError(error_msg)
+    raise RuntimeError("No LLM provider available. Please check your GOOGLE_API_KEY in .env")
 
 
-def generate_response(query: str, context_chunks: List[DocumentChunk], model_override: str = None, chat_history: List[dict] = None, use_cache: bool = True) -> str:
+def get_pro_provider() -> Optional[Gemini3ProProvider]:
     """
-    Genera una respuesta usando el LLM apropiado con caché automático y validaciones.
+    Obtiene el provider Gemini 3 Pro para generación de documentos.
+    
+    Returns:
+        Gemini3ProProvider o None si no está disponible
+    """
+    if not _providers:
+        initialize_providers()
+    
+    if ModelType.PRO in _providers:
+        return _providers[ModelType.PRO]
+    return None
+
+
+def get_flash_provider() -> Gemini3FlashProvider:
+    """
+    Obtiene el provider Gemini 3 Flash para chat.
+    
+    Returns:
+        Gemini3FlashProvider
+    """
+    if not _providers:
+        initialize_providers()
+    
+    if ModelType.FLASH in _providers:
+        return _providers[ModelType.FLASH]
+    
+    raise RuntimeError("Gemini 3 Flash no disponible")
+
+
+def generate_response(
+    query: str, 
+    context_chunks: List[DocumentChunk], 
+    model_override: str = None, 
+    chat_history: List[dict] = None, 
+    use_cache: bool = True,
+    use_pro: bool = False,
+    raw_document: str = None
+) -> str:
+    """
+    Genera una respuesta usando Flash (default) o Pro (explícito).
+    
+    CONTROL DE COSTOS:
+    - Por defecto usa Flash
+    - Solo usa Pro si use_pro=True o raw_document está presente
+    - Pro NUNCA reintenta
     
     Args:
         query: Pregunta del usuario
         context_chunks: Documentos relevantes del RAG
-        model_override: Modelo específico a usar (opcional)
+        model_override: Modelo específico (ignorado)
         chat_history: Historial de chat (opcional)
         use_cache: Si True, intenta usar caché (default: True)
+        use_pro: Si True, usa Gemini 3 Pro (para quick-analysis/propuestas)
+        raw_document: Documento crudo (activa Pro automáticamente)
         
     Returns:
         Respuesta generada y validada
@@ -137,17 +189,22 @@ def generate_response(query: str, context_chunks: List[DocumentChunk], model_ove
     metrics = get_metrics()
     validator = ResponseValidator()
     
-    # Intentar obtener del caché
-    if use_cache and _cache:
-        context_texts = [chunk.chunk_text[:200] for chunk in context_chunks]  # Primeros 200 chars
-        model_name = model_override or "gpt4o_mini"
+    # Determinar si usar Pro (SOLO por parámetro explícito o raw_document)
+    should_use_pro = use_pro or (raw_document is not None)
+    
+    if should_use_pro:
+        logger.info("📄 Usando Gemini 3 Pro (solicitado explícitamente)")
+    
+    # Intentar obtener del caché (SOLO para Flash)
+    if not should_use_pro and use_cache and _cache:
+        context_texts = [chunk.chunk_text[:200] for chunk in context_chunks] if context_chunks else []
+        model_name = "gemini_flash"
         
         cached_response = _cache.get(query, context_texts, model_name)
         if cached_response:
             was_cached = True
             response_time = time.time() - start_time
             
-            # Registrar métricas
             metrics.record_request(
                 query=query,
                 response=cached_response,
@@ -159,8 +216,17 @@ def generate_response(query: str, context_chunks: List[DocumentChunk], model_ove
             return cached_response
     
     # Generar respuesta
-    provider = get_provider(model_name=model_override)
-    response = provider.generate_response(query, context_chunks, chat_history=chat_history)
+    if should_use_pro and ModelType.PRO in _providers:
+        provider = _providers[ModelType.PRO]
+        response = provider.generate_response(
+            query=query,
+            context_chunks=None,  # Pro no usa RAG
+            chat_history=chat_history,
+            raw_document=raw_document
+        )
+    else:
+        provider = get_provider()
+        response = provider.generate_response(query, context_chunks, chat_history=chat_history)
     
     response_time = time.time() - start_time
     
@@ -171,11 +237,13 @@ def generate_response(query: str, context_chunks: List[DocumentChunk], model_ove
         logger.warning(f"⚠️ Respuesta de baja calidad (score: {validation['quality_score']})")
         logger.warning(f"   Issues: {', '.join(validation['issues'])}")
         
-        # Si es un problema técnico, reintentar UNA vez
-        if validator.should_retry(validation):
-            logger.info("🔄 Reintentando generación...")
+        # CONTROL DE COSTOS: Pro NUNCA reintenta
+        if validator.should_retry(validation) and not should_use_pro:
+            logger.info("🔄 Reintentando generación con Flash...")
             response = provider.generate_response(query, context_chunks, chat_history=chat_history)
             validation = validator.validate_response(query, response, context_chunks)
+        elif should_use_pro:
+            logger.info("💰 Gemini Pro: aceptando respuesta sin retry (control de costos)")
     
     # Log de calidad
     if validation['quality_score'] >= 0.8:
@@ -183,11 +251,10 @@ def generate_response(query: str, context_chunks: List[DocumentChunk], model_ove
     elif validation['quality_score'] >= 0.6:
         logger.info(f"⚠️ Respuesta aceptable (score: {validation['quality_score']})")
     
-    # Guardar en caché solo si es de calidad aceptable
-    if use_cache and _cache and response and validation['quality_score'] >= 0.6:
-        context_texts = [chunk.chunk_text[:200] for chunk in context_chunks]
-        model_name = model_override or "gpt4o_mini"
-        _cache.set(query, context_texts, model_name, response)
+    # Guardar en caché solo Flash y si es de calidad aceptable
+    if not should_use_pro and use_cache and _cache and response and validation['quality_score'] >= 0.6:
+        context_texts = [chunk.chunk_text[:200] for chunk in context_chunks] if context_chunks else []
+        _cache.set(query, context_texts, "gemini_flash", response)
     
     # Registrar métricas
     metrics.record_request(
@@ -205,18 +272,143 @@ def generate_response(query: str, context_chunks: List[DocumentChunk], model_ove
     return response
 
 
-def generate_response_stream(query: str, context_chunks: List[DocumentChunk], model_override: str = None, chat_history: List[dict] = None) -> Generator[str, None, None]:
+def generate_response_stream(
+    query: str, 
+    context_chunks: List[DocumentChunk], 
+    model_override: str = None, 
+    chat_history: List[dict] = None,
+    use_pro: bool = False,
+    raw_document: str = None,
+    thinking_level: str = None
+) -> Generator[str, None, None]:
     """
-    Genera una respuesta en streaming usando el LLM apropiado.
+    Genera una respuesta en streaming usando Flash (default) o Pro (explícito).
+    
+    CONTROL DE COSTOS:
+    - Por defecto usa Flash
+    - Solo usa Pro si use_pro=True o raw_document está presente
     
     Args:
         query: Pregunta del usuario
         context_chunks: Documentos relevantes del RAG
-        model_override: Modelo específico a usar (opcional)
+        model_override: Modelo específico (ignorado)
+        chat_history: Historial de chat (opcional)
+        use_pro: Si True, usa Gemini 3 Pro (para quick-analysis/propuestas)
+        raw_document: Documento crudo (activa Pro automáticamente)
+        thinking_level: Nivel de thinking (OFF, LOW, MEDIUM, HIGH)
+        
+    Yields:
+        Fragmentos de la respuesta
+    """
+    # Determinar si usar Pro (SOLO por parámetro explícito o raw_document)
+    should_use_pro = use_pro or (raw_document is not None)
+    
+    if should_use_pro:
+        logger.info("📄 Streaming: Usando Gemini 3 Pro (solicitado explícitamente)")
+    
+    if should_use_pro and ModelType.PRO in _providers:
+        provider = _providers[ModelType.PRO]
+        return provider.generate_response_stream(
+            query=query,
+            context_chunks=None,  # Pro no usa RAG
+            chat_history=chat_history,
+            raw_document=raw_document
+        )
+    else:
+        provider = get_provider()
+        return provider.generate_response_stream(
+            query, 
+            context_chunks, 
+            chat_history=chat_history,
+            thinking_level=thinking_level
+        )
+
+
+def generate_response_stream_pro(
+    query: str,
+    raw_document: str,
+    chat_history: List[dict] = None
+) -> Generator[str, None, None]:
+    """
+    Genera una respuesta en streaming usando Gemini 3 Pro.
+    
+    USO: Solo para quick-analysis y propuestas comerciales.
+    
+    Args:
+        query: Pregunta/instrucciones del usuario
+        raw_document: Documento crudo a analizar
         chat_history: Historial de chat (opcional)
         
     Yields:
         Fragmentos de la respuesta
     """
-    provider = get_provider(model_name=model_override)
-    return provider.generate_response_stream(query, context_chunks, chat_history=chat_history)
+    logger.info("📄 generate_response_stream_pro: Usando Gemini 3 Pro")
+    
+    pro_provider = get_pro_provider()
+    if not pro_provider:
+        raise RuntimeError("Gemini 3 Pro no disponible")
+    
+    return pro_provider.generate_response_stream(
+        query=query,
+        context_chunks=None,
+        chat_history=chat_history,
+        raw_document=raw_document
+    )
+
+
+def generate_document(
+    document_type: str,
+    raw_document: str,
+    instructions: str = None,
+    output_format: str = "markdown"
+) -> str:
+    """
+    Genera un documento usando Gemini 3 Pro.
+    
+    Args:
+        document_type: Tipo de documento (proposal, analysis, summary, etc.)
+        raw_document: Contenido del documento fuente
+        instructions: Instrucciones adicionales
+        output_format: Formato de salida
+        
+    Returns:
+        Documento generado
+    """
+    pro_provider = get_pro_provider()
+    if not pro_provider:
+        raise RuntimeError("Gemini 3 Pro no disponible para generación de documentos")
+    
+    return pro_provider.generate_document(
+        document_type=document_type,
+        raw_document=raw_document,
+        instructions=instructions,
+        output_format=output_format
+    )
+
+
+def generate_workspace_name(document_content: str) -> str:
+    """
+    Genera un nombre para el workspace usando Gemini 3 Flash (SIN thinking).
+    
+    Args:
+        document_content: Contenido del documento (primeros 2000 chars)
+        
+    Returns:
+        Nombre del workspace
+    """
+    flash_provider = get_flash_provider()
+    return flash_provider.generate_workspace_name(document_content)
+
+
+def generate_workspace_summary(document_content: str) -> str:
+    """
+    Genera un resumen del workspace usando Gemini 3 Flash (SIN thinking).
+    
+    Args:
+        document_content: Contenido del documento (primeros 5000 chars)
+        
+    Returns:
+        Resumen del workspace
+    """
+    flash_provider = get_flash_provider()
+    return flash_provider.generate_workspace_summary(document_content)

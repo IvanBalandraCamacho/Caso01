@@ -6,6 +6,7 @@ import { checkAuthMe } from "@/lib/api"
 export interface UserData {
   email: string
   full_name?: string | null
+  profile_picture?: string | null
   created_at?: string
 }
 
@@ -28,6 +29,7 @@ export function useUser() {
         setUser({
           email: userData.email,
           full_name: userData.full_name ?? undefined,
+          profile_picture: userData.profile_picture,
           created_at: userData.created_at,
         })
         // También guardar en localStorage para uso offline

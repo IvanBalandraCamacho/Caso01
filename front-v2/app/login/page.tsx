@@ -38,38 +38,10 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1';
-
-      // Crear FormData para OAuth2PasswordRequestForm
-      const formData = new URLSearchParams();
-      formData.append('username', email); // OAuth2 usa 'username' pero enviamos el email
-      formData.append('password', password);
-
-      const response = await fetch(`${apiUrl}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: formData.toString(),
-      });
-
-      if (!response.ok) {
-        // MOCK AUTH: Try mock authentication as fallback (remove these 8 lines to disable)
-        const mockResult = getMockToken(email, password);
-        if (mockResult) {
-          const data = mockResult;
-          localStorage.setItem('access_token', data.access_token);
-          window.dispatchEvent(new Event('loginSuccess'));
-          showToast(`¡Bienvenido ${data.full_name}! (Datos Mock)`, "welcome");
-          setTimeout(() => router.push('/'), 800);
-          return;
-        }
-
-        const error = await response.json();
-        throw new Error(error.detail || 'Error al iniciar sesión');
-      }
-
-      const data = await response.json();
+      // Usar la función de la API que maneja correctamente los errores
+      const { loginUser, checkAuthMe } = await import('@/lib/api');
+      
+      const data = await loginUser(email, password);
 
       // Guardar token en localStorage
       localStorage.setItem('access_token', data.access_token);
@@ -78,17 +50,11 @@ export default function LoginPage() {
       window.dispatchEvent(new Event('loginSuccess'));
 
       // Obtener información del usuario
-      const userResponse = await fetch(`${apiUrl}/auth/me`, {
-        headers: {
-          'Authorization': `Bearer ${data.access_token}`,
-        },
-      });
-
-      if (userResponse.ok) {
-        const userData = await userResponse.json();
+      try {
+        const userData = await checkAuthMe();
         const firstName = userData.full_name?.split(' ')[0] || userData.email.split('@')[0];
         showToast(`¡Bienvenido ${firstName}!`, "welcome");
-      } else {
+      } catch {
         showToast("¡Bienvenido!", "welcome");
       }
 
@@ -97,9 +63,29 @@ export default function LoginPage() {
         router.push('/');
       }, 800);
 
-    } catch (error: unknown) {
-      console.error('Error en login:', error as Error);
-      showToast((error as Error).message || "Error al iniciar sesión", "error");
+    } catch (error: any) {
+      console.error('Error en login:', error);
+      
+      // MOCK AUTH: Try mock authentication as fallback (remove these lines to disable)
+      const mockResult = getMockToken(email, password);
+      if (mockResult) {
+        localStorage.setItem('access_token', mockResult.access_token);
+        window.dispatchEvent(new Event('loginSuccess'));
+        showToast(`¡Bienvenido ${mockResult.full_name}! (Datos Mock)`, "welcome");
+        setTimeout(() => router.push('/'), 800);
+        return;
+      }
+
+      // Extraer mensaje de error más específico
+      let errorMessage = "Error al iniciar sesión";
+      
+      if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      showToast(errorMessage, "error");
     } finally {
       setIsLoading(false);
     }

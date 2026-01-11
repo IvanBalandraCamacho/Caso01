@@ -148,6 +148,7 @@ def get_general_conversation(
         updated_at=conversation.updated_at,
         message_count=len(messages),
         has_proposal=conversation.has_proposal,
+        proposal_content=conversation.proposal_content,
         messages=[schemas.MessagePublic.from_orm(msg) for msg in messages]
     )
 
@@ -211,6 +212,7 @@ def get_conversation(
         updated_at=conversation.updated_at,
         message_count=message_count,
         has_proposal=conversation.has_proposal,
+        proposal_content=conversation.proposal_content,
         messages=[schemas.MessagePublic.from_orm(msg) for msg in messages]
     )
 
@@ -335,6 +337,7 @@ def update_conversation(
         updated_at=conversation.updated_at,
         message_count=len(messages),
         has_proposal=conversation.has_proposal,
+        proposal_content=conversation.proposal_content,
         messages=[schemas.MessagePublic.from_orm(msg) for msg in messages]
     )
 

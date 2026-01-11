@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Spin, Modal, Input, Button, Form, message } from "antd"
+import { Spin, Modal, Input, Button, Form, App } from "antd"
 import { useWorkspaceContext, type Workspace } from "@/context/WorkspaceContext"
 import { useUser } from "@/hooks/useUser"
 import { PlusOutlined, FolderOpenOutlined, RightOutlined } from "@ant-design/icons"
@@ -10,6 +10,7 @@ import { ModernButton } from "@/components/ui/ModernButton"
 
 export default function WorkspacePage() {
   const router = useRouter()
+  const { message } = App.useApp()
   const { workspaces, isLoadingWorkspaces, createWorkspace, fetchWorkspaces } = useWorkspaceContext()
   const { user, isLoading: userLoading } = useUser()
   const [isModalOpen, setIsModalOpen] = useState(false)

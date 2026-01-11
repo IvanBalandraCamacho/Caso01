@@ -46,14 +46,18 @@ service = ProposalsServiceImpl()
     description="Analiza un documento RFP y extrae información relevante usando IA"
 )
 async def analyze_document(
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    db: Session = Depends(database.get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
-    analysis = await get_analyze(file=file)
+    analysis = await get_analyze(file=file, db=db, user=current_user)
     return analysis
 
 
 async def get_analyze(
-    file: UploadFile = File(...)
+    file: UploadFile,
+    db: Session,
+    user: User
 ):
     """Delega toda la lógica de validación, extracción y análisis al servicio."""
     if file:
@@ -63,6 +67,8 @@ async def get_analyze(
         try:
             analysis = await service.analyze(
                 file=file,
+                db=db,
+                user=user
             )
             logger.info(f"ANALYSIS OK: {analysis}")
             return analysis
@@ -157,7 +163,8 @@ def general_query_chat(
     relevant_chunks: Dict[str, Any],
     chat_model: str,
     workspace_instructions: str,
-    chat_history: list[dict] = None
+    chat_history: list[dict] = None,
+    thinking_level: str = None
 ):
     """
     Responde a una consulta general usando IA.
@@ -168,6 +175,7 @@ def general_query_chat(
         chat_model: Modelo de chat a usar
         workspace_instructions: Instrucciones del workspace
         chat_history: Historial de mensajes previos
+        thinking_level: Nivel de thinking (OFF, LOW, MEDIUM, HIGH)
         
     Returns:
         Respuesta generada
@@ -192,7 +200,8 @@ def general_query_chat(
             full_prompt, 
             relevant_chunks, 
             chat_model,
-            chat_history=chat_history
+            chat_history=chat_history,
+            thinking_level=thinking_level
         )
         return response
     except Exception as e:

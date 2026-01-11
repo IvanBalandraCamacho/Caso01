@@ -24,12 +24,13 @@ google-cloud-logging
 google-cloud-aiplatform==1.40.0
 google-cloud-documentai==2.20.1
 google-cloud-language==2.13.0
-google-generativeai==0.8.3
 google-cloud-storage==2.14.0
 gunicorn==21.2.0
+# google-generativeai==0.8.3  # Deprecated - usando nuevo SDK
+
+# --- HTTP Client (para servicio RAG externo) ---
 httpx
 pandas
-openpyxl
 python-docx
 python-pptx
 pypdf

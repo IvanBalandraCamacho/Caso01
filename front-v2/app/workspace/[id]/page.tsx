@@ -11,6 +11,7 @@ import Sidebar from "@/components/sidebar"
 import { UserMenu } from "@/components/UserMenu"
 import { useUser } from "@/hooks/useUser"
 import { useWorkspaceContext } from "@/context/WorkspaceContext"
+import { WorkspaceHealthBar } from "@/components/WorkspaceHealthBar"
 import { 
   Paperclip, 
   SendHorizontal, 
@@ -152,6 +153,11 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                   {workspaceName}
                 </h1>
               </div>
+              
+              <div className="max-w-md mx-auto mb-6">
+                <WorkspaceHealthBar workspaceId={id} />
+              </div>
+
               <p className="text-lg text-zinc-400 font-medium">
                 Comienza una nueva conversación o continúa donde lo dejaste
               </p>

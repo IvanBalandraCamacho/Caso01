@@ -2,7 +2,7 @@
 
 import { useCopilotReadable } from "@copilotkit/react-core";
 import { useEffect, useState } from "react";
-import { getDocumentContentApi } from "@/lib/api";
+import { fetchDocumentContent } from "@/lib/api";
 
 interface UseCopilotDocumentContextProps {
   workspaceId: string;
@@ -17,16 +17,23 @@ export function useCopilotDocumentContext({
   const [documentMetadata, setDocumentMetadata] = useState<any>(null);
 
   useEffect(() => {
-    if (documentId) {
+    if (documentId && workspaceId) {
       loadDocumentContent();
     }
-  }, [documentId]);
+  }, [documentId, workspaceId]);
 
   const loadDocumentContent = async () => {
     try {
-      const content = await getDocumentContentApi(documentId!);
-      setDocumentContent(content.text);
-      setDocumentMetadata(content.metadata);
+      // fetchDocumentContent returns a Blob, we need to convert it to text
+      const blob = await fetchDocumentContent(workspaceId, documentId!);
+      const text = await blob.text();
+      setDocumentContent(text);
+      setDocumentMetadata({ 
+        id: documentId, 
+        workspaceId,
+        size: blob.size,
+        type: blob.type 
+      });
     } catch (error) {
       console.error("Error loading document:", error);
     }

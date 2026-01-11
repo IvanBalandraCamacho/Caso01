@@ -1314,7 +1314,13 @@ export default function Sidebar() {
               <Button
                 type="text"
                 icon={<Rocket size={16} />}
-                onClick={() => setIsRfpModalOpen(true)}
+                onClick={() => {
+                  if (activeWorkspace?.id) {
+                    router.push(`/workspace/${activeWorkspace.id}/quick-analysis`);
+                  } else {
+                    router.push('/quick-analysis');
+                  }
+                }}
                 className="transition-smooth hover-lift"
                 style={{
                   width: "100%",
@@ -1526,7 +1532,7 @@ export default function Sidebar() {
         footer={null}
         centered
         width={500}
-        styles={{
+styles={{
           content: {
             background: "#1E1F20",
             borderRadius: "24px",
@@ -1539,7 +1545,7 @@ export default function Sidebar() {
             backdropFilter: "blur(8px)",
             background: "rgba(0, 0, 0, 0.8)"
           }
-        }}
+        } as any}
         closeIcon={<span className="text-zinc-500 hover:text-white transition-colors text-xl">×</span>}
       >
         <div className="mb-8">
@@ -2138,71 +2144,7 @@ export default function Sidebar() {
         </div>
       </Modal>
 
-      {/* Modal para mostrar resultados del análisis */}
-      <Modal
-        title={
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            color: '#FFFFFF',
-            fontSize: '18px',
-            fontWeight: 600
-          }}>
-            <div style={{
-              width: '32px',
-              height: '32px',
-              background: 'linear-gradient(135deg, #E31837, #FF4757)',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <FileWordOutlined style={{ color: '#FFFFFF', fontSize: '16px' }} />
-            </div>
-            Resultados del Análisis RFP
-          </div>
-        }
-        open={isResultModalOpen}
-        onCancel={() => setIsResultModalOpen(false)}
-        width={1200}
-        style={{
-          top: 20,
-          paddingBottom: 0
-        }}
-        styles={{
-          body: {
-            background: '#1A1A1A',
-            padding: '24px',
-            maxHeight: '80vh',
-            overflow: 'hidden'
-          },
-          header: {
-            background: '#18181b',
-            borderBottom: '1px solid #27272a',
-            padding: '20px 32px'
-          },
-          content: {
-            background: '#1A1A1A',
-            padding: 0
-          }
-        } as any}
-        footer={null}
-      >
-        {analysisResult && (
-          <>
-            <InteractiveAnalysisResults
-              result={analysisResult}
-              onRefresh={() => handleRfpAnalysis()}
-              onExport={(format) => handleDownloadDocument(format as 'docx' | 'pdf')}
-            />
-            {/* Panel flotante de CopilotKit para el contexto del análisis */}
-            <AnalysisCopilotPanel 
-              analysisContext={JSON.stringify(analysisResult, null, 2)} 
-            />
-          </>
-        )}
-      </Modal>
+      
 
       {/* New Chat Modal with File Upload */}
       <Modal
@@ -2316,266 +2258,7 @@ export default function Sidebar() {
         </div>
       </Modal>
 
-      {/* Modal para Análisis Rápido RFP */}
-      <Modal
-        title={null}
-        open={isRfpModalOpen}
-        onCancel={() => {
-          setIsRfpModalOpen(false)
-          setRfpFile(null)
-        }}
-        footer={null}
-        centered
-        width={500}
-        styles={modalStyles}
-        closeIcon={<span style={{ color: "#666666", fontSize: "18px" }}>×</span>}
-      >
-        {/* Header del Modal */}
-        <div style={{ marginBottom: "28px" }}>
-          <div style={{ 
-            display: "flex", 
-            alignItems: "center", 
-            gap: "12px",
-            marginBottom: "12px" 
-          }}>
-            <div style={{
-              width: "48px",
-              height: "48px",
-              background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
-              borderRadius: "12px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 4px 12px rgba(16, 185, 129, 0.3)",
-            }}>
-              <Rocket size={24} style={{ color: "#FFFFFF" }} />
-            </div>
-            <div>
-              <Text style={{ color: "#FFFFFF", fontSize: "22px", fontWeight: 700, display: "block" }}>
-                Análisis Rápido RFP
-              </Text>
-              <Text style={{ color: "#888888", fontSize: "13px", display: "block" }}>
-                Extrae información clave automáticamente
-              </Text>
-            </div>
-          </div>
-        </div>
 
-        {/* Upload Area */}
-        <div style={{ marginBottom: "24px" }}>
-          <Text style={{ 
-            color: "#CCCCCC", 
-            fontSize: "14px", 
-            display: "block", 
-            marginBottom: "12px",
-            fontWeight: 600,
-          }}>
-            Selecciona tu documento RFP
-          </Text>
-          
-          <Upload
-            beforeUpload={(file) => {
-              const isValidType = [
-                'application/pdf',
-                'application/msword',
-                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-              ].includes(file.type)
-
-              if (!isValidType) {
-                message.error('Solo se permiten archivos PDF y Word')
-                return Upload.LIST_IGNORE
-              }
-
-              const uploadFile: UploadFile = {
-                uid: file.uid || '-1',
-                name: file.name,
-                status: 'done',
-                originFileObj: file as any,
-              }
-              setRfpFile(uploadFile)
-              return false
-            }}
-            maxCount={1}
-            showUploadList={false}
-            style={{ width: "100%" }}
-          >
-            <div style={{
-              width: "100%",
-              minHeight: "180px",
-              border: "2px dashed rgba(16, 185, 129, 0.3)",
-              borderRadius: "12px",
-              background: "linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.02) 100%)",
-              padding: "32px",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              transition: "all 0.3s ease",
-              backdropFilter: "blur(10px)",
-            }}
-            className="upload-hover"
-            >
-              {!rfpFile ? (
-                <>
-                  <div style={{
-                    width: "64px",
-                    height: "64px",
-                    background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
-                    borderRadius: "16px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    marginBottom: "16px",
-                    boxShadow: "0 4px 12px rgba(16, 185, 129, 0.2)",
-                  }}>
-                    <UploadOutlined style={{ fontSize: "28px", color: "#FFFFFF" }} />
-                  </div>
-                  <Text style={{ 
-                    color: "#FFFFFF", 
-                    fontSize: "16px", 
-                    fontWeight: 600,
-                    marginBottom: "8px",
-                    display: "block",
-                  }}>
-                    Arrastra tu archivo o haz click aquí
-                  </Text>
-                  <Text style={{ 
-                    color: "#888888", 
-                    fontSize: "13px",
-                    display: "block",
-                  }}>
-                    PDF, Word (DOCX) • Máximo 10MB
-                  </Text>
-                </>
-              ) : (
-                <div style={{
-                  width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  padding: "16px",
-                  background: "rgba(16, 185, 129, 0.1)",
-                  borderRadius: "8px",
-                  border: "1px solid rgba(16, 185, 129, 0.3)",
-                }}>
-                  <div style={{
-                    width: "40px",
-                    height: "40px",
-                    background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
-                    borderRadius: "8px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}>
-                    <FileText size={20} style={{ color: "#FFFFFF" }} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={{ 
-                      color: "#FFFFFF", 
-                      fontSize: "14px",
-                      fontWeight: 600,
-                      display: "block",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}>
-                      {rfpFile.name}
-                    </Text>
-                    <Text style={{ 
-                      color: "#10B981", 
-                      fontSize: "12px",
-                      display: "block",
-                    }}>
-                      ✓ Archivo seleccionado
-                    </Text>
-                  </div>
-                  <Button
-                    type="text"
-                    danger
-                    size="small"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setRfpFile(null)
-                    }}
-                    style={{
-                      color: "#EF4444",
-                      flexShrink: 0,
-                    }}
-                  >
-                    Eliminar
-                  </Button>
-                </div>
-              )}
-            </div>
-          </Upload>
-        </div>
-
-        {/* Footer Actions */}
-        <div style={{ 
-          display: "flex", 
-          gap: "12px", 
-          justifyContent: "flex-end",
-        }}>
-          <Button
-            onClick={() => {
-              setIsRfpModalOpen(false)
-              setRfpFile(null)
-            }}
-            style={{
-              height: "42px",
-              padding: "0 24px",
-              borderRadius: "8px",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              background: "rgba(255, 255, 255, 0.05)",
-              color: "#CCCCCC",
-              fontWeight: 600,
-              transition: "all 0.3s ease",
-            }}
-            className="hover-lift"
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="primary"
-            loading={isAnalyzing}
-            disabled={!rfpFile}
-            onClick={handleRfpAnalysis}
-            icon={!isAnalyzing && <Rocket size={16} />}
-            style={{
-              height: "42px",
-              padding: "0 28px",
-              borderRadius: "8px",
-              border: "none",
-              background: rfpFile 
-                ? "linear-gradient(135deg, #10B981 0%, #059669 100%)"
-                : "rgba(255, 255, 255, 0.1)",
-              color: rfpFile ? "#FFFFFF" : "#666666",
-              fontWeight: 600,
-              boxShadow: rfpFile 
-                ? "0 4px 12px rgba(16, 185, 129, 0.3)" 
-                : "none",
-              transition: "all 0.3s ease",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-            }}
-            className={rfpFile ? "hover-lift" : ""}
-          >
-            {isAnalyzing ? "Analizando..." : "Analizar RFP"}
-          </Button>
-        </div>
-
-        {/* Estilos CSS adicionales */}
-        <style jsx global>{`
-          .upload-hover:hover {
-            border-color: rgba(16, 185, 129, 0.6) !important;
-            background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(5, 150, 105, 0.04) 100%) !important;
-            transform: translateY(-2px);
-          }
-        `}</style>
-      </Modal>
     </>
   )
 }

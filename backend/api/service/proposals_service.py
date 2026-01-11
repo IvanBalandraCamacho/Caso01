@@ -1,12 +1,18 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 from fastapi import  UploadFile
+from sqlalchemy.orm import Session
+from models.user import User
+
 class ProposalsService(ABC):
 
     @abstractmethod
-    def analyze(  
+    async def analyze(  
         self,  
-        file: UploadFile) -> Dict[str, Any]:
+        file: UploadFile,
+        db: Session,
+        user: User
+    ) -> Dict[str, Any]:
         """Método abstracto para analizar un RFP. """
         pass
     

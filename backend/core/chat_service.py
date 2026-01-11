@@ -61,3 +61,31 @@ def create_message(db: Session, conversation_id: str, content: str, role: str):
     return msg
 
 
+def get_chat_history_for_llm(db: Session, conversation_id: str, limit: int = 20):
+    """
+    Recupera los últimos mensajes para dar contexto al LLM sin costo adicional.
+    """
+    from models.conversation import Message # Asegurar importación
+    
+    # 1. Obtener mensajes recientes
+    messages = db.query(Message).filter(
+        Message.conversation_id == conversation_id
+    ).order_by(Message.created_at.desc()).limit(limit).all()
+    
+    # 2. Reordenar cronológicamente
+    messages.reverse()
+    
+    # 3. Formatear para el LLM
+    history = []
+    for msg in messages:
+        # Filtrar mensajes vacíos o de sistema si es necesario
+        if msg.content:
+            history.append({
+                "role": msg.role,
+                "content": msg.content
+            })
+            
+    return history
+
+
+

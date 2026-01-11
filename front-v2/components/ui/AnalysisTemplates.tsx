@@ -147,7 +147,7 @@ export function AnalysisTemplates({ open, onClose, onSelect }: AnalysisTemplates
           borderRadius: '24px',
           overflow: 'hidden'
         },
-      }}
+      } as any}
       closeIcon={<span className="text-zinc-500">×</span>}
     >
       <div className="text-center mb-10">

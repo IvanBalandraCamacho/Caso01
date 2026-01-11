@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Table, Card, Tabs, Tag, Button, Space, Tooltip, message, Modal } from "antd";
+import { Table, Card, Tabs, Tag, Button, Space, Tooltip, App, Modal, Spin, Collapse } from "antd";
 import { 
   CopyOutlined, 
   EditOutlined, 
@@ -11,12 +11,37 @@ import {
   TeamOutlined,
   CalendarOutlined,
   DollarOutlined,
-  CodeOutlined
+  CodeOutlined,
+  SearchOutlined,
+  UserOutlined,
+  SafetyCertificateOutlined
 } from "@ant-design/icons";
 import { useCopilotAction, useCopilotReadable } from "@copilotkit/react-core";
+import { enrichTeamWithCandidates, searchTalent } from "@/lib/api";
+
+// Tipos para candidatos sugeridos del MCP
+interface SuggestedCandidate {
+  nombre: string;
+  cargo_actual: string;
+  certificacion: string;
+  institucion: string;
+  pais: string;
+  match_score: number;
+}
+
+interface TeamMember {
+  nombre?: string;
+  rol: string;
+  experiencia?: string;
+  skills?: string[];
+  seniority?: string;
+  cantidad?: number;
+  candidatos_sugeridos?: SuggestedCandidate[];
+}
 
 interface AnalysisResult {
   cliente: string;
+  pais?: string;
   alcance_economico: {
     presupuesto: string;
     moneda: string;
@@ -29,12 +54,7 @@ interface AnalysisResult {
   }>;
   tecnologias_requeridas: string[];
   preguntas_sugeridas: string[];
-  equipo_sugerido: Array<{
-    nombre: string;
-    rol: string;
-    experiencia: string;
-    skills: string[];
-  }>;
+  equipo_sugerido: TeamMember[];
 }
 
 interface InteractiveAnalysisResultsProps {
@@ -48,9 +68,12 @@ export function InteractiveAnalysisResults({
   onRefresh,
   onExport 
 }: InteractiveAnalysisResultsProps) {
+  const { message } = App.useApp();
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [localResult, setLocalResult] = useState(result);
+  const [isEnrichingTeam, setIsEnrichingTeam] = useState(false);
+  const [expandedRows, setExpandedRows] = useState<string[]>([]);
 
   // Hacer los datos accesibles a CopilotKit
   useCopilotReadable({
@@ -137,13 +160,14 @@ export function InteractiveAnalysisResults({
     ],
     handler: async ({ action, memberName, memberData }) => {
       if (action === "add" && memberData) {
+        const data = memberData as { rol?: string; experiencia?: string; skills?: string[] };
         setLocalResult(prev => ({
           ...prev,
           equipo_sugerido: [...prev.equipo_sugerido, {
             nombre: memberName,
-            rol: memberData.rol || "",
-            experiencia: memberData.experiencia || "",
-            skills: memberData.skills || []
+            rol: data.rol || "",
+            experiencia: data.experiencia || "",
+            skills: data.skills || []
           }]
         }));
         return `Miembro ${memberName} agregado al equipo`;
@@ -151,6 +175,58 @@ export function InteractiveAnalysisResults({
       return `Acción ${action} ejecutada para ${memberName}`;
     },
   });
+
+  // Función para enriquecer equipo con candidatos del MCP
+  const handleEnrichTeam = async () => {
+    if (!localResult.equipo_sugerido?.length) {
+      message.warning("No hay equipo sugerido para enriquecer");
+      return;
+    }
+
+    setIsEnrichingTeam(true);
+    try {
+      const response = await enrichTeamWithCandidates({
+        equipo_sugerido: localResult.equipo_sugerido.map(m => ({
+          rol: m.rol || m.nombre || "",
+          seniority: m.seniority,
+          cantidad: m.cantidad || 1,
+          skills: m.skills || []
+        })),
+        pais: localResult.pais
+      });
+
+      if (response.exito) {
+        // Actualizar equipo con candidatos
+        setLocalResult(prev => ({
+          ...prev,
+          equipo_sugerido: response.equipo_enriquecido.map(m => ({
+            nombre: m.rol,
+            rol: m.rol,
+            seniority: m.seniority,
+            experiencia: m.seniority || "",
+            skills: m.skills,
+            cantidad: m.cantidad,
+            candidatos_sugeridos: m.candidatos_sugeridos
+          }))
+        }));
+        message.success(response.mensaje);
+      } else {
+        message.error(response.mensaje);
+      }
+    } catch (error) {
+      message.error("Error al buscar candidatos");
+      console.error(error);
+    } finally {
+      setIsEnrichingTeam(false);
+    }
+  };
+
+  // Verificar si el equipo ya tiene candidatos
+  const hasEnrichedCandidates = useMemo(() => {
+    return localResult.equipo_sugerido?.some(m => 
+      m.candidatos_sugeridos && m.candidatos_sugeridos.length > 0
+    );
+  }, [localResult.equipo_sugerido]);
 
   // Configuración de columnas para tabla de plazos
   const deadlinesColumns = [
@@ -214,8 +290,13 @@ export function InteractiveAnalysisResults({
       title: "Rol",
       dataIndex: "nombre",
       key: "nombre",
-      render: (text: string) => (
-        <span className="font-bold text-white">{text}</span>
+      render: (text: string, record: TeamMember) => (
+        <div>
+          <span className="font-bold text-white">{text || record.rol}</span>
+          {record.cantidad && record.cantidad > 1 && (
+            <Tag color="blue" className="ml-2">x{record.cantidad}</Tag>
+          )}
+        </div>
       ),
     },
     {
@@ -231,8 +312,8 @@ export function InteractiveAnalysisResults({
       dataIndex: "experiencia",
       key: "experiencia",
       width: 120,
-      render: (text: string) => (
-        <Tag color="gold">{text}</Tag>
+      render: (text: string, record: TeamMember) => (
+        <Tag color="gold">{text || record.seniority || "N/A"}</Tag>
       ),
     },
     {
@@ -251,10 +332,25 @@ export function InteractiveAnalysisResults({
       ),
     },
     {
+      title: "Candidatos",
+      dataIndex: "candidatos_sugeridos",
+      key: "candidatos",
+      width: 120,
+      render: (candidatos: SuggestedCandidate[]) => (
+        candidatos?.length > 0 ? (
+          <Tag color="green" icon={<UserOutlined />}>
+            {candidatos.length} encontrados
+          </Tag>
+        ) : (
+          <Tag color="default">Sin buscar</Tag>
+        )
+      ),
+    },
+    {
       title: "Acciones",
       key: "actions",
       width: 100,
-      render: (_: any, record: any) => (
+      render: (_: any, record: TeamMember) => (
         <Space>
           <Tooltip title="Ver detalle">
             <Button 
@@ -274,6 +370,43 @@ export function InteractiveAnalysisResults({
       ),
     },
   ];
+
+  // Componente para mostrar candidatos expandidos
+  const CandidatesExpandedRow = ({ candidatos }: { candidatos: SuggestedCandidate[] }) => (
+    <div className="bg-zinc-900/50 p-4 rounded-lg">
+      <h4 className="text-white font-medium mb-3 flex items-center gap-2">
+        <SafetyCertificateOutlined className="text-green-500" />
+        Candidatos Sugeridos del Capital Intelectual
+      </h4>
+      <div className="grid gap-3">
+        {candidatos.map((c, idx) => (
+          <div 
+            key={idx}
+            className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-lg border border-zinc-700/50 hover:border-green-500/30 transition-colors"
+          >
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <UserOutlined className="text-zinc-400" />
+                <span className="font-medium text-white">{c.nombre}</span>
+                <Tag color="blue" className="text-xs">{c.pais}</Tag>
+              </div>
+              <p className="text-zinc-400 text-sm mt-1">{c.cargo_actual}</p>
+              <p className="text-zinc-500 text-xs mt-1">
+                <SafetyCertificateOutlined className="mr-1" />
+                {c.certificacion} - {c.institucion}
+              </p>
+            </div>
+            <div className="text-right">
+              <div className="text-green-400 font-mono text-lg">
+                {Math.round(c.match_score * 100)}%
+              </div>
+              <span className="text-zinc-500 text-xs">Match</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   const tabItems = [
     {
@@ -373,20 +506,55 @@ export function InteractiveAnalysisResults({
         <span className="flex items-center gap-2">
           <TeamOutlined />
           Equipo ({localResult.equipo_sugerido?.length || 0})
+          {hasEnrichedCandidates && <Tag color="green" className="ml-1">Enriquecido</Tag>}
         </span>
       ),
       children: (
-        <Table
-          dataSource={localResult.equipo_sugerido?.map((m, i) => ({ ...m, key: i }))}
-          columns={teamColumns}
-          pagination={false}
-          className="dark-table"
-          size="middle"
-          rowSelection={{
-            type: 'checkbox',
-            onChange: (_, rows) => setSelectedRows(rows.map(r => r.nombre)),
-          }}
-        />
+        <div className="space-y-4">
+          {/* Botón para buscar candidatos */}
+          <div className="flex justify-between items-center">
+            <p className="text-zinc-400 text-sm">
+              {hasEnrichedCandidates 
+                ? "Equipo enriquecido con candidatos del Capital Intelectual" 
+                : "Busca candidatos reales en la base de talento de TIVIT"
+              }
+            </p>
+            <Button
+              type="primary"
+              icon={isEnrichingTeam ? <Spin size="small" /> : <SearchOutlined />}
+              onClick={handleEnrichTeam}
+              loading={isEnrichingTeam}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {hasEnrichedCandidates ? "Actualizar Candidatos" : "Buscar Candidatos"}
+            </Button>
+          </div>
+
+          {/* Tabla con filas expandibles */}
+          <Table
+            dataSource={localResult.equipo_sugerido?.map((m, i) => ({ ...m, key: i }))}
+            columns={teamColumns}
+            pagination={false}
+            className="dark-table"
+            size="middle"
+            expandable={{
+              expandedRowRender: (record: TeamMember) => (
+                record.candidatos_sugeridos?.length ? (
+                  <CandidatesExpandedRow candidatos={record.candidatos_sugeridos} />
+                ) : (
+                  <p className="text-zinc-500 p-4">
+                    No hay candidatos sugeridos. Haz clic en "Buscar Candidatos" para encontrar talento.
+                  </p>
+                )
+              ),
+              rowExpandable: (record: TeamMember) => true,
+            }}
+            rowSelection={{
+              type: 'checkbox',
+              onChange: (_, rows) => setSelectedRows(rows.map(r => r.nombre || r.rol)),
+            }}
+          />
+        </div>
       ),
     },
     {

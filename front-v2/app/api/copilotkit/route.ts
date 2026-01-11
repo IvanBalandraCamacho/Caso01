@@ -1,176 +1,49 @@
 import {
   CopilotRuntime,
   copilotRuntimeNextJSAppRouterEndpoint,
-  OpenAIAdapter,
+  GoogleGenerativeAIAdapter,
 } from "@copilotkit/runtime";
 import { NextRequest } from "next/server";
-import OpenAI from "openai";
 
-// Crear cliente OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy initialization del adaptador Gemini
+let geminiAdapter: GoogleGenerativeAIAdapter | null = null;
 
-// URL del backend para obtener contexto RAG
-const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || "http://backend:8000/api/v1";
-
-// Función para obtener contexto RAG del backend
-async function getRAGContext(query: string, workspaceId?: string): Promise<string> {
-  if (!workspaceId || workspaceId === "general") {
-    return "";
-  }
-  
-  try {
-    console.log(`[CopilotKit] Fetching RAG context for workspace: ${workspaceId}, query: ${query.substring(0, 50)}...`);
-    
-    const response = await fetch(`${BACKEND_URL}/rag/search`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query,
-        workspace_id: workspaceId,
-        limit: 5,
-      }),
+function getGeminiAdapter(): GoogleGenerativeAIAdapter {
+  if (!geminiAdapter) {
+    const apiKey = process.env.GOOGLE_API_KEY;
+    if (!apiKey) {
+      throw new Error("GOOGLE_API_KEY no configurada");
+    }
+    // Usar modelo estable de Gemini (no preview)
+    geminiAdapter = new GoogleGenerativeAIAdapter({
+      model: process.env.GEMINI_FLASH_MODEL || "gemini-2.0-flash-exp",
     });
-    
-    if (!response.ok) {
-      console.error("[CopilotKit] RAG search failed:", response.status);
-      return "";
-    }
-    
-    const results = await response.json();
-    if (results.results && results.results.length > 0) {
-      const context = results.results
-        .map((r: any, i: number) => `[Documento ${i + 1}]: ${r.content}`)
-        .join("\n\n");
-      console.log(`[CopilotKit] Retrieved ${results.results.length} RAG chunks`);
-      return context;
-    }
-  } catch (error) {
-    console.error("[CopilotKit] Error fetching RAG context:", error);
   }
-  
-  return "";
+  return geminiAdapter;
 }
 
-// System prompt base
-const BASE_SYSTEM_PROMPT = `Eres un experto asistente de análisis de RFPs (Request for Proposals) de TIVIT.
-Tu objetivo es ayudar a analizar documentos, extraer datos y generar propuestas.
+// Runtime simple sin acciones del servidor
+// Las acciones las maneja el cliente con useCopilotAction
+let runtime: CopilotRuntime | null = null;
 
-IMPORTANTE - GENERATIVE UI:
-Cuando el usuario pida ver datos en forma visual (tablas, gráficos, métricas, timeline), 
-DEBES usar las acciones disponibles para renderizar los datos directamente en el chat:
-
-- renderTable: Para tablas de datos (requisitos, tecnologías, equipo, plazos, etc.)
-- renderBarChart: Para comparar valores numéricos (costos por fase, recursos, etc.)
-- renderLineChart: Para tendencias temporales (evolución de costos, cronogramas)
-- renderPieChart: Para distribuciones y proporciones (tipos de requisitos, costos)
-- renderMetrics: Para KPIs y métricas clave del proyecto
-- renderTimeline: Para cronogramas y fechas importantes del RFP
-
-SIEMPRE extrae los datos REALES del contexto de los documentos proporcionados.
-NO inventes datos - usa SOLO información del contexto RAG.
-Si no hay suficiente información en el contexto, indícalo claramente.`;
-
-// Crear el runtime con action para búsqueda RAG
-const runtime = new CopilotRuntime({
-  actions: [
-    {
-      name: "searchRAGDocuments",
-      description: "Busca información relevante en los documentos del workspace usando RAG. Úsalo SIEMPRE antes de responder preguntas sobre el contenido del documento o generar visualizaciones.",
-      parameters: [
-        {
-          name: "query",
-          type: "string",
-          description: "La consulta de búsqueda para encontrar información relevante",
-          required: true,
-        },
-        {
-          name: "workspaceId",
-          type: "string",
-          description: "ID del workspace donde buscar (obtenerlo del contexto)",
-          required: true,
-        },
-      ],
-      handler: async ({ query, workspaceId }: { query: string; workspaceId: string }) => {
-        console.log(`[CopilotKit Action] searchRAGDocuments called: ${query}, workspace: ${workspaceId}`);
-        const context = await getRAGContext(query, workspaceId);
-        if (context) {
-          return `Información encontrada en los documentos:\n\n${context}`;
-        }
-        return "No se encontró información relevante en los documentos del workspace.";
-      },
-    },
-  ],
-});
-
-// Crear el adapter de OpenAI
-const serviceAdapter = new OpenAIAdapter({
-  openai,
-  model: "gpt-4o-mini",
-});
+function getRuntime(): CopilotRuntime {
+  if (!runtime) {
+    runtime = new CopilotRuntime();
+  }
+  return runtime;
+}
 
 export const POST = async (req: NextRequest) => {
   try {
-    // Clonar el request para leer el body
-    const body = await req.json();
-    
-    // Extraer workspaceId de las propiedades del request
-    const properties = body.properties || {};
-    const workspaceId = properties.workspace_id || properties.workspaceId;
-    
-    // Extraer el último mensaje del usuario para buscar contexto RAG
-    let userQuery = "";
-    const messages = body.messages || [];
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === "user") {
-        const content = messages[i].content;
-        userQuery = typeof content === "string" 
-          ? content 
-          : content?.map((c: any) => c.text || "").join(" ") || "";
-        break;
-      }
-    }
-    
-    // Obtener contexto RAG si hay workspace
-    let ragContext = "";
-    if (workspaceId && userQuery) {
-      ragContext = await getRAGContext(userQuery, workspaceId);
-    }
-    
-    // Construir system prompt con contexto RAG
-    let systemPrompt = BASE_SYSTEM_PROMPT;
-    if (ragContext) {
-      systemPrompt += `\n\n--- CONTEXTO DE DOCUMENTOS DEL RFP ---\n${ragContext}\n--- FIN DEL CONTEXTO ---\n\nUsa esta información para responder las preguntas del usuario y generar visualizaciones.`;
-    }
-    
-    // Agregar info del workspace al contexto
-    if (workspaceId) {
-      systemPrompt += `\n\nWorkspace ID actual: ${workspaceId}`;
-    }
-    
-    // Crear nuevo request con el body modificado para incluir system prompt
-    const modifiedBody = {
-      ...body,
-      systemPrompt,
-    };
-    
-    // Crear nuevo Request con el body modificado
-    const modifiedReq = new NextRequest(req.url, {
-      method: req.method,
-      headers: req.headers,
-      body: JSON.stringify(modifiedBody),
-    });
-
     const { handleRequest } = copilotRuntimeNextJSAppRouterEndpoint({
-      runtime,
-      serviceAdapter,
+      runtime: getRuntime(),
+      serviceAdapter: getGeminiAdapter(),
       endpoint: "/api/copilotkit",
     });
 
-    return handleRequest(modifiedReq);
+    return handleRequest(req);
   } catch (error) {
-    console.error("[CopilotKit] Error in POST handler:", error);
+    console.error("[CopilotKit] Error:", error);
     return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },

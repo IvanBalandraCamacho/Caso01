@@ -43,6 +43,7 @@ export interface UserPublic {
   full_name?: string | null;
   id: string;
   is_active: boolean;
+  profile_picture?: string | null;
   created_at: string; // ISO 8601 date-time
 }
 
@@ -54,6 +55,19 @@ export interface WorkspaceBase {
   name: string;
   description?: string | null;
   instructions?: string | null;
+  
+  // --- Strategic Fields (Fase 1) ---
+  country?: string | null;
+  client_company?: string | null;
+  operation_name?: string | null;
+  tvt?: number | null;
+  tech_stack?: string[] | null;
+  opportunity_type?: string | null;
+  estimated_price?: number | null;
+  estimated_time?: string | null;
+  resource_count?: number | null;
+  category?: string | null;
+  objective?: string | null;
 }
 
 export interface WorkspaceCreate extends WorkspaceBase { }
@@ -62,6 +76,19 @@ export interface WorkspaceUpdate {
   name?: string | null;
   description?: string | null;
   instructions?: string | null;
+  
+  // --- Strategic Fields (Fase 1) ---
+  country?: string | null;
+  client_company?: string | null;
+  operation_name?: string | null;
+  tvt?: number | null;
+  tech_stack?: string[] | null;
+  opportunity_type?: string | null;
+  estimated_price?: number | null;
+  estimated_time?: string | null;
+  resource_count?: number | null;
+  category?: string | null;
+  objective?: string | null;
 }
 
 export interface WorkspacePublic extends WorkspaceBase {
@@ -69,6 +96,15 @@ export interface WorkspacePublic extends WorkspaceBase {
   created_at: string; // ISO 8601 date-time
   is_active: boolean;
   default_conversation_id?: string | null;
+}
+
+/**
+ * Workspace health/completion status
+ */
+export interface WorkspaceHealth {
+  completion_percentage: number;
+  missing_sections: string[];
+  status: 'healthy' | 'incomplete' | 'needs_attention';
 }
 
 // ==============================================
@@ -116,6 +152,7 @@ export interface ChatRequest {
   query: string;
   conversation_id?: string | null;
   model?: string | null;
+  thinking_level?: 'OFF' | 'LOW' | 'MEDIUM' | 'HIGH' | null;
 }
 
 /**
@@ -278,6 +315,7 @@ export interface ConversationPublic {
   updated_at: string; // ISO 8601 date-time
   message_count: number; // default: 0
   has_proposal: boolean; // default: false
+  proposal_content?: string | null; // Markdown content of the generated proposal
 }
 
 // Alias for backwards compatibility
@@ -460,6 +498,17 @@ export interface QueryAnalysis {
 }
 
 // ==============================================
+// HEALTH & COMPLETION TYPES
+// ==============================================
+
+export interface WorkspaceHealth {
+  workspace_id: string;
+  percentage: number;
+  missing_sections: string[];
+  is_complete: boolean;
+}
+
+// ==============================================
 // TEAM SUGGESTION TYPES
 // ==============================================
 
@@ -476,4 +525,104 @@ export interface TeamSuggestionResponse {
   costo_total_mensual: number;
   costo_total_proyecto: number;
   cobertura_servicios: string[];
+}
+
+// ==============================================
+// MCP TALENT SEARCH TYPES
+// ==============================================
+
+/**
+ * Candidato encontrado en la busqueda de talento MCP
+ */
+export interface TalentCandidate {
+  nombre: string;
+  cargo: string;
+  certificacion: string;
+  institucion: string;
+  pais: string;
+  fecha_emision: string;
+  score: number;
+}
+
+/**
+ * Request para busqueda de talento
+ */
+export interface TalentSearchRequest {
+  consulta: string;
+  limit?: number;
+  pais?: string;  // Filtro opcional por pais
+}
+
+/**
+ * Response de busqueda de talento
+ */
+export interface TalentSearchResponse {
+  exito: boolean;
+  mensaje: string;
+  candidatos: TalentCandidate[];
+}
+
+/**
+ * Miembro del equipo para enriquecimiento
+ */
+export interface TeamMemberForEnrichment {
+  rol: string;
+  seniority?: string;
+  cantidad?: number;
+  skills?: string[];
+}
+
+/**
+ * Request para enriquecer equipo con candidatos
+ */
+export interface EnrichTeamRequest {
+  equipo_sugerido: TeamMemberForEnrichment[];
+  pais?: string;
+}
+
+/**
+ * Candidato sugerido para un rol
+ */
+export interface SuggestedCandidate {
+  nombre: string;
+  cargo_actual: string;
+  certificacion: string;
+  institucion: string;
+  pais: string;
+  match_score: number;
+}
+
+/**
+ * Miembro del equipo enriquecido con candidatos
+ */
+export interface EnrichedTeamMember {
+  rol: string;
+  seniority?: string;
+  cantidad: number;
+  skills: string[];
+  candidatos_sugeridos: SuggestedCandidate[];
+}
+
+/**
+ * Response de enriquecimiento de equipo
+ */
+export interface EnrichTeamResponse {
+  exito: boolean;
+  mensaje: string;
+  equipo_enriquecido: EnrichedTeamMember[];
+}
+
+/**
+ * Estadisticas de la base de talento
+ */
+export interface TalentStats {
+  exito: boolean;
+  estadisticas?: {
+    total_certificaciones: number;
+    total_colaboradores: number;
+    paises: Record<string, number>;
+    instituciones_top_10: Record<string, number>;
+    cargos_top_10: Record<string, number>;
+  };
+  mensaje?: string;
 }

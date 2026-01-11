@@ -5,27 +5,30 @@ import { ReactNode } from "react";
 
 interface CopilotProviderProps {
   children: ReactNode;
+  workspaceId?: string;
 }
 
 // Variable de entorno para habilitar/deshabilitar CopilotKit
-const COPILOT_ENABLED = process.env.NEXT_PUBLIC_COPILOT_ENABLED === "true";
+// Por defecto habilitado en desarrollo, explícitamente "false" lo deshabilita
+const COPILOT_ENABLED = process.env.NEXT_PUBLIC_COPILOT_ENABLED !== "false";
 
-export function CopilotProvider({ children }: CopilotProviderProps) {
+// URL del runtime - constante para evitar re-renders
+const RUNTIME_URL = "/api/copilotkit";
+
+export function CopilotProvider({ children, workspaceId }: CopilotProviderProps) {
   // Si CopilotKit está deshabilitado, renderizar solo los hijos
   if (!COPILOT_ENABLED) {
     return <>{children}</>;
   }
 
-  // Usar el API Route interno de Next.js que maneja el runtime de CopilotKit
-  // Esto evita problemas de CORS y red entre contenedores Docker
-  const runtimeUrl = "/api/copilotkit";
-
-  console.log("CopilotProvider initialized with runtimeUrl:", runtimeUrl);
+  // Configurar propiedades a enviar con cada request
+  const properties = workspaceId ? { workspace_id: workspaceId, workspaceId } : undefined;
 
   return (
     <CopilotKit 
-      runtimeUrl={runtimeUrl}
-      showDevConsole={process.env.NODE_ENV === "development"}
+      runtimeUrl={RUNTIME_URL}
+      showDevConsole={false}
+      properties={properties}
     >
       {children}
     </CopilotKit>

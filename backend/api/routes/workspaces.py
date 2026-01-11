@@ -47,6 +47,8 @@ from sqlalchemy.orm import Session
 
 limiter = Limiter(key_func=get_remote_address)
 
+from core.proposals_service import calculate_workspace_health
+
 router = APIRouter()
 
 # Configuración Redis para cache
@@ -324,6 +326,18 @@ def create_workspace(
         name=workspace_in.name,
         description=workspace_in.description,
         instructions=workspace_in.instructions,
+        # --- Strategic Fields (Fase 1) ---
+        country=workspace_in.country,
+        client_company=workspace_in.client_company,
+        operation_name=workspace_in.operation_name,
+        tvt=workspace_in.tvt,
+        tech_stack=workspace_in.tech_stack,
+        opportunity_type=workspace_in.opportunity_type,
+        estimated_price=workspace_in.estimated_price,
+        estimated_time=workspace_in.estimated_time,
+        resource_count=workspace_in.resource_count,
+        category=workspace_in.category,
+        objective=workspace_in.objective,
         owner_id=current_user.id,  # Asignar al usuario actual
     )
 
@@ -350,6 +364,18 @@ def create_workspace(
         name=db_workspace.name,
         description=db_workspace.description,
         instructions=db_workspace.instructions,
+        # --- Strategic Fields ---
+        country=db_workspace.country,
+        client_company=db_workspace.client_company,
+        operation_name=db_workspace.operation_name,
+        tvt=db_workspace.tvt,
+        tech_stack=db_workspace.tech_stack,
+        opportunity_type=db_workspace.opportunity_type,
+        estimated_price=db_workspace.estimated_price,
+        estimated_time=db_workspace.estimated_time,
+        resource_count=db_workspace.resource_count,
+        category=db_workspace.category,
+        objective=db_workspace.objective,
         created_at=db_workspace.created_at,
         is_active=db_workspace.is_active,
         default_conversation_id=db_conversation.id,
@@ -667,6 +693,7 @@ def get_workspace_documents(
     documents = (
         db.query(document_model.Document)
         .filter(document_model.Document.workspace_id == workspace_id)
+        .order_by(document_model.Document.created_at.desc())
         .all()
     )
 
@@ -1174,7 +1201,8 @@ async def chat_with_workspace(
                 relevant_chunks, 
                 chat_request.model, 
                 workspace_instructions,
-                chat_history=chat_history
+                chat_history=chat_history,
+                thinking_level=chat_request.thinking_level
             )
         elif intent == "REQUIREMENTS_MATRIX":
             response_stream = intention_task.requirements_matrix_chat(
@@ -1233,6 +1261,14 @@ async def chat_with_workspace(
                 content=full_response_text,
             )
             db_session.add(msg)
+            
+            # Si fue una propuesta, guardar el contenido en la conversación para persistencia
+            if intent == "GENERATE_PROPOSAL" and full_response_text:
+                conv = db_session.query(Conversation).filter(Conversation.id == conversation_id).first()
+                if conv:
+                    conv.proposal_content = full_response_text
+                    logger.info(f"✅ Propuesta guardada en conversation.proposal_content ({len(full_response_text)} chars)")
+            
             db_session.commit()
 
     return StreamingResponse(
@@ -1986,7 +2022,100 @@ def invalidate_cache(current_user: User = Depends(get_current_active_user)):
     return {"message": "Cache TIVIT invalidado correctamente"}
 
 
-@router.get("/llm/metrics", summary="Obtener métricas del sistema LLM optimizado")
+@router.get(
+
+
+    "/workspaces/{workspace_id}/health",
+
+
+    summary="Obtener salud/completitud del Workspace",
+
+
+)
+
+
+def get_workspace_health_endpoint(
+
+
+    workspace_id: str,
+
+
+    current_user: User = Depends(get_current_active_user),
+
+
+    db: Session = Depends(database.get_db),
+
+
+):
+
+
+    """
+
+
+    Calcula el porcentaje de completitud del workspace y lista campos faltantes.
+
+
+    """
+
+
+    # Verificar existencia y permisos
+
+
+    db_workspace = (
+
+
+        db.query(workspace_model.Workspace)
+
+
+        .filter(workspace_model.Workspace.id == workspace_id)
+
+
+        .first()
+
+
+    )
+
+
+
+
+
+    if not db_workspace:
+
+
+        raise HTTPException(status_code=404, detail="Workspace no encontrado.")
+
+
+
+
+
+    if db_workspace.owner_id != current_user.id:
+
+
+        raise HTTPException(status_code=403, detail="No autorizado.")
+
+
+
+
+
+    return calculate_workspace_health(db, workspace_id)
+
+
+
+
+
+
+
+
+@router.get(
+
+
+    "/llm/metrics", summary="Obtener métricas del sistema LLM optimizado"
+
+
+)
+
+
+
 def get_llm_metrics_endpoint(current_user: User = Depends(get_current_active_user)):
     """
     Obtiene métricas de rendimiento del sistema LLM optimizado.

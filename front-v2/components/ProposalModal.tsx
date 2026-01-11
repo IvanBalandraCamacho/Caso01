@@ -16,7 +16,7 @@ import {
   Tag,
   Divider,
   Alert,
-  message,
+  App,
 } from "antd";
 import {
   FileSearchOutlined,
@@ -45,6 +45,7 @@ export function ProposalModal({
   workspaceId,
   conversationId,
 }: ProposalModalProps) {
+  const { message } = App.useApp();
   const [form] = Form.useForm();
   const [currentStep, setCurrentStep] = useState(0);
   const [isAnalyzing, setIsAnalyzing] = useState(false);

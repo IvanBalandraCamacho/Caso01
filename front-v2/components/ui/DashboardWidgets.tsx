@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useState } from 'react'
-import { Card, Progress, Tag, Spin, message, Tooltip, Button, Input, DatePicker, TimePicker } from 'antd'
+import { Card, Progress, Tag, Spin, App, Tooltip, Button, Input, DatePicker, TimePicker } from 'antd'
 import { 
   CheckCircleOutlined, 
   ClockCircleOutlined, 
@@ -37,6 +37,7 @@ export function DashboardStats({
   token,
   autoFetch = false,
 }: DashboardStatsProps) {
+  const { message } = App.useApp()
   const [loading, setLoading] = useState(false)
   const [realData, setRealData] = useState<DashboardStatsData | null>(null)
 

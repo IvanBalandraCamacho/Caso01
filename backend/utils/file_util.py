@@ -168,7 +168,7 @@ class FileUtil:
         
         try:
             with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
-                content = await file.read() 
+                content = await file.read()
                 tmp_file.write(content)
                 tmp_path = tmp_file.name
             
