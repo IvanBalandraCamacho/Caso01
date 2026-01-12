@@ -23,8 +23,16 @@ from core.auth import (
     get_current_active_user
 )
 from core.config import settings
-import logging
 
+# --- AGREGAR ESTOS IMPORTS ---
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+from fastapi import Body
+from typing import Any
+import os
+# -----------------------------
+import logging
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "TU_CLIENT_ID_DE_GCP_CONSOLE")
 # Configurar logger
 logger = logging.getLogger(__name__)
 
@@ -392,3 +400,102 @@ async def upload_profile_picture(
     
     logger.info(f"Foto de perfil actualizada para: {current_user.email}")
     return current_user
+
+@router.post(
+    "/auth/login/google",
+    response_model=schemas.Token,
+    summary="Login con Google"
+)
+def google_login(
+    token_data: dict = Body(...), 
+    db: Session = Depends(database.get_db)
+):
+    """
+    Autentica un usuario usando un token de Google ID.
+    Si el usuario no existe, lo registra automáticamente.
+    """
+    token = token_data.get("token")
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Token no proporcionado"
+        )
+
+    try:
+        # 1. Validar el token con Google
+        # Si tienes problemas con el Audience, puedes poner None en lugar de GOOGLE_CLIENT_ID temporalmente para probar
+        idinfo = id_token.verify_oauth2_token(
+            token, 
+            google_requests.Request(), 
+            audience=GOOGLE_CLIENT_ID if GOOGLE_CLIENT_ID != "TU_CLIENT_ID_DE_GCP_CONSOLE" else None
+        )
+
+        # 2. Extraer info
+        email = idinfo.get('email')
+        if not email:
+            raise HTTPException(status_code=400, detail="El token de Google no contiene email")
+            
+        name = idinfo.get('name', '')
+        picture = idinfo.get('picture', '')
+
+        # 3. Buscar usuario en BD
+        user = db.query(User).filter(User.email == email).first()
+
+        if not user:
+            # === REGISTRO AUTOMÁTICO ===
+            logger.info(f"Registrando nuevo usuario vía Google: {email}")
+            user = User(
+                email=email,
+                full_name=name,
+                profile_picture=picture,
+                hashed_password=None,  # Clave: Sin contraseña
+                auth_provider="google", # Clave: Identificar origen
+                is_active=True
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        else:
+            # Actualizar datos si ya existe (Opcional, útil para mantener foto actualizada)
+            updated = False
+            if picture and user.profile_picture != picture and user.auth_provider == "google":
+                user.profile_picture = picture
+                updated = True
+            
+            # Si el usuario se registró por email antes, podemos linkearlo o dar error.
+            # Aquí asumimos que permitimos el login.
+            if updated:
+                db.commit()
+                db.refresh(user)
+
+        # 4. Generar Token JWT propio
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={
+                "sub": user.email, 
+                "user_id": user.id,
+                "first_name": user.full_name.split()[0] if user.full_name else "Usuario"
+            },
+            expires_delta=access_token_expires
+        )
+        
+        logger.info(f"Login Google exitoso para: {user.email}")
+        
+        # Retornamos estructura compatible con schemas.Token
+        return {
+            "access_token": access_token,
+            "token_type": "bearer"
+        }
+
+    except ValueError as e:
+        logger.error(f"Error validando token Google: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Token de Google inválido o expirado"
+        )
+    except Exception as e:
+        logger.error(f"Error general login google: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail="Error procesando login con Google"
+        )

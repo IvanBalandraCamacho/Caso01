@@ -172,7 +172,7 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
           </div>
         );
       }
-      return null;
+      return <></>; // CORRECCIÓN: Devolver Fragmento vacío en lugar de null
     },
     handler: async ({ fieldName, newValue }) => {
       return updateFieldHandler(fieldName, newValue);
@@ -205,7 +205,7 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
           </div>
         );
       }
-      return null;
+      return <></>; // CORRECCIÓN: Devolver Fragmento vacío en lugar de null
     },
     handler: async ({ updates }) => {
       console.log(`[CopilotAction] updateMultipleFields llamado:`, updates);
@@ -259,7 +259,7 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
           </div>
         );
       }
-      return null;
+      return <></>; // CORRECCIÓN: Devolver Fragmento vacío en lugar de null
     },
     handler: async ({ nombre, experiencia = "Por definir", rol = nombre }) => {
       console.log(`[CopilotAction] addTeamMember llamado: ${nombre}, ${experiencia}, ${rol}`);
@@ -307,7 +307,7 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
           </div>
         );
       }
-      return null;
+      return <></>; // CORRECCIÓN: Devolver Fragmento vacío en lugar de null
     },
     handler: async ({ technology }) => {
       console.log(`[CopilotAction] addTechnology llamado: ${technology}`);
@@ -331,7 +331,7 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
     },
   });
 
-  // Acción para agregar una pregunta sugerida
+  // Acción para agregar una pregunta sugerida (SIN RENDER, no requiere cambios, pero verifico)
   useCopilotAction({
     name: "addQuestion",
     description: "Agrega una pregunta a la lista de preguntas sugeridas para aclarar con el cliente",
@@ -359,7 +359,7 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
     },
   });
 
-  // Acción para limpiar/resetear un campo
+  // Acción para limpiar/resetear un campo (SIN RENDER, no requiere cambios)
   useCopilotAction({
     name: "clearField",
     description: "Limpia o resetea un campo específico",

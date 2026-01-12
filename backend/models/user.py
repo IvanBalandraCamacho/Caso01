@@ -1,45 +1,25 @@
-"""
-Modelo de Usuario para autenticación y autorización.
-
-Este módulo define el modelo User que se usa para:
-- Autenticación con JWT
-- Gestión de usuarios
-- Ownership de workspaces
-- Permisos y roles
-"""
-
+# backend/models/user.py
 from sqlalchemy import Column, String, Boolean, DateTime
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
 from .database import Base
 
-
 class User(Base):
-    """
-    Modelo de Usuario.
-    
-    Attributes:
-        id: UUID único del usuario
-        email: Email único del usuario (usado para login)
-        hashed_password: Contraseña hasheada con bcrypt
-        full_name: Nombre completo del usuario (opcional)
-        is_active: Si el usuario está activo (puede hacer login)
-        is_superuser: Si el usuario es administrador
-        created_at: Fecha de creación
-        updated_at: Fecha de última actualización
-        
-    Relationships:
-        workspaces: Lista de workspaces que posee el usuario
-    """
     __tablename__ = "users"
     
     # Campos principales
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     email = Column(String(255), unique=True, nullable=False, index=True)
-    hashed_password = Column(String(255), nullable=False)
+    
+    # CORRECCIÓN: nullable=True para permitir login con Google sin contraseña
+    hashed_password = Column(String(255), nullable=True)
+    
     full_name = Column(String(255), nullable=True)
-    profile_picture = Column(String(500), nullable=True)  # URL o path de la foto de perfil
+    profile_picture = Column(String(500), nullable=True)
+    
+    # Campo para saber si es "google" o "email"
+    auth_provider = Column(String(50), default="email", nullable=False)
     
     # Flags de estado
     is_active = Column(Boolean, default=True, nullable=False)

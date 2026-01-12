@@ -432,7 +432,7 @@ export default function ComplianceChecklist({ workspaceId, proposalContent, onRe
         styles={{
           body: { background: "#1A1A1A", padding: "24px", maxHeight: "80vh", overflowY: "auto" },
           header: { background: "#18181b", borderBottom: "1px solid #27272a" },
-          content: { background: "#1A1A1A" },
+          // CORRECCIÓN: Se eliminó la propiedad 'content' que causaba el error de TypeScript
         }}
       >
         {renderResumen()}

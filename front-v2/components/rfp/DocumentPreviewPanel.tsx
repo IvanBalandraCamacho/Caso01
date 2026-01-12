@@ -41,68 +41,69 @@ export default function DocumentPreviewPanel({
   const isImage = fileType?.toLowerCase().includes("image");
 
   // Componentes de markdown estilizados para preview
+  // CORRECCIÓN: Usamos 'any' en los props para evitar conflictos estrictos de TypeScript con react-markdown
   const markdownComponents = useMemo(() => ({
-    h1: ({ children }: { children: React.ReactNode }) => (
+    h1: ({ children }: any) => (
       <h1 className="text-2xl font-bold text-white mt-6 mb-4 border-b border-zinc-700 pb-2">
         {children}
       </h1>
     ),
-    h2: ({ children }: { children: React.ReactNode }) => (
+    h2: ({ children }: any) => (
       <h2 className="text-xl font-bold text-white mt-5 mb-3 text-[#E31837]">
         {children}
       </h2>
     ),
-    h3: ({ children }: { children: React.ReactNode }) => (
+    h3: ({ children }: any) => (
       <h3 className="text-lg font-semibold text-zinc-200 mt-4 mb-2">
         {children}
       </h3>
     ),
-    p: ({ children }: { children: React.ReactNode }) => (
+    p: ({ children }: any) => (
       <p className="text-zinc-300 leading-relaxed mb-4">
         {children}
       </p>
     ),
-    ul: ({ children }: { children: React.ReactNode }) => (
+    ul: ({ children }: any) => (
       <ul className="list-disc pl-6 mb-4 space-y-1 text-zinc-300">
         {children}
       </ul>
     ),
-    ol: ({ children }: { children: React.ReactNode }) => (
+    ol: ({ children }: any) => (
       <ol className="list-decimal pl-6 mb-4 space-y-1 text-zinc-300">
         {children}
       </ol>
     ),
-    table: ({ children }: { children: React.ReactNode }) => (
+    table: ({ children }: any) => (
       <div className="overflow-x-auto my-4 rounded-lg border border-zinc-700">
         <table className="w-full border-collapse bg-zinc-900/50 text-sm">
           {children}
         </table>
       </div>
     ),
-    thead: ({ children }: { children: React.ReactNode }) => (
+    thead: ({ children }: any) => (
       <thead className="bg-zinc-800 text-zinc-200">{children}</thead>
     ),
-    tbody: ({ children }: { children: React.ReactNode }) => (
+    tbody: ({ children }: any) => (
       <tbody className="divide-y divide-zinc-700">{children}</tbody>
     ),
-    tr: ({ children }: { children: React.ReactNode }) => (
+    tr: ({ children }: any) => (
       <tr className="hover:bg-zinc-800/50 transition-colors">{children}</tr>
     ),
-    th: ({ children }: { children: React.ReactNode }) => (
+    th: ({ children }: any) => (
       <th className="px-4 py-3 text-left font-semibold text-zinc-200">{children}</th>
     ),
-    td: ({ children }: { children: React.ReactNode }) => (
+    td: ({ children }: any) => (
       <td className="px-4 py-3 text-zinc-400">{children}</td>
     ),
-    strong: ({ children }: { children: React.ReactNode }) => (
+    strong: ({ children }: any) => (
       <strong className="text-white font-semibold">{children}</strong>
     ),
-    blockquote: ({ children }: { children: React.ReactNode }) => (
+    blockquote: ({ children }: any) => (
       <blockquote className="border-l-4 border-[#E31837] pl-4 my-4 italic text-zinc-400 bg-zinc-900/30 py-2 rounded-r">
         {children}
       </blockquote>
     ),
-    code: ({ className, children }: { className?: string; children: React.ReactNode }) => {
+    code: ({ className, children }: any) => {
       const isInline = !className;
       return isInline ? (
         <code className="bg-zinc-800 text-orange-400 px-1.5 py-0.5 rounded text-sm font-mono">
@@ -235,7 +236,7 @@ export default function DocumentPreviewPanel({
            styles={{
              body: { background: "#131314", padding: "0", height: isFullscreen ? "calc(100vh - 110px)" : "70vh", overflow: "hidden" },
              header: { background: "#1A1A1C", borderBottom: "1px solid #2A2A2D", padding: "16px 24px" },
-             content: { background: "#131314" }
+             // CORRECCIÓN: Se eliminó la propiedad 'content' que causaba el error de TypeScript
            }}
            footer={
              <div className="flex justify-between items-center bg-[#1A1A1C] p-4 border-t border-zinc-800">

@@ -36,3 +36,5 @@ python-pptx
 pypdf
 pdfplumber
 reportlab
+google-auth
+requests
