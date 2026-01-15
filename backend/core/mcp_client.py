@@ -75,7 +75,7 @@ class MCPTalentClient:
             base_url: URL base del servicio MCP
             timeout: Timeout en segundos para requests HTTP
         """
-        self.base_url = (base_url or getattr(settings, 'MCP_SERVICE_URL', 'http://mcp-server:8083')).rstrip('/')
+        self.base_url = (base_url or getattr(settings, 'MCP_SERVICE_URL', 'https://mcp-tivit.eastus2.cloudapp.azure.com')).rstrip('/')
         self.timeout = timeout
         self._client: Optional[httpx.AsyncClient] = None
         self._enabled = getattr(settings, 'MCP_SERVICE_ENABLED', True)
@@ -299,7 +299,7 @@ class MCPTalentClient:
 # ============================================================================
 
 mcp_talent_client = MCPTalentClient(
-    base_url=getattr(settings, 'MCP_SERVICE_URL', 'http://mcp-server:8083'),
+    base_url=getattr(settings, 'MCP_SERVICE_URL', 'https://mcp-tivit.eastus2.cloudapp.azure.com'),
     timeout=30.0
 )
 

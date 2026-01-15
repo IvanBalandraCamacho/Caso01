@@ -105,7 +105,7 @@ class Settings(BaseSettings):
     # ========================================================================
     # MCP TALENT SERVICE
     # ========================================================================
-    MCP_SERVICE_URL: str = "http://mcp-server:8083"
+    MCP_SERVICE_URL: str = "https://mcp-tivit.eastus2.cloudapp.azure.com"
     MCP_SERVICE_ENABLED: bool = True
     MCP_SERVICE_TIMEOUT: float = 30.0
     
