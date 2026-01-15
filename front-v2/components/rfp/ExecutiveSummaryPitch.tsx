@@ -8,7 +8,7 @@ import {
   ReloadOutlined,
   MailOutlined,
   LinkedinOutlined,
-  PresentationOutlined,
+  FundProjectionScreenOutlined,
   ExpandOutlined,
   CheckCircleOutlined,
 } from "@ant-design/icons";
@@ -227,7 +227,7 @@ export default function ExecutiveSummaryPitch({ extractedData }: Props) {
         key: "presentacion",
         label: (
           <span className="flex items-center gap-2">
-            <PresentationOutlined /> Presentacion
+            <FundProjectionScreenOutlined /> Presentacion
           </span>
         ),
         children: (
@@ -363,7 +363,6 @@ export default function ExecutiveSummaryPitch({ extractedData }: Props) {
         styles={{
           body: { background: "#1A1A1A", padding: "24px", maxHeight: "80vh", overflowY: "auto" },
           header: { background: "#18181b", borderBottom: "1px solid #27272a" },
-          content: { background: "#1A1A1A" },
         }}
       >
         {renderPitchSection()}

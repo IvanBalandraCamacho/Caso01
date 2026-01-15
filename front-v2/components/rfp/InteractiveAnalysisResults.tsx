@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Table, Card, Tabs, Tag, Button, Space, Tooltip, App, Modal, Spin, Collapse } from "antd";
+import { Table, Card, Tabs, Tag, Button, Space, Tooltip, App, Modal, Spin, Collapse, Input } from "antd";
 import { 
   CopyOutlined, 
   EditOutlined, 
@@ -14,7 +14,11 @@ import {
   CodeOutlined,
   SearchOutlined,
   UserOutlined,
-  SafetyCertificateOutlined
+  SafetyCertificateOutlined,
+  CheckOutlined,
+  CloseOutlined,
+  PlusOutlined,
+  DeleteOutlined
 } from "@ant-design/icons";
 import { useCopilotAction, useCopilotReadable } from "@copilotkit/react-core";
 import { enrichTeamWithCandidates, searchTalent } from "@/lib/api";
@@ -42,6 +46,7 @@ interface TeamMember {
 interface AnalysisResult {
   cliente: string;
   pais?: string;
+  tvt?: string; // ID de propuesta comercial (puede iniciar con 0)
   alcance_economico: {
     presupuesto: string;
     moneda: string;
@@ -74,6 +79,126 @@ export function InteractiveAnalysisResults({
   const [localResult, setLocalResult] = useState(result);
   const [isEnrichingTeam, setIsEnrichingTeam] = useState(false);
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
+  
+  // Estados para edición de campos
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState<string>("");
+  const [newTechInput, setNewTechInput] = useState<string>("");
+  const [showAddTech, setShowAddTech] = useState(false);
+
+  // Funciones para manejar edición de campos
+  const startEditing = (field: string, currentValue: string) => {
+    setEditingField(field);
+    setEditValue(currentValue || "");
+  };
+
+  const cancelEditing = () => {
+    setEditingField(null);
+    setEditValue("");
+  };
+
+  const saveField = (field: string) => {
+    if (field === "cliente") {
+      setLocalResult(prev => ({ ...prev, cliente: editValue }));
+    } else if (field === "pais") {
+      setLocalResult(prev => ({ ...prev, pais: editValue }));
+    } else if (field === "tvt") {
+      setLocalResult(prev => ({ ...prev, tvt: editValue }));
+    } else if (field === "presupuesto") {
+      setLocalResult(prev => ({
+        ...prev,
+        alcance_economico: { ...prev.alcance_economico, presupuesto: editValue }
+      }));
+    } else if (field === "moneda") {
+      setLocalResult(prev => ({
+        ...prev,
+        alcance_economico: { ...prev.alcance_economico, moneda: editValue }
+      }));
+    }
+    setEditingField(null);
+    setEditValue("");
+    message.success(`Campo "${field}" actualizado`);
+  };
+
+  // Funciones para manejar tecnologías
+  const addTechnology = () => {
+    if (newTechInput.trim()) {
+      setLocalResult(prev => ({
+        ...prev,
+        tecnologias_requeridas: [...(prev.tecnologias_requeridas || []), newTechInput.trim()]
+      }));
+      setNewTechInput("");
+      setShowAddTech(false);
+      message.success("Tecnología agregada");
+    }
+  };
+
+  const removeTechnology = (techToRemove: string) => {
+    setLocalResult(prev => ({
+      ...prev,
+      tecnologias_requeridas: (prev.tecnologias_requeridas || []).filter(t => t !== techToRemove)
+    }));
+    message.success("Tecnología eliminada");
+  };
+
+  // Componente reutilizable para campo editable
+  const EditableField = ({ 
+    field, 
+    value, 
+    label, 
+    className = "" 
+  }: { 
+    field: string; 
+    value: string; 
+    label?: string;
+    className?: string;
+  }) => {
+    const isEditing = editingField === field;
+    
+    if (isEditing) {
+      return (
+        <div className="flex items-center gap-2">
+          <Input
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onPressEnter={() => saveField(field)}
+            autoFocus
+            className="flex-1"
+            size="small"
+          />
+          <Button
+            type="text"
+            icon={<CheckOutlined />}
+            size="small"
+            onClick={() => saveField(field)}
+            className="text-green-500 hover:text-green-400"
+          />
+          <Button
+            type="text"
+            icon={<CloseOutlined />}
+            size="small"
+            onClick={cancelEditing}
+            className="text-red-500 hover:text-red-400"
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-center gap-2 group">
+        <span className={className}>{value || "Sin definir"}</span>
+        <Tooltip title="Editar">
+          <Button
+            type="text"
+            icon={<EditOutlined />}
+            size="small"
+            onClick={() => startEditing(field, value)}
+            className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-white"
+          />
+        </Tooltip>
+      </div>
+    );
+  };
 
   // Hacer los datos accesibles a CopilotKit
   useCopilotReadable({
@@ -376,7 +501,7 @@ export function InteractiveAnalysisResults({
     <div className="bg-zinc-900/50 p-4 rounded-lg">
       <h4 className="text-white font-medium mb-3 flex items-center gap-2">
         <SafetyCertificateOutlined className="text-green-500" />
-        Candidatos Sugeridos del Capital Intelectual
+        Candidatos Sugeridos de Census TIVIT
       </h4>
       <div className="grid gap-3">
         {candidatos.map((c, idx) => (
@@ -414,40 +539,180 @@ export function InteractiveAnalysisResults({
       label: (
         <span className="flex items-center gap-2">
           <DollarOutlined />
-          Resumen General
+          Información del RFP
         </span>
       ),
       children: (
         <div className="space-y-6">
-          {/* Cards de KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* TVT - Campo destacado nuevo */}
+          <Card className="bg-red-900/20 border-red-500/30">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-red-400 text-xs font-bold uppercase tracking-wide mb-1">
+                  TVT (ID Propuesta Comercial)
+                </p>
+                <EditableField 
+                  field="tvt" 
+                  value={localResult.tvt || ""} 
+                  className="text-white text-xl font-bold font-mono"
+                />
+                <p className="text-zinc-500 text-xs mt-1">
+                  Puede contener números que inicien con 0
+                </p>
+              </div>
+            </div>
+          </Card>
+
+          {/* Cards de KPIs editables */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Cliente - Editable */}
             <Card className="bg-blue-900/20 border-blue-500/30">
-              <div className="text-center">
-                <p className="text-zinc-400 text-sm mb-1">Cliente</p>
-                <h3 className="text-white text-xl font-bold">{localResult.cliente}</h3>
+              <div>
+                <p className="text-zinc-400 text-sm mb-1 flex items-center gap-1">
+                  Cliente
+                  <EditOutlined className="text-xs text-blue-400" />
+                </p>
+                <EditableField 
+                  field="cliente" 
+                  value={localResult.cliente} 
+                  className="text-white text-lg font-bold"
+                />
               </div>
             </Card>
+
+            {/* País - Editable */}
+            <Card className="bg-cyan-900/20 border-cyan-500/30">
+              <div>
+                <p className="text-zinc-400 text-sm mb-1 flex items-center gap-1">
+                  País
+                  <EditOutlined className="text-xs text-cyan-400" />
+                </p>
+                <EditableField 
+                  field="pais" 
+                  value={localResult.pais || ""} 
+                  className="text-cyan-400 text-lg font-bold"
+                />
+              </div>
+            </Card>
+
+            {/* Presupuesto - Editable */}
             <Card className="bg-emerald-900/20 border-emerald-500/30">
-              <div className="text-center">
-                <p className="text-zinc-400 text-sm mb-1">Presupuesto</p>
-                <h3 className="text-emerald-400 text-xl font-bold font-mono">
-                  {localResult.alcance_economico?.moneda?.split('(')[0]?.trim()} {localResult.alcance_economico?.presupuesto}
-                </h3>
+              <div>
+                <p className="text-zinc-400 text-sm mb-1 flex items-center gap-1">
+                  Presupuesto
+                  <EditOutlined className="text-xs text-emerald-400" />
+                </p>
+                <div className="flex items-center gap-2">
+                  <EditableField 
+                    field="moneda" 
+                    value={localResult.alcance_economico?.moneda?.split('(')[0]?.trim() || "USD"} 
+                    className="text-emerald-400 text-lg font-bold"
+                  />
+                  <EditableField 
+                    field="presupuesto" 
+                    value={localResult.alcance_economico?.presupuesto || ""} 
+                    className="text-emerald-400 text-lg font-bold font-mono"
+                  />
+                </div>
               </div>
             </Card>
+
+            {/* Equipo - Solo lectura */}
             <Card className="bg-purple-900/20 border-purple-500/30">
-              <div className="text-center">
+              <div>
                 <p className="text-zinc-400 text-sm mb-1">Equipo Sugerido</p>
-                <h3 className="text-purple-400 text-xl font-bold">
+                <h3 className="text-purple-400 text-lg font-bold">
                   {localResult.equipo_sugerido?.length || 0} roles
                 </h3>
               </div>
             </Card>
           </div>
 
-          {/* Objetivo */}
+          {/* Stack Tecnológico - Editable */}
+          <Card 
+            title={
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 text-white">
+                  <CodeOutlined className="text-cyan-400" />
+                  Stack Tecnológico
+                  <EditOutlined className="text-xs text-cyan-400" />
+                </span>
+                <Button
+                  type="primary"
+                  size="small"
+                  icon={<PlusOutlined />}
+                  onClick={() => setShowAddTech(true)}
+                  className="bg-cyan-600 hover:bg-cyan-700"
+                >
+                  Agregar
+                </Button>
+              </div>
+            } 
+            className="bg-zinc-900/40 border-zinc-800"
+          >
+            {/* Input para agregar nueva tecnología */}
+            {showAddTech && (
+              <div className="flex items-center gap-2 mb-4 p-3 bg-cyan-900/20 rounded-lg border border-cyan-500/30">
+                <Input
+                  value={newTechInput}
+                  onChange={(e) => setNewTechInput(e.target.value)}
+                  onPressEnter={addTechnology}
+                  placeholder="Escribe el nombre de la tecnología..."
+                  autoFocus
+                  className="flex-1"
+                />
+                <Button
+                  type="primary"
+                  icon={<CheckOutlined />}
+                  onClick={addTechnology}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  Agregar
+                </Button>
+                <Button
+                  icon={<CloseOutlined />}
+                  onClick={() => {
+                    setShowAddTech(false);
+                    setNewTechInput("");
+                  }}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            )}
+            
+            <div className="flex flex-wrap gap-3">
+              {localResult.tecnologias_requeridas?.map((tech, i) => (
+                <Tag 
+                  key={i} 
+                  color="cyan" 
+                  className="text-base px-4 py-2 cursor-pointer hover:scale-105 transition-transform group"
+                  closable
+                  onClose={(e) => {
+                    e.preventDefault();
+                    removeTechnology(tech);
+                  }}
+                >
+                  {tech}
+                </Tag>
+              ))}
+              {(!localResult.tecnologias_requeridas || localResult.tecnologias_requeridas.length === 0) && (
+                <p className="text-zinc-500">No hay tecnologías definidas. Haz clic en "Agregar" para añadir.</p>
+              )}
+            </div>
+          </Card>
+
+          {/* Objetivo - Solo lectura (Resumen) */}
           {localResult.objetivo_general?.length > 0 && (
-            <Card title="Objetivo del Proyecto" className="bg-zinc-900/40 border-zinc-800">
+            <Card 
+              title={
+                <span className="text-white">
+                  Resumen / Objetivo del Proyecto
+                  <Tag color="default" className="ml-2 text-xs">Solo lectura</Tag>
+                </span>
+              } 
+              className="bg-zinc-900/40 border-zinc-800"
+            >
               {localResult.objetivo_general.map((obj, i) => (
                 <p key={i} className="text-zinc-200 mb-2">{obj}</p>
               ))}
@@ -480,23 +745,50 @@ export function InteractiveAnalysisResults({
         <span className="flex items-center gap-2">
           <CodeOutlined />
           Tecnologías ({localResult.tecnologias_requeridas?.length || 0})
+          <EditOutlined className="text-xs text-cyan-400" />
         </span>
       ),
       children: (
-        <div className="flex flex-wrap gap-3">
-          {localResult.tecnologias_requeridas?.map((tech, i) => (
-            <Tag 
-              key={i} 
-              color="cyan" 
-              className="text-base px-4 py-2 cursor-pointer hover:scale-105 transition-transform"
-              onClick={() => {
-                navigator.clipboard.writeText(tech);
-                message.success(`"${tech}" copiado`);
-              }}
+        <div className="space-y-4">
+          {/* Input para agregar nueva tecnología */}
+          <div className="flex items-center gap-2">
+            <Input
+              value={newTechInput}
+              onChange={(e) => setNewTechInput(e.target.value)}
+              onPressEnter={addTechnology}
+              placeholder="Agregar nueva tecnología..."
+              className="max-w-md"
+            />
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={addTechnology}
+              disabled={!newTechInput.trim()}
+              className="bg-cyan-600 hover:bg-cyan-700"
             >
-              {tech}
-            </Tag>
-          ))}
+              Agregar
+            </Button>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            {localResult.tecnologias_requeridas?.map((tech, i) => (
+              <Tag 
+                key={i} 
+                color="cyan" 
+                className="text-base px-4 py-2 cursor-pointer hover:scale-105 transition-transform"
+                closable
+                onClose={(e) => {
+                  e.preventDefault();
+                  removeTechnology(tech);
+                }}
+              >
+                {tech}
+              </Tag>
+            ))}
+            {(!localResult.tecnologias_requeridas || localResult.tecnologias_requeridas.length === 0) && (
+              <p className="text-zinc-500">No hay tecnologías definidas.</p>
+            )}
+          </div>
         </div>
       ),
     },
@@ -515,7 +807,7 @@ export function InteractiveAnalysisResults({
           <div className="flex justify-between items-center">
             <p className="text-zinc-400 text-sm">
               {hasEnrichedCandidates 
-                ? "Equipo enriquecido con candidatos del Capital Intelectual" 
+                ? "Equipo enriquecido con candidatos de Census TIVIT" 
                 : "Busca candidatos reales en la base de talento de TIVIT"
               }
             </p>

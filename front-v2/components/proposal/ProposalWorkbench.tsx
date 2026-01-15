@@ -172,7 +172,7 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
           </div>
         );
       }
-      return null;
+      return <></>;
     },
     handler: async ({ fieldName, newValue }) => {
       return updateFieldHandler(fieldName, newValue);
@@ -205,7 +205,7 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
           </div>
         );
       }
-      return null;
+      return <></>;
     },
     handler: async ({ updates }) => {
       console.log(`[CopilotAction] updateMultipleFields llamado:`, updates);
@@ -259,7 +259,7 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
           </div>
         );
       }
-      return null;
+      return <></>;
     },
     handler: async ({ nombre, experiencia = "Por definir", rol = nombre }) => {
       console.log(`[CopilotAction] addTeamMember llamado: ${nombre}, ${experiencia}, ${rol}`);
@@ -307,7 +307,7 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
           </div>
         );
       }
-      return null;
+      return <></>;
     },
     handler: async ({ technology }) => {
       console.log(`[CopilotAction] addTechnology llamado: ${technology}`);
@@ -674,9 +674,14 @@ export default function ProposalWorkbench({ workspaceId, initialData, onClose }:
             <div className="flex-1 relative custom-copilot-wrapper">
  <CopilotChat 
                   className="h-full w-full border-none shadow-none"
-                  instructions={`Eres un asistente de edición de propuestas. SIEMPRE usa las acciones disponibles para modificar datos.
+                  instructions={`Eres un asistente de análisis de RFPs y edición de propuestas de TIVIT. 
+Tienes acceso al documento RFP del workspace actual vía búsqueda RAG.
 
-ACCIONES DISPONIBLES:
+CAPACIDADES:
+1. CONSULTAR EL DOCUMENTO: Puedes buscar y responder preguntas sobre el contenido del RFP/documento cargado.
+2. EDITAR DATOS: Usa las acciones disponibles para modificar los campos de la propuesta.
+
+ACCIONES DISPONIBLES PARA EDICIÓN:
 - updateField(fieldName, newValue): Cambia un campo específico
 - addTeamMember(nombre, experiencia, rol): Agrega persona al equipo  
 - addTechnology(technology): Agrega tecnología al stack
@@ -685,14 +690,16 @@ ACCIONES DISPONIBLES:
 EJEMPLOS DE USO:
 - "El cliente es Banco Nacional" → updateField("cliente", "Banco Nacional")
 - "El presupuesto es 500000" → updateField("tvt", "500000")
-- "País: México" → updateField("pais", "México")
-- "Agrega React y Node" → updateField("stack_tecnologico", "React, Node")
-- "Agrega un Tech Lead senior" → addTeamMember("Tech Lead", "Senior", "Líder técnico")
+- "¿Cuál es el alcance del proyecto?" → Busca en el documento y responde
+- "¿Qué tecnologías piden?" → Busca en el documento y responde
 
-REGLA: Cuando el usuario mencione un valor para un campo, EJECUTA la acción inmediatamente. NO respondas solo con texto.`}
+REGLAS IMPORTANTES:
+1. Cuando el usuario mencione un valor para un campo, EJECUTA la acción inmediatamente.
+2. Cuando busques información, si NO encuentras datos específicos en el documento, informa: "No encontré esta información en el documento. Te recomiendo verificarlo manualmente."
+3. Para respuestas basadas en búsqueda del documento (no modificaciones), agrega al final: "⚠️ Verifica esta información en el documento original, la IA puede cometer errores."`}
                   labels={{
-                    title: "Asistente",
-                    initial: "Puedo editar los datos. Dime qué cambiar: cliente, presupuesto, país, tecnologías, equipo...",
+                    title: "Asistente RFP",
+                    initial: "¡Hola! Puedo ayudarte a:\n• Consultar información del RFP cargado\n• Editar datos de la propuesta (cliente, presupuesto, tecnologías, equipo...)\n\n¿Qué necesitas?",
                   }}
                />
            </div>
